@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsArbitraryLoads</key>
+            <true/>
+        </dict>
+        <key>NSBonjourServices</key>
+        <array>
+            <string>_stackchan-mpc._tcp</string>
+        </array>
+        <key>com.apple.developer.networking.wifi-info</key>
+        <true/>
+        
+        <key>NSLocalNetworkUsageDescription</key>
+        <string>This app requires access to the local network to communicate with devices.</string>
+        <key>NSMicrophoneUsageDescription</key>
+        <string>We need access to the microphone to capture audio data.</string>
+        <key>ITSAppUsesNonExemptEncryption</key>
+        <false/>
+        <key>CFBundleDisplayName</key>
+        <string>StackChan World</string>
+        
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>Save the photo to the album</string>
+    </dict>
+</plist>

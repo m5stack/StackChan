@@ -1,1 +1,0 @@
-# StackChan iOS App
