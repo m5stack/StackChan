@@ -1,0 +1,15 @@
+# https://goframe.org/docs/web/server-config-file-template
+server:
+  address:     ":12800"
+#  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+# https://goframe.org/docs/core/glog-config
+logger:
+  level : "all"
+  stdout: true
+
+# https://goframe.org/docs/core/gdb-config-file
+database:
+  default:
+    link: "sqlite::@file(/stackChan.sqlite)"
