@@ -1,0 +1,37 @@
+[
+    {
+        "url": "https://github.com/Forairaaaaa/mooncake.git",
+        "path": "components/mooncake",
+        "branch": "main"
+    },
+    {
+        "url": "https://github.com/Forairaaaaa/mooncake_log.git",
+        "path": "components/mooncake_log",
+        "branch": "main"
+    },
+    {
+        "url": "https://github.com/Forairaaaaa/smooth_ui_toolkit.git",
+        "path": "components/smooth_ui_toolkit",
+        "branch": "main"
+    },
+    {
+        "url": "https://github.com/78/xiaozhi-esp32.git",
+        "path": "xiaozhi-esp32",
+        "branch": "92de37e182067db093c73057a9aa08e21e59cb33"
+    },
+    {
+        "url": "https://github.com/bblanchon/ArduinoJson.git",
+        "path": "components/ArduinoJson",
+        "branch": "v7.4.2"
+    },
+    {
+        "url": "https://github.com/espressif/esp-now.git",
+        "path": "components/esp-now",
+        "branch": "c33383de97f3ed2fc52117f5ef04f71990432e5d"
+    },
+    {
+        "url": "https://github.com/espressif/esp-sr",
+        "path": "components/espressif__esp-sr",
+        "branch": "8adb700e780cbd6c7743717c35ebfcf08f943526"
+    }
+]

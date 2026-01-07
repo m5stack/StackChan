@@ -1,0 +1,67 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# MacOS desktop metadata files
+.DS_Store
+
+# Build files
+build/
+cmake-build-*/
+/components/
+managed_components/
+
+# PlatformIO
+.pio/
+
+# VSCode
+.vscode/
+.cache/
+
+# Python virtual environment
+.venv/
+
+# Debug / Release files
+Debug/
+debug/
+Release/
+release/
+out/
+bin/
+obj/
+
+*.code-workspace
+
+sdkconfig
+sdkconfig.old
+
+xiaozhi-esp32/
