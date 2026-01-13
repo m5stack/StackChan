@@ -6,6 +6,7 @@
 #include "hal.h"
 #include <stackchan/stackchan.h>
 #include "board/hal_bridge.h"
+#include <mooncake.h>
 #include <mooncake_log.h>
 #include <board.h>
 #include <web_socket.h>
@@ -21,11 +22,13 @@
 #include <esp_heap_caps.h>
 #include <display.h>
 #include <lvgl_image.h>
+#include <wifi_manager.h>
 #include "utils/jpeg_to_image/jpeg_decoder.h"
 
 static std::string _tag = "WS-Avatar";
 
-static const std::string _server                  = "ws://target-server:12800";
+static const std::string _server = "ws://47.113.125.164:12800";
+// static const std::string _server                  = "ws://192.168.51.58:12800";
 static const std::string _setting_ns              = "stackchan";
 static const std::string _setting_device_name_key = "device_name";
 
@@ -110,10 +113,15 @@ public:
         // 设置回调
         _websocket->OnConnected([this]() {
             ESP_LOGI(_tag.c_str(), "Connected to server!");
+            // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Server connected");
+            _last_heartbeat_time = GetHAL().millis();
             _websocket->Send("{\"type\":\"hello\", \"msg\":\"Hello from StackChan!\"}");
         });
 
-        _websocket->OnDisconnected([this]() { ESP_LOGI(_tag.c_str(), "Disconnected!"); });
+        _websocket->OnDisconnected([this]() {
+            ESP_LOGI(_tag.c_str(), "Disconnected!");
+            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Server disconnected");
+        });
 
         _websocket->OnData([this](const char* data, size_t len, bool binary) {
             std::lock_guard<std::mutex> lock(_mutex);
@@ -121,8 +129,10 @@ public:
         });
 
         ESP_LOGI(_tag.c_str(), "Connecting to %s...", _url.c_str());
+        // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Connecting to server...");
         if (!_websocket->Connect(_url.c_str())) {
             ESP_LOGE(_tag.c_str(), "Failed to connect");
+            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Connect to server Failed");
         }
         _last_reconnect_attempt = GetHAL().millis();
     }
@@ -139,6 +149,14 @@ public:
             }
         } else {
             processMessages();
+
+            // Check heartbeat timeout
+            if (GetHAL().millis() - _last_heartbeat_time > 10000) {
+                ESP_LOGE(_tag.c_str(), "Heartbeat timeout!");
+                GetHAL().onWsLog.emit(CommonLogLevel::Error, "Heartbeat Timeout");
+                _last_heartbeat_time = GetHAL().millis();
+                return;
+            }
         }
 
         if (_is_streaming) {
@@ -239,6 +257,7 @@ public:
                 }
                 case DataType::HeartbeatPing: {
                     ESP_LOGI(_tag.c_str(), "HeartbeatPing");
+                    _last_heartbeat_time = GetHAL().millis();
                     sendPacket(DataType::HeartbeatPong, nullptr, 0);
                     break;
                 }
@@ -389,6 +408,7 @@ private:
     std::string _url;
     uint32_t _last_reconnect_attempt = 0;
     uint32_t _last_capture_time      = 0;
+    uint32_t _last_heartbeat_time    = 0;
     bool _is_streaming               = false;
     bool _is_video_mode              = false;
     std::mutex _mutex;
@@ -423,6 +443,9 @@ private:
             packet.insert(packet.end(), data, data + len);
         }
 
+        // _interval = esp_timer_get_time() - _time_count;
+        // mclog::info("pack time: {} ms, size: {}", _interval / 1000, packet.size());
+
         // _time_count = esp_timer_get_time();
         _websocket->Send(packet.data(), packet.size(), true);
         _interval = esp_timer_get_time() - _time_count;
@@ -430,29 +453,90 @@ private:
     }
 };
 
-static void _websocket_task(void* param)
-{
-    ESP_LOGI(_tag.c_str(), "Start WebSocket Avatar Task");
-
-    // 等待网络连接
-    while (!WifiStation::GetInstance().IsConnected()) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+class WebsocketAvatarWorker : public mooncake::BasicAbility {
+public:
+    void onCreate() override
+    {
+        _service = std::make_unique<WebSocketAvatar>();
+        _service->init();
     }
-    ESP_LOGI(_tag.c_str(), "Network connected!");
 
-    static WebSocketAvatar ws_avatar;
-    ws_avatar.init();
-
-    while (true) {
-        ws_avatar.update();
-        GetHAL().delay(20);
+    void onRunning() override
+    {
+        if (GetHAL().millis() - _last_tick < 20) {
+            return;
+        }
+        _last_tick = GetHAL().millis();
+        _service->update();
     }
-}
 
-void Hal::startWebSocketAvatar()
+    void onDestroy() override
+    {
+        _service.reset();
+    }
+
+private:
+    std::unique_ptr<WebSocketAvatar> _service;
+    uint32_t _last_tick = 0;
+};
+
+void Hal::startWebSocketAvatarService(std::function<void(std::string_view)> onStartLog)
 {
+    mclog::tagInfo(_tag, "start websocket avatar service");
+
+    std::atomic<bool> network_connected = false;
+
     auto& board = Board::GetInstance();
+    mclog::tagInfo(_tag, "start and wait for network connected...");
+    board.SetNetworkEventCallback([&network_connected, &onStartLog](NetworkEvent event, const std::string& data) {
+        switch (event) {
+            case NetworkEvent::Scanning:
+                onStartLog("WiFi scanning...");
+                break;
+            case NetworkEvent::Connecting: {
+                if (data.empty()) {
+                    onStartLog("WiFi Connecting...");
+                } else {
+                    onStartLog(fmt::format("Connecting to {} ...", data));
+                }
+                break;
+            }
+            case NetworkEvent::Connected: {
+                network_connected = true;
+                break;
+            }
+            case NetworkEvent::Disconnected:
+                break;
+            case NetworkEvent::WifiConfigModeEnter: {
+                auto& wifi_manager = WifiManager::GetInstance();
+                auto msg = fmt::format("Enter WiFi config mode. Hotspot: {}, Config URL: {}", wifi_manager.GetApSsid(),
+                                       wifi_manager.GetApWebUrl());
+                onStartLog(msg);
+                break;
+            }
+            case NetworkEvent::WifiConfigModeExit:
+                // WiFi config mode exit is handled by WifiBoard internally
+                break;
+            // Cellular modem specific events
+            case NetworkEvent::ModemDetecting:
+                break;
+            case NetworkEvent::ModemErrorNoSim:
+                break;
+            case NetworkEvent::ModemErrorRegDenied:
+                break;
+            case NetworkEvent::ModemErrorInitFailed:
+                break;
+            case NetworkEvent::ModemErrorTimeout:
+                break;
+        }
+    });
     board.StartNetwork();
 
-    xTaskCreate(_websocket_task, "ws_avatar_task", 8192, NULL, 5, NULL);
+    while (!network_connected) {
+        GetHAL().delay(500);
+    }
+    mclog::tagInfo(_tag, "network connected");
+    board.SetNetworkEventCallback(nullptr);
+
+    mooncake::GetMooncake().extensionManager()->createAbility(std::make_unique<WebsocketAvatarWorker>());
 }

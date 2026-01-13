@@ -10,7 +10,7 @@
 #include <mooncake_log.h>
 #include <memory>
 
-static const std::string _tag = "HAL-IMU";
+static const std::string_view _tag = "HAL-IMU";
 
 static std::unique_ptr<BMI270> _bmi270;
 

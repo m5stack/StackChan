@@ -53,7 +53,7 @@ public:
         return angle;
     }
 
-    bool isMoving() override
+    bool is_moving_impl() override
     {
         int moving = _scs_bus.ReadMove(_id);
         // mclog::tagInfo(_tag, "id: {} moving: {}", _id, moving);

@@ -39,10 +39,13 @@ void display_setup_xiaozhi_ui();
 
 void xiaozhi_board_init();
 void start_xiaozhi_app();
+bool is_xiaozhi_ready();
 
 i2c_master_bus_handle_t board_get_i2c_bus();
-
 StackChanCamera* board_get_camera();
+int board_get_battery_level();
+void board_set_backlight_brightness(uint8_t brightness, bool permanent = false);
+uint8_t board_get_backlight_brightness();
 
 void app_play_sound(const std::string_view& sound);
 

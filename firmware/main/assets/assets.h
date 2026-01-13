@@ -18,6 +18,8 @@ LV_IMG_DECLARE(icon_setup);
 LV_IMG_DECLARE(icon_uiflow);
 LV_IMG_DECLARE(icon_calibrate);
 LV_IMG_DECLARE(icon_remote);
+LV_IMG_DECLARE(setup_stackchan_front_view);
+LV_IMG_DECLARE(icon_home);
 
 extern const char ogg_camera_shutter_start[] asm("_binary_camera_shutter_ogg_start");
 extern const char ogg_camera_shutter_end[] asm("_binary_camera_shutter_ogg_end");

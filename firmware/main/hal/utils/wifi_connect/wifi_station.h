@@ -10,9 +10,15 @@
 #include <esp_netif.h>
 #include <esp_wifi_types_generic.h>
 
+/**
+ * @brief A simplied WiFi station for config verifyation and config store.
+ *
+ */
 class StackChanWifiStation {
 public:
-    static StackChanWifiStation& GetInstance();
+    StackChanWifiStation();
+    ~StackChanWifiStation();
+
     void AddAuth(const std::string& ssid, const std::string& password);
     void Start();
     void Stop();
@@ -35,11 +41,6 @@ public:
     void OnConnectFailed(std::function<void(const std::string& ssid)> on_connect_failed);
 
 private:
-    StackChanWifiStation();
-    ~StackChanWifiStation();
-    StackChanWifiStation(const StackChanWifiStation&) = delete;
-    StackChanWifiStation& operator=(const StackChanWifiStation&) = delete;
-
     EventGroupHandle_t event_group_;
     esp_event_handler_instance_t instance_any_id_ = nullptr;
     esp_event_handler_instance_t instance_got_ip_ = nullptr;

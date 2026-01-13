@@ -20,7 +20,11 @@ public:
     {
         _panel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
         _panel->setPadding(0, 0, 0, 0);
+        _panel->setBgColor(lv_color_hex(0xF6F6F6));
+        _panel->align(LV_ALIGN_CENTER, 0, 0);
+        _panel->setBorderWidth(0);
         _panel->setSize(320, 240);
+        _panel->setRadius(0);
 
         _label = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
         _label->setText(label);
@@ -36,6 +40,7 @@ public:
 
         _btn_confirm = std::make_unique<uitk::lvgl_cpp::Button>(_panel->get());
         _btn_confirm->label().setText("ok");
+        _btn_confirm->label().setTextFont(&lv_font_montserrat_24);
         _btn_confirm->setSize(70, 110);
         _btn_confirm->align(LV_ALIGN_CENTER, 110, 40);
         _btn_confirm->onClick().connect([&]() { _is_selected = true; });

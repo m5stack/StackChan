@@ -5,7 +5,9 @@
  */
 #include "workers.h"
 #include <stackchan/stackchan.h>
+#include <apps/common/toast/toast.h>
 #include <mooncake_log.h>
+#include <assets/assets.h>
 #include <hal/hal.h>
 
 using namespace smooth_ui_toolkit::lvgl_cpp;
@@ -15,13 +17,13 @@ static std::string _tag = "Setup-Servo";
 
 ZeroCalibrationWorker::ZeroCalibrationWorker()
 {
-    _pannel = std::make_unique<Container>(lv_screen_active());
-    _pannel->setBgColor(lv_color_hex(0xFFFFFF));
-    _pannel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
-    _pannel->align(LV_ALIGN_CENTER, 0, 0);
-    _pannel->setBorderWidth(0);
-    _pannel->setSize(320, 240);
-    _pannel->setRadius(0);
+    _panel = std::make_unique<Container>(lv_screen_active());
+    _panel->setBgColor(lv_color_hex(0xFFFFFF));
+    _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+    _panel->align(LV_ALIGN_CENTER, 0, 0);
+    _panel->setBorderWidth(0);
+    _panel->setSize(320, 240);
+    _panel->setRadius(0);
 
     _btn_go_home = std::make_unique<Button>(lv_screen_active());
     apply_button_common_style(*_btn_go_home);
@@ -57,6 +59,7 @@ void ZeroCalibrationWorker::update()
     if (_confirm_flag) {
         _confirm_flag = false;
 
+        view::pop_a_toast("Home position set", view::ToastType::Success);
         mclog::tagInfo(_tag, "set current angle as zero");
 
         auto& motion = GetStackChan().motion();
@@ -67,6 +70,7 @@ void ZeroCalibrationWorker::update()
     if (_go_home_flag) {
         _go_home_flag = false;
 
+        view::pop_a_toast("Moving to home", view::ToastType::Warning);
         mclog::tagInfo(_tag, "go home");
 
         auto& motion = GetStackChan().motion();
@@ -88,19 +92,19 @@ static const std::vector<RgbColorEntry> _rgb_colors = {
 
 RgbTestWorker::RgbTestWorker()
 {
-    _pannel = std::make_unique<Container>(lv_screen_active());
-    _pannel->setBgColor(lv_color_hex(0xFFFFFF));
-    _pannel->align(LV_ALIGN_CENTER, 0, 0);
-    _pannel->setBorderWidth(0);
-    _pannel->setSize(320, 240);
-    _pannel->setRadius(0);
-    _pannel->setFlexFlow(LV_FLEX_FLOW_COLUMN);
-    _pannel->setFlexAlign(LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    _pannel->setPadding(20, 20, 20, 20);
-    _pannel->setPadRow(15);
+    _panel = std::make_unique<Container>(lv_screen_active());
+    _panel->setBgColor(lv_color_hex(0xFFFFFF));
+    _panel->align(LV_ALIGN_CENTER, 0, 0);
+    _panel->setBorderWidth(0);
+    _panel->setSize(320, 240);
+    _panel->setRadius(0);
+    _panel->setFlexFlow(LV_FLEX_FLOW_COLUMN);
+    _panel->setFlexAlign(LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    _panel->setPadding(20, 20, 20, 20);
+    _panel->setPadRow(15);
 
     for (const auto& color : _rgb_colors) {
-        auto btn = std::make_unique<Button>(*_pannel);
+        auto btn = std::make_unique<Button>(*_panel);
         apply_button_common_style(*btn);
         btn->setSize(200, 50);
         btn->label().setText(color.name);
@@ -113,7 +117,7 @@ RgbTestWorker::RgbTestWorker()
         _buttons.push_back(std::move(btn));
     }
 
-    auto btn_quit = std::make_unique<Button>(*_pannel);
+    auto btn_quit = std::make_unique<Button>(*_panel);
     apply_button_common_style(*btn_quit);
     btn_quit->setSize(200, 50);
     btn_quit->label().setText("Quit");

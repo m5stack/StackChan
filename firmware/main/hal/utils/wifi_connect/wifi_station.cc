@@ -9,12 +9,6 @@
 #define WIFI_EVENT_CONNECTED BIT0
 #define MAX_RECONNECT_COUNT  10
 
-StackChanWifiStation& StackChanWifiStation::GetInstance()
-{
-    static StackChanWifiStation instance;
-    return instance;
-}
-
 StackChanWifiStation::StackChanWifiStation()
 {
     event_group_ = xEventGroupCreate();
@@ -95,7 +89,7 @@ void StackChanWifiStation::Start()
     }
 
     esp_netif_init();
-    // esp_event_loop_create_default(); // Assumed to be created by main app or previous init
+    esp_event_loop_create_default();
 
     station_netif_ = esp_netif_create_default_wifi_sta();
 

@@ -11,6 +11,7 @@
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <apps/common/common.h>
 #include <string_view>
 #include <cstdint>
 #include <memory>
@@ -18,6 +19,36 @@
 using namespace mooncake;
 using namespace smooth_ui_toolkit::lvgl_cpp;
 using namespace stackchan;
+
+class LoadingPage {
+public:
+    LoadingPage()
+    {
+        _panel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
+        _panel->setBgColor(lv_color_hex(0x000000));
+        _panel->align(LV_ALIGN_CENTER, 0, 0);
+        _panel->setSize(320, 240);
+        _panel->setBorderWidth(0);
+        _panel->setRadius(0);
+
+        _msg = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
+        _msg->setTextFont(&lv_font_montserrat_20);
+        _msg->setTextColor(lv_color_hex(0xFFFFFF));
+        _msg->setTextAlign(LV_TEXT_ALIGN_CENTER);
+        _msg->align(LV_ALIGN_CENTER, 0, 0);
+        _msg->setText("");
+        _msg->setWidth(220);
+    }
+
+    void setMessage(std::string_view msg)
+    {
+        _msg->setText(msg);
+    }
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _msg;
+};
 
 #include <string>
 #include <sstream>
@@ -62,10 +93,24 @@ void AppAvatar::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
+    // Craete loading page
+    std::unique_ptr<LoadingPage> loading_page;
+    {
+        LvglLockGuard lock;
+        loading_page = std::make_unique<LoadingPage>();
+    }
+
+    // Start avatar service
+    GetHAL().startWebSocketAvatarService([&](std::string_view msg) {
+        LvglLockGuard lock;
+        loading_page->setMessage(msg);
+    });
     // GetHAL().startBleServer();
-    GetHAL().startWebSocketAvatar();
 
     LvglLockGuard lock;
+
+    // Destroy loading page
+    loading_page.reset();
 
     // Create default avatar
     auto avatar = std::make_unique<avatar::DefaultAvatar>();
@@ -73,7 +118,7 @@ void AppAvatar::onOpen()
     GetStackChan().attachAvatar(std::move(avatar));
 
     /* ------------------------------- BLE events ------------------------------- */
-    _ble_avatar_data.callback_id = GetHAL().onBleAvatarData.connect([&](const char* data) {
+    GetHAL().onBleAvatarData.connect([&](const char* data) {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_ble_avatar_data.update_flag) {
             return;
@@ -82,7 +127,7 @@ void AppAvatar::onOpen()
         _ble_avatar_data.data_ptr    = (char*)data;
     });
 
-    _ble_motion_data.callback_id = GetHAL().onBleMotionData.connect([&](const char* data) {
+    GetHAL().onBleMotionData.connect([&](const char* data) {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_ble_motion_data.update_flag) {
             return;
@@ -93,20 +138,20 @@ void AppAvatar::onOpen()
 
     /* ---------------------------- Websocket events ---------------------------- */
     // Avatar control
-    _ws_callback_ids.avatar_id = GetHAL().onWsAvatarData.connect([&](std::string_view data) {
+    GetHAL().onWsAvatarData.connect([&](std::string_view data) {
         LvglLockGuard lvgl_lock;
         GetStackChan().updateAvatarFromJson(data.data());
     });
 
     // Motion control
-    _ws_callback_ids.motion_id = GetHAL().onWsMotionData.connect([&](std::string_view data) {
+    GetHAL().onWsMotionData.connect([&](std::string_view data) {
         LvglLockGuard lvgl_lock;
         check_auto_angle_sync_mode();
         GetStackChan().updateMotionFromJson(data.data());
     });
 
     // Phone call handling
-    _ws_callback_ids.call_req_id = GetHAL().onWsCallRequest.connect([&](std::string caller) {
+    GetHAL().onWsCallRequest.connect([&](std::string caller) {
         if (_ws_call_view_id >= 0) {
             mclog::tagWarn(getAppInfo().name, "ws call view already exists");
             return;
@@ -145,7 +190,7 @@ void AppAvatar::onOpen()
         _ws_call_view_id = avatar.addDecorator(std::move(view));
     });
 
-    _ws_callback_ids.call_end_id = GetHAL().onWsCallEnd.connect([&](WsSignalSource source) {
+    GetHAL().onWsCallEnd.connect([&](WsSignalSource source) {
         if (source != WsSignalSource::Remote) {
             return;
         }
@@ -168,11 +213,10 @@ void AppAvatar::onOpen()
     });
 
     // Text message handling
-    _ws_callback_ids.text_msg_id = GetHAL().onWsTextMessage.connect([&](const WsTextMessage_t& message) {
+    GetHAL().onWsTextMessage.connect([&](const WsTextMessage_t& message) {
         LvglLockGuard lvgl_lock;
 
         auto& stackchan = GetStackChan();
-        auto& avatar    = stackchan.avatar();
 
         stackchan.addModifier(
             std::make_unique<TimedSpeechModifier>(fmt::format("{} says: {}", message.name, message.content), 6000));
@@ -186,7 +230,7 @@ void AppAvatar::onOpen()
         }
     });
 
-    _ws_callback_ids.dance_data_id = GetHAL().onWsDanceData.connect([&](std::string_view data) {
+    GetHAL().onWsDanceData.connect([&](std::string_view data) {
         LvglLockGuard lvgl_lock;
         auto sequence = stackchan::animation::parse_sequence_from_json(data.data());
         if (!sequence.empty()) {
@@ -194,8 +238,17 @@ void AppAvatar::onOpen()
         }
     });
 
+    GetHAL().onWsLog.connect([&](CommonLogLevel level, std::string_view msg) {
+        auto type         = static_cast<view::ToastType>(level);
+        uint32_t duration = type == view::ToastType::Error ? 12000 : 1600;
+        view::pop_a_toast(msg, type, duration);
+    });
+
     /* ------------------------------ Video window ------------------------------ */
     _video_window = std::make_unique<view::VideoWindow>(lv_screen_active());
+
+    /* ----------------------------- Home Indicator ----------------------------- */
+    view::create_home_indicator([&]() { close(); });
 }
 
 void AppAvatar::onRunning()
@@ -218,26 +271,34 @@ void AppAvatar::onRunning()
     }
 
     GetStackChan().update();
+
+    view::update_home_indicator();
 }
 
 void AppAvatar::onClose()
 {
     mclog::tagInfo(getAppInfo().name, "on close");
 
-    LvglLockGuard lock;
+    {
+        LvglLockGuard lock;
 
-    GetStackChan().resetAvatar();
-    _video_window.reset();
+        GetStackChan().resetAvatar();
+        _video_window.reset();
 
-    GetHAL().onBleAvatarData.disconnect(_ble_avatar_data.callback_id);
-    GetHAL().onBleMotionData.disconnect(_ble_motion_data.callback_id);
+        GetHAL().onBleAvatarData.clear();
+        GetHAL().onBleMotionData.clear();
 
-    GetHAL().onWsAvatarData.disconnect(_ws_callback_ids.avatar_id);
-    GetHAL().onWsMotionData.disconnect(_ws_callback_ids.motion_id);
-    GetHAL().onWsCallRequest.disconnect(_ws_callback_ids.call_req_id);
-    GetHAL().onWsCallEnd.disconnect(_ws_callback_ids.call_end_id);
-    GetHAL().onWsTextMessage.disconnect(_ws_callback_ids.text_msg_id);
-    GetHAL().onWsDanceData.disconnect(_ws_callback_ids.dance_data_id);
+        GetHAL().onWsAvatarData.clear();
+        GetHAL().onWsMotionData.clear();
+        GetHAL().onWsCallRequest.clear();
+        GetHAL().onWsCallEnd.clear();
+        GetHAL().onWsTextMessage.clear();
+        GetHAL().onWsDanceData.clear();
+
+        view::destroy_home_indicator();
+    }
+
+    GetHAL().requestWarmReboot(1);
 }
 
 void AppAvatar::check_auto_angle_sync_mode()

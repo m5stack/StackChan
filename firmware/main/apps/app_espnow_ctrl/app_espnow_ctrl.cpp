@@ -11,6 +11,7 @@
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <apps/common/common.h>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -82,6 +83,7 @@ void AppEspnowControl::onOpen()
     avatar->init(lv_screen_active());
     stackchan.attachAvatar(std::move(avatar));
 
+    stackchan.clearModifiers();
     stackchan.addModifier(std::make_unique<BreathModifier>());
     stackchan.addModifier(std::make_unique<BlinkModifier>());
 
@@ -89,6 +91,8 @@ void AppEspnowControl::onOpen()
     stackchan.motion().setAutoAngleSyncEnabled(false);
 
     GetHAL().setLaserEnabled(false);
+
+    view::create_home_indicator([&]() { close(); });
 }
 
 void handle_received_data()
@@ -178,6 +182,8 @@ void AppEspnowControl::onRunning()
     }
 
     GetStackChan().update();
+
+    view::update_home_indicator();
 }
 
 void AppEspnowControl::onClose()
@@ -185,4 +191,8 @@ void AppEspnowControl::onClose()
     mclog::tagInfo(getAppInfo().name, "on close");
 
     LvglLockGuard lock;
+
+    view::destroy_home_indicator();
+
+    GetHAL().requestWarmReboot(2);
 }

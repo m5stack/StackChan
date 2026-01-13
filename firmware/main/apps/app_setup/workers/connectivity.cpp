@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 #include "workers.h"
+#include <src/misc/lv_area.h>
+#include <src/misc/lv_text.h>
 #include <stackchan/stackchan.h>
 #include <ArduinoJson.hpp>
 #include <mooncake_log.h>
@@ -25,6 +27,9 @@ WifiSetupWorker::WifiSetupWorker()
     // Create default avatar
     auto avatar = std::make_unique<avatar::DefaultAvatar>();
     avatar->init(lv_screen_active(), &lv_font_montserrat_24);
+    avatar->leftEye().setVisible(false);
+    avatar->rightEye().setVisible(false);
+    avatar->mouth().setVisible(false);
     GetStackChan().attachAvatar(std::move(avatar));
 
     _app_config_signal_id =
@@ -52,31 +57,45 @@ void WifiSetupWorker::update_state()
             if (_is_first_in) {
                 _is_first_in = false;
 
-                auto& avatar = GetStackChan().avatar();
-                avatar.leftEye().setVisible(false);
-                avatar.rightEye().setVisible(false);
-                avatar.mouth().setVisible(false);
-                avatar.setSpeech("Scan the QR code to download the \"StackChan\" app.");
-
                 auto& data = _state_app_download_data;
 
-                std::string qrcode_text = "todotodotodotodotodotodotodlotodotodotodoto";
+                data.panel = std::make_unique<Container>(lv_screen_active());
+                data.panel->setBgColor(lv_color_hex(0xF6F6F6));
+                data.panel->align(LV_ALIGN_CENTER, 0, 0);
+                data.panel->setBorderWidth(0);
+                data.panel->setSize(320, 240);
+                data.panel->setRadius(0);
+
+                data.title = std::make_unique<Label>(lv_screen_active());
+                data.title->setTextFont(&lv_font_montserrat_20);
+                data.title->setTextColor(lv_color_hex(0x7E7B9C));
+                data.title->align(LV_ALIGN_TOP_MID, 0, 13);
+                data.title->setText("APP SETUP");
+
+                std::string qrcode_text = "https://apps.apple.com/us/app/stackchan-world/id6756086326";
                 data.qrcode             = std::make_unique<Qrcode>(lv_screen_active());
                 data.qrcode->setSize(150);
-                data.qrcode->setDarkColor(lv_color_white());
-                data.qrcode->setLightColor(lv_color_black());
+                data.qrcode->setDarkColor(lv_color_hex(0x221C5B));
+                data.qrcode->setLightColor(lv_color_hex(0xF6F6F6));
                 data.qrcode->update(qrcode_text);
-                data.qrcode->align(LV_ALIGN_CENTER, -60, -25);
+                data.qrcode->align(LV_ALIGN_CENTER, -72, 12);
 
-                data.btn = std::make_unique<Button>(lv_screen_active());
-                apply_button_common_style(*data.btn);
-                data.btn->align(LV_ALIGN_CENTER, 90, 0);
-                data.btn->setSize(100, 60);
-                data.btn->label().setText("Next");
-                data.btn->onClick().connect([this]() { _state_app_download_data.is_clicked = true; });
+                data.btn_next = std::make_unique<Button>(lv_screen_active());
+                apply_button_common_style(*data.btn_next);
+                data.btn_next->align(LV_ALIGN_CENTER, 79, 73);
+                data.btn_next->setSize(112, 48);
+                data.btn_next->label().setText("Next");
+                data.btn_next->onClick().connect([this]() { _state_app_download_data.next_clicked = true; });
+
+                data.info = std::make_unique<Label>(lv_screen_active());
+                data.info->setTextFont(&lv_font_montserrat_20);
+                data.info->setTextColor(lv_color_hex(0x26206A));
+                data.info->align(LV_ALIGN_TOP_LEFT, 183, 56);
+                data.info->setTextAlign(LV_TEXT_ALIGN_LEFT);
+                data.info->setText("Download\n\"StackChan\"\napp to start\nthe setup");
             }
 
-            if (_state_app_download_data.is_clicked) {
+            if (_state_app_download_data.next_clicked) {
                 switch_state(State::WaitAppConnection);
             }
 
@@ -94,24 +113,36 @@ void WifiSetupWorker::update_state()
             if (_is_first_in) {
                 _is_first_in = false;
 
-                auto& avatar = GetStackChan().avatar();
-                avatar.leftEye().setVisible(false);
-                avatar.rightEye().setVisible(false);
-                avatar.mouth().setVisible(false);
-                avatar.setSpeech("Look for me in \"StackChan\" app to start the setup.");
-                avatar.addDecorator(std::make_unique<avatar::HeartDecorator>(lv_screen_active(), 3000));
+                auto& data = _state_wait_app_connection_data;
 
-                auto& data  = _state_wait_app_connection_data;
-                data.id_btn = std::make_unique<Button>(lv_screen_active());
-                apply_button_common_style(*data.id_btn);
-                data.id_btn->align(LV_ALIGN_CENTER, 0, 0);
-                data.id_btn->setSize(262, 52);
-                data.id_btn->onClick().connect([]() {
+                data.panel = std::make_unique<Container>(lv_screen_active());
+                data.panel->setBgColor(lv_color_hex(0xF6F6F6));
+                data.panel->align(LV_ALIGN_CENTER, 0, 0);
+                data.panel->setBorderWidth(0);
+                data.panel->setSize(320, 240);
+                data.panel->setRadius(0);
+
+                data.btn_id = std::make_unique<Button>(lv_screen_active());
+                apply_button_common_style(*data.btn_id);
+                data.btn_id->align(LV_ALIGN_CENTER, 0, -20);
+                data.btn_id->setSize(262, 52);
+                data.btn_id->onClick().connect([]() {
                     auto& avatar = GetStackChan().avatar();
                     avatar.clearDecorators();
                     avatar.addDecorator(std::make_unique<avatar::HeartDecorator>(lv_screen_active(), 3000));
                 });
-                data.id_btn->label().setText(fmt::format("ID: {}", GetHAL().getFactoryMacString()));
+                data.btn_id->label().setText(fmt::format("ID: {}", GetHAL().getFactoryMacString()));
+
+                data.info = std::make_unique<Label>(lv_screen_active());
+                data.info->setTextFont(&lv_font_montserrat_24);
+                data.info->setTextColor(lv_color_hex(0x26206A));
+                data.info->align(LV_ALIGN_BOTTOM_MID, 0, -26);
+                data.info->setTextAlign(LV_TEXT_ALIGN_CENTER);
+                data.info->setText("Look for me in the app\nto start setup.");
+
+                auto& avatar = GetStackChan().avatar();
+                avatar.clearDecorators();
+                avatar.addDecorator(std::make_unique<avatar::HeartDecorator>(lv_screen_active(), 3000));
             }
 
             // Check events
@@ -205,12 +236,10 @@ void WifiSetupWorker::cleanup_ui()
     switch (_last_state) {
         case State::AppDownload: {
             _state_app_download_data.reset();
-            GetStackChan().avatar().setSpeech("");
             break;
         }
         case State::WaitAppConnection: {
             _state_wait_app_connection_data.reset();
-            GetStackChan().avatar().setSpeech("");
             break;
         }
         case State::AppConnected: {

@@ -9,7 +9,7 @@
 #include <nvs_flash.h>
 
 static std::unique_ptr<Hal> _hal_instance;
-static const std::string _tag = "HAL";
+static const std::string_view _tag = "HAL";
 
 Hal& GetHAL()
 {
@@ -32,7 +32,6 @@ void Hal::init()
     }
     ESP_ERROR_CHECK(ret);
 
-    // ble_init();
     xiaozhi_board_init();
     xiaozhi_mcp_init();
     head_touch_init();
@@ -40,9 +39,6 @@ void Hal::init()
     imu_init();
     servo_init();
     lvgl_init();
-    reminder_init();
-
-    // startWebSocketAvatar();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -50,6 +46,7 @@ void Hal::init()
 /* -------------------------------------------------------------------------- */
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <system_info.h>
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <esp_mac.h>
@@ -88,10 +85,22 @@ void Hal::reboot()
     esp_restart();
 }
 
+void Hal::updateHeapStatusLog()
+{
+    static uint32_t last_log_tick = 0;
+    if (millis() - last_log_tick < 10000) {
+        return;
+    }
+    last_log_tick = millis();
+    SystemInfo::PrintHeapStats();
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                   Xiaozhi                                  */
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
+#include <stackchan/stackchan.h>
+#include <apps/common/common.h>
 
 void Hal::xiaozhi_board_init()
 {
@@ -100,9 +109,35 @@ void Hal::xiaozhi_board_init()
     hal_bridge::xiaozhi_board_init();
 }
 
+static void _stackchan_update_task(void* param)
+{
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        LvglLockGuard lock;
+
+        GetStackChan().update();
+
+        if (view::is_home_indicator_created()) {
+            view::update_home_indicator();
+        } else {
+            // Create home indicator after xiaozhi is ready
+            if (hal_bridge::is_xiaozhi_ready()) {
+                view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); });
+            }
+        }
+    }
+}
+
 void Hal::startXiaozhi()
 {
     mclog::tagInfo(_tag, "start xiaozhi");
+
+    auto& motion = GetStackChan().motion();
+    motion.setAutoAngleSyncEnabled(true);
+    motion.setAutoTorqueReleaseEnabled(true);
+
+    xTaskCreate(_stackchan_update_task, "stackchan", 4096, NULL, 15, NULL);
 
     hal_bridge::start_xiaozhi_app();
 }
@@ -122,6 +157,16 @@ void Hal::lvglUnlock()
     hal_bridge::disply_lvgl_unlock();
 }
 
+void Hal::setBackLightBrightness(uint8_t brightness, bool permanent)
+{
+    hal_bridge::board_set_backlight_brightness(brightness, permanent);
+}
+
+uint8_t Hal::getBackLightBrightness()
+{
+    return hal_bridge::board_get_backlight_brightness();
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                    Lvgl                                    */
 /* -------------------------------------------------------------------------- */
@@ -131,13 +176,7 @@ void Hal::lvglUnlock()
 static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data)
 {
     hal_bridge::lock();
-    auto bridge_data = hal_bridge::get_data();
-
-    if (bridge_data.isXiaozhiMode) {
-        hal_bridge::unlock();
-        data->state = LV_INDEV_STATE_RELEASED;
-        return;
-    }
+    auto& bridge_data = hal_bridge::get_data();
 
     // mclog::tagInfo(_tag, "touchpoint: {}, x: {}, y: {}", bridge_data.touchPoint.num, bridge_data.touchPoint.x,
     //                bridge_data.touchPoint.y);
@@ -216,4 +255,40 @@ void Hal::reminder_init()
     mclog::tagInfo(_tag, "reminder init");
 
     ReminderManager::GetInstance().Start();
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Warm Reboot                                */
+/* -------------------------------------------------------------------------- */
+#include <settings.h>
+#include <string_view>
+
+static std::string_view _warm_boot_nvs_ns  = "warm_boot";
+static std::string_view _warm_boot_nvs_key = "app_index";
+
+void Hal::requestWarmReboot(int appIndex)
+{
+    mclog::tagInfo(_tag, "warm reboot request to app index: {}", appIndex);
+
+    {
+        Settings settings(_warm_boot_nvs_ns.data(), true);
+        settings.SetInt(_warm_boot_nvs_key.data(), appIndex);
+    }
+
+    delay(100);
+    esp_restart();
+}
+
+int Hal::getWarmRebootTarget()
+{
+    Settings settings(_warm_boot_nvs_ns.data(), false);
+    return settings.GetInt(_warm_boot_nvs_key.data(), -1);
+}
+
+void Hal::clearWarmRebootRequest()
+{
+    mclog::tagInfo(_tag, "clear warm reboot request");
+
+    Settings settings(_warm_boot_nvs_ns.data(), true);
+    settings.SetInt(_warm_boot_nvs_key.data(), -1);
 }

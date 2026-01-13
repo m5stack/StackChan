@@ -41,27 +41,30 @@ bool SimpleAudioPlayer::Play(const uint8_t* data, size_t size, bool loop)
 {
     Stop();  // 停止之前的播放
 
-    is_playing_     = true;
-    stop_requested_ = false;
+    // is_playing_     = true;
+    // stop_requested_ = false;
 
-    PlayerParams* params = new PlayerParams{this, data, size, loop};
+    // PlayerParams* params = new PlayerParams{this, data, size, loop};
 
-    BaseType_t ret = xTaskCreate(
-        [](void* arg) {
-            PlayerParams* p = (PlayerParams*)arg;
-            p->player->PlaybackTask(p->data, p->size, p->loop);
-            delete p;
-            vTaskDelete(NULL);
-        },
-        "simple_player", 4096 * 2, params, 5, &task_handle_);
+    // BaseType_t ret = xTaskCreate(
+    //     [](void* arg) {
+    //         PlayerParams* p = (PlayerParams*)arg;
+    //         p->player->PlaybackTask(p->data, p->size, p->loop);
+    //         delete p;
+    //         vTaskDelete(NULL);
+    //     },
+    //     "simple_player", 4096 * 2, params, 5, &task_handle_);
 
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create playback task");
-        delete params;
-        is_playing_ = false;
-        return false;
-    }
-    return true;
+    // if (ret != pdPASS) {
+    //     ESP_LOGE(TAG, "Failed to create playback task");
+    //     delete params;
+    //     is_playing_ = false;
+    //     return false;
+    // }
+    // return true;
+
+    // todo
+    return false;
 }
 
 void SimpleAudioPlayer::Stop()

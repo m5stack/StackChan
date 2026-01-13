@@ -15,13 +15,13 @@ using namespace smooth_ui_toolkit::lvgl_cpp;
 
 AppTemplate::AppTemplate()
 {
-    // Configure App name
+    // 配置 App 名
     setAppInfo().name = "AppTemplate";
-    // Configure App icon
+    // 配置 App 图标
     // setAppInfo().icon = (void*)&icon_app_dummy;
 }
 
-// Called when the App is installed
+// App 被安装时会被调用
 void AppTemplate::onCreate()
 {
     mclog::tagInfo(getAppInfo().name, "on create");
@@ -30,49 +30,49 @@ void AppTemplate::onCreate()
 static std::unique_ptr<Button> _button_quit;
 static uint32_t _time_count = 0;
 
-// Called when the App is opened
-// You can construct UI, initialize operations, etc. here
+// App 被打开时会被调用
+// 可以在这里构造 UI，初始化操作等
 void AppTemplate::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-    // Lock before Lvgl operations to avoid conflict with lvgl thread
-    // GetHAL().lvglLock(); to lock, GetHAL().lvglUnlock(); to unlock
-    // You can also use LvglLockGuard for automatic locking and unlocking
+    // Lvgl 操作前要先上锁，避免和 lvgl 线程冲突
+    // GetHAL().lvglLock(); 上锁，GetHAL().lvglUnlock(); 解锁
+    // 也可以使用 LvglLockGuard 自动上锁和解锁
     LvglLockGuard lock;
 
-    // Create a quit button
-    // Using lvgl cpp wrapper here
-    // Same as using c method directly, lv_button_create...
+    // 创建一个退出按钮
+    // 这里使用的是 lvgl 的 cpp 封装
+    // 和直接使用 c 方法是一样的, lv_button_create...
     _button_quit = std::make_unique<Button>(lv_screen_active());
     _button_quit->setAlign(LV_ALIGN_CENTER);
     _button_quit->label().setText("QUIT");
     _button_quit->onClick().connect([this]() {
-        // Call close() to close the App
+        // 调用 close() 可以关闭 App
         close();
     });
 }
 
-// Called repeatedly while the App is running
+// App 运行时会一直被反复调用
 void AppTemplate::onRunning()
 {
     // mclog::tagInfo(getAppInfo().name, "on running");
 
-    // Print "hi" every 1 second
+    // 每隔 1 秒打印一次 "hi"
     if (GetHAL().millis() - _time_count > 1000) {
         mclog::tagInfo(getAppInfo().name, "hi");
         _time_count = GetHAL().millis();
     }
 }
 
-// Called when the App is closed
-// You can destroy UI, release resources, etc. here
+// App 被关闭时会被调用
+// 可以在这里销毁 UI，释放资源等
 void AppTemplate::onClose()
 {
     mclog::tagInfo(getAppInfo().name, "on close");
 
     LvglLockGuard lock;
 
-    // Destroy button
+    // 销毁按钮
     _button_quit.reset();
 }

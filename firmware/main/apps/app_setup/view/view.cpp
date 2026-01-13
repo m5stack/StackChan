@@ -12,8 +12,8 @@ SelectMenuPage::SelectMenuPage(std::vector<MenuSection> sections) : _sections(st
 {
     _pannel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
     _pannel->setSize(320, 240);
-    _pannel->setBgColor(lv_color_hex(0xffffff));
-    _pannel->setPadding(10, 24, 0, 0);
+    _pannel->setBgColor(lv_color_hex(0xF6F6F6));
+    _pannel->setPadding(10, 72, 0, 0);
     _pannel->setBorderWidth(0);
     _pannel->setRadius(0);
     _pannel->setScrollDir(LV_DIR_VER);
@@ -70,7 +70,7 @@ void SelectMenuPage::create_item_button(int y, const MenuItem& item, int section
     btn->setBgColor(lv_color_hex(0xB8D3FD));
     btn->setBorderWidth(0);
     btn->setShadowWidth(0);
-    btn->setRadius(12);
+    btn->setRadius(18);
 
     btn->label().setText(item.label);
     btn->label().setTextFont(&lv_font_montserrat_24);

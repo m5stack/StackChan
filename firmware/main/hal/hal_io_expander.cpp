@@ -9,7 +9,7 @@
 #include <mooncake_log.h>
 #include <memory>
 
-static const std::string _tag = "HAL-IOE";
+static const std::string_view _tag = "HAL-IOE";
 
 static std::unique_ptr<m5::PY32IOExpander_Class> _io_expander;
 

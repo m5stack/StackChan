@@ -17,7 +17,7 @@
     {
         "url": "https://github.com/78/xiaozhi-esp32.git",
         "path": "xiaozhi-esp32",
-        "branch": "92de37e182067db093c73057a9aa08e21e59cb33"
+        "branch": "v2.1.0"
     },
     {
         "url": "https://github.com/bblanchon/ArduinoJson.git",

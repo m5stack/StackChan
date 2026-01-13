@@ -10,7 +10,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-static const std::string _tag = "HAL-HeadTouch";
+static const std::string_view _tag = "HAL-HeadTouch";
 
 // 触摸状态
 enum class TouchState { IDLE, TOUCHED, SWIPING };
@@ -68,7 +68,7 @@ public:
                     current_state    = TouchState::TOUCHED;
                     initial_position = data.get_position();
                     gesture          = HeadPetGesture::Press;
-                    // mclog::tagDebug(_tag, "Touch detected at position: {}", initial_position);
+                    // mclog::tagInfo(_tag, "Touch detected at position: {}", initial_position);
                 }
                 break;
 
@@ -84,11 +84,11 @@ public:
                     if (delta > config.swipe_threshold) {
                         current_state = TouchState::SWIPING;
                         gesture       = HeadPetGesture::SwipeForward;
-                        // mclog::tagDebug(_tag, "Swipe forward detected, delta: {}", delta);
+                        // mclog::tagInfo(_tag, "Swipe forward detected, delta: {}", delta);
                     } else if (delta < -config.swipe_threshold) {
                         current_state = TouchState::SWIPING;
                         gesture       = HeadPetGesture::SwipeBackward;
-                        // mclog::tagDebug(_tag, "Swipe backward detected, delta: {}", delta);
+                        // mclog::tagInfo(_tag, "Swipe backward detected, delta: {}", delta);
                     }
                 }
                 break;
@@ -158,5 +158,5 @@ void Hal::head_touch_init()
     si12t_init(&si12t_cfg, &si12t);
     si12t_setup(si12t, SI12T_TYPE_LOW, SI12T_SENSITIVITY_LEVEL_3);
 
-    xTaskCreate(_head_touch_update_task, "headtouch", 4096, si12t, 5, NULL);
+    xTaskCreateWithCaps(_head_touch_update_task, "headtouch", 4096, si12t, 5, NULL, MALLOC_CAP_SPIRAM);
 }

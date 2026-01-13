@@ -23,7 +23,7 @@
 #include <espnow_utils.h>
 #include <esp_check.h>
 
-static const std::string _tag = "HAL-EspNow";
+static const std::string_view _tag = "HAL-EspNow";
 
 static EventGroupHandle_t s_wifi_event_group = NULL;
 static const int WIFI_CONNECTED_BIT          = BIT0;
@@ -60,7 +60,7 @@ static void _wifi_init(int channel = 1)
 
     // ESP_ERROR_CHECK(nvs_flash_init());
     // ESP_ERROR_CHECK(esp_netif_init());
-    // ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t* sta_netif = esp_netif_create_default_wifi_sta();
     assert(sta_netif);
 

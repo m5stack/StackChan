@@ -35,6 +35,19 @@ extern "C" void app_main(void)
     // Main loop
     while (1) {
         GetHAL().feedTheDog();
+        GetHAL().updateHeapStatusLog();
+
         GetMooncake().update();
+
+        if (GetHAL().isXiaozhiStartRequested()) {
+            break;
+        }
     }
+
+    // Uninstall all apps and destroy mooncake
+    GetMooncake().uninstallAllApps();
+    DestroyMooncake();
+
+    // Start xiaozhi, never returns
+    GetHAL().startXiaozhi();
 }

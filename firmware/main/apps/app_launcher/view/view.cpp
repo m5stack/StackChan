@@ -7,6 +7,7 @@
 #include <mooncake_log.h>
 #include <assets/assets.h>
 #include <functional>
+#include <hal/hal.h>
 #include <cstdint>
 #include <vector>
 
@@ -435,16 +436,34 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     _dynamic_icon_label->init(icon_label_texts, _icon_gap, _panel->get());
 
     /* ----------------------------- History restore ---------------------------- */
+    bool need_restore      = false;
+    int restore_icon_pos_x = -1;
+
+    // If warm boot was requested
+    if (GetHAL().getWarmRebootTarget() >= 0) {
+        auto app_index = GetHAL().getWarmRebootTarget();
+        mclog::tagInfo(_tag, "warm boot was requested, app index: {}", app_index);
+        app_index          = uitk::clamp(app_index, 0, static_cast<int>(appPorps.size()) - 1);
+        restore_icon_pos_x = app_index * _icon_gap;
+        need_restore       = true;
+        GetHAL().clearWarmRebootRequest();
+    }
+
     if (_last_clicked_icon_pos_x != -1) {
         // mclog::tagInfo(_tag, "navigate to last clicked icon, pos x: {}", _last_clicked_icon_pos_x);
-        _panel->scrollBy(-_last_clicked_icon_pos_x, 0, LV_ANIM_OFF);
-
-        _dynamic_bg_color->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-        _page_indicator->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-        _dynamic_icon_label->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-
+        restore_icon_pos_x       = _last_clicked_icon_pos_x;
+        need_restore             = true;
         _last_clicked_icon_pos_x = -1;
-        _state                   = STATE_NORMAL;
+    }
+
+    if (need_restore) {
+        _panel->scrollBy(-restore_icon_pos_x, 0, LV_ANIM_OFF);
+
+        _dynamic_bg_color->jumpTo(restore_icon_pos_x / _icon_gap);
+        _page_indicator->jumpTo(restore_icon_pos_x / _icon_gap);
+        _dynamic_icon_label->jumpTo(restore_icon_pos_x / _icon_gap);
+
+        _state = STATE_NORMAL;
     }
 
     // If first create
@@ -461,11 +480,13 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
         _startup_anim->teleport(240, 120);
         _panel->setY(_startup_anim->directValue().x);
         _panel->setRadius(_startup_anim->directValue().y);
-
         _startup_anim->move(0, 0);
 
         _state = STATE_STARTUP;
     }
+
+    // Destory boot logo label
+    GetHAL().bootLogo.reset();
 }
 
 void LauncherView::update()

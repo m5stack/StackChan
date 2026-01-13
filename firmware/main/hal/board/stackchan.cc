@@ -7,6 +7,7 @@
 #include "power_save_timer.h"
 #include "i2c_device.h"
 #include "axp2101.h"
+#include "settings.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -51,7 +52,7 @@ public:
         uint8_t data = ReadReg(0x90);
         data |= 0b10110100;
         WriteReg(0x90, data);
-        WriteReg(0x99, (0b11110 - 5));
+        // WriteReg(0x99, (0b11110 - 5));
         WriteReg(0x97, (0b11110 - 2));
         WriteReg(0x69, 0b00110101);
         WriteReg(0x30, 0b111111);
@@ -65,12 +66,32 @@ public:
         } else {
             ESP_LOGI(TAG, "Set charge current success");
         }
+
+        SetBrightness(0);
     }
 
     void SetBrightness(uint8_t brightness)
     {
-        brightness = ((brightness + 641) >> 5);
-        WriteReg(0x99, brightness);
+        if (brightness == 0) {
+            // DLDO1 off
+            uint8_t val = ReadReg(0x90);
+            WriteReg(0x90, val & 0x7F);
+        } else {
+            // 映射计算：将 1~100 映射到 寄存器值 20~28
+            // 公式：MinReg + (input * (MaxReg - MinReg) / MaxInput)
+            // 20 + (brightness * 8 / 100)
+            if (brightness > 100) {
+                brightness = 100;
+            }
+            uint8_t reg_val = 20 + ((uint16_t)brightness * 8 / 100);
+            WriteReg(0x99, reg_val);
+
+            // Make sure DLDO1 on
+            uint8_t val = ReadReg(0x90);
+            if (!(val & 0x80)) {
+                WriteReg(0x90, val | 0x80);
+            }
+        }
     }
 
     /**
@@ -269,8 +290,9 @@ private:
         ft6336_->UpdateTouchPoint();
         auto& touch_point = ft6336_->GetTouchPoint();
 
+        hal_bridge::set_touch_point(touch_point.num, touch_point.x, touch_point.y);
         if (!hal_bridge::is_xiaozhi_mode()) {
-            hal_bridge::set_touch_point(touch_point.num, touch_point.x, touch_point.y);
+            // hal_bridge::set_touch_point(touch_point.num, touch_point.x, touch_point.y);
             return;
         }
 
@@ -287,8 +309,9 @@ private:
             // 只有短触才触发
             if (touch_duration < TOUCH_THRESHOLD_MS) {
                 auto& app = Application::GetInstance();
-                if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                    ResetWifiConfiguration();
+                if (app.GetDeviceState() == kDeviceStateStarting) {
+                    EnterWifiConfigMode();
+                    return;
                 }
                 app.ToggleChatState();
             }
@@ -461,12 +484,12 @@ public:
         return true;
     }
 
-    virtual void SetPowerSaveMode(bool enabled) override
+    virtual void SetPowerSaveLevel(PowerSaveLevel level) override
     {
-        if (!enabled) {
+        if (level != PowerSaveLevel::LOW_POWER) {
             power_save_timer_->WakeUp();
         }
-        WifiBoard::SetPowerSaveMode(enabled);
+        WifiBoard::SetPowerSaveLevel(level);
     }
 
     virtual Backlight* GetBacklight() override
@@ -494,4 +517,41 @@ StackChanCamera* hal_bridge::board_get_camera()
     auto& board = Board::GetInstance();
     auto camera = (StackChanCamera*)board.GetCamera();
     return camera;
+}
+
+int hal_bridge::board_get_battery_level()
+{
+    auto& board      = Board::GetInstance();
+    int level        = 0;
+    bool charging    = false;
+    bool discharging = false;
+    if (board.GetBatteryLevel(level, charging, discharging)) {
+        return level;
+    } else {
+        return 100;
+    }
+}
+
+void hal_bridge::board_set_backlight_brightness(uint8_t brightness, bool permanent)
+{
+    auto& board    = Board::GetInstance();
+    auto backlight = board.GetBacklight();
+    if (backlight) {
+        backlight->SetBrightness(brightness, false);
+        if (permanent) {
+            Settings settings("display", true);
+            settings.SetInt("brightness", brightness);
+        }
+    }
+}
+
+uint8_t hal_bridge::board_get_backlight_brightness()
+{
+    auto& board    = Board::GetInstance();
+    auto backlight = board.GetBacklight();
+    if (backlight) {
+        return backlight->brightness();
+    } else {
+        return 0;
+    }
 }
