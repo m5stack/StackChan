@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+ *
+ * SPDX-License-Identifier: MIT
+ */
 #include "PY32IOExpander_Class.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"

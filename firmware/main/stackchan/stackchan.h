@@ -90,18 +90,14 @@ public:
         return false;
     }
 
-    /**
-     * @brief Check if motion is attached
-     *
-     * @return true
-     * @return false
-     */
-    bool hasMotion()
+    addon::NeonLight& leftNeonLight() override
     {
-        if (_motion) {
-            return true;
-        }
-        return false;
+        return _left_neon_light;
+    }
+
+    addon::NeonLight& rightNeonLight() override
+    {
+        return _right_neon_light;
     }
 
     /**
@@ -143,6 +139,9 @@ public:
         if (_motion) {
             _motion->update();
         }
+
+        _left_neon_light.update();
+        _right_neon_light.update();
     }
 
     /**
@@ -169,9 +168,21 @@ public:
         }
     }
 
+    /**
+     * @brief
+     *
+     * @param jsonContent
+     */
+    void updateNeonLightFromJson(const char* jsonContent)
+    {
+        addon::update_neon_light_from_json(&_left_neon_light, &_right_neon_light, jsonContent);
+    }
+
 private:
     std::unique_ptr<avatar::Avatar> _avatar;
     std::unique_ptr<motion::Motion> _motion;
+    addon::LeftNeonLight _left_neon_light;
+    addon::RightNeonLight _right_neon_light;
     ObjectPool<Modifier> _modifier_pool;
 };
 

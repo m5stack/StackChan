@@ -5,12 +5,14 @@
  */
 #include "hal.h"
 #include "utils/bleprph/bleprph.h"
+#include "utils/secret_logic/secret_logic.h"
 #include <ArduinoJson.hpp>
 #include <mooncake_log.h>
-#include <esp_mac.h>
+#include <mooncake.h>
 #include <settings.h>
+#include <esp_mac.h>
 
-static const std::string _tag = "HAL-BLE";
+static const std::string_view _tag = "HAL-BLE";
 
 static int _handle_ble_motion_write(const char* json_data, uint16_t len, uint16_t conn_handle)
 {
@@ -28,15 +30,15 @@ static int _handle_ble_avatar_write(const char* json_data, uint16_t len, uint16_
 
 static int _handle_ble_config_write(const char* json_data, uint16_t len, uint16_t conn_handle)
 {
-    mclog::tagInfo(_tag, "on config:\n{}", json_data);
+    // mclog::tagInfo(_tag, "on config:\n{}", json_data);
     GetHAL().onBleConfigData.emit(json_data);
     return 0;
 }
 
-static int _handle_ble_animation_write(const char* json_data, uint16_t len, uint16_t conn_handle)
+static int _handle_ble_rgb_write(const char* json_data, uint16_t len, uint16_t conn_handle)
 {
-    mclog::tagInfo(_tag, "on animation:\n{}", json_data);
-    GetHAL().onBleAnimationData.emit(json_data);
+    // mclog::tagInfo(_tag, "on rgb:\n{}", json_data);
+    GetHAL().onBleRgbData.emit(json_data);
     return 0;
 }
 
@@ -54,7 +56,7 @@ void Hal::ble_init()
         .motion_cb       = _handle_ble_motion_write,
         .avatar_cb       = _handle_ble_avatar_write,
         .config_cb       = _handle_ble_config_write,
-        .animation_cb    = _handle_ble_animation_write,
+        .rgb_cb          = _handle_ble_rgb_write,
         .battery_read_cb = _handle_ble_battery_read,
     };
     stackchan_ble_register_callbacks(&ble_callbacks);
@@ -85,6 +87,7 @@ bool Hal::isBleConnected()
 #include <string_view>
 #include <queue>
 #include <mutex>
+#include <atomic>
 
 class WifiConfigServer {
 public:
@@ -94,26 +97,29 @@ public:
         _was_connected = stackchan_ble_is_connected();
 
         // Setup WifiStation callbacks
-        auto& wifi = StackChanWifiStation::GetInstance();
-        wifi.OnConnect([this](const std::string& ssid) {
-            mclog::tagInfo(_tag, "Wifi Connecting to {}", ssid);
+        _wifi_station = std::make_unique<StackChanWifiStation>();
+        _wifi_station->OnConnect([this](const std::string& ssid) {
+            mclog::tagInfo(_tag, "wifi Connecting to {}", ssid);
+            _is_wifi_connecting = true;
             notify_state(0, "wifiConnecting");
         });
-        wifi.OnConnected([this](const std::string& ssid) {
-            mclog::tagInfo(_tag, "Wifi Connected to {}", ssid);
+        _wifi_station->OnConnected([this](const std::string& ssid) {
+            mclog::tagInfo(_tag, "wifi Connected to {}", ssid);
+            _is_wifi_connecting = false;
             notify_state(1, "wifiConnected");
             GetHAL().onAppConfigEvent.emit(AppConfigEvent::WifiConnected);
 
             Settings settings("app_config", true);
             settings.SetBool("is_configed", true);
         });
-        wifi.OnConnectFailed([this](const std::string& ssid) {
-            mclog::tagInfo(_tag, "Wifi Connect Failed to {}", ssid);
+        _wifi_station->OnConnectFailed([this](const std::string& ssid) {
+            mclog::tagInfo(_tag, "wifi Connect Failed to {}", ssid);
+            _is_wifi_connecting = false;
             notify_state(2, "wifiConnectFailed");
             GetHAL().onAppConfigEvent.emit(AppConfigEvent::WifiConnectFailed);
         });
 
-        wifi.Start();
+        _wifi_station->Start();
     }
 
     void update()
@@ -151,6 +157,8 @@ private:
     std::queue<std::string> _msg_queue;
     std::mutex _mutex;
     bool _was_connected = false;
+    std::atomic<bool> _is_wifi_connecting{false};
+    std::unique_ptr<StackChanWifiStation> _wifi_station;
 
     void on_config_data(const char* json_data)
     {
@@ -170,15 +178,37 @@ private:
 
         if (doc["cmd"] == "setWifi") {
             handle_set_wifi(doc["data"]);
+        } else if (doc["cmd"] == "getWifiStatus") {
+            handle_get_wifi_status();
+        } else if (doc["cmd"] == "handshake") {
+            std::string data = doc["data"].as<std::string>();
+            handle_handshake(data);
+        }
+    }
+
+    void handle_get_wifi_status()
+    {
+        if (_wifi_station->IsConnected()) {
+            notify_state(1, "wifiConnected");
+        } else if (_is_wifi_connecting) {
+            notify_state(0, "wifiConnecting");
+        } else {
+            notify_state(3, "wifiDisconnected");
         }
     }
 
     void handle_set_wifi(ArduinoJson::JsonObject data)
     {
+        if (_is_wifi_connecting) {
+            mclog::tagWarn(_tag, "busy connecting, ignoring setWifi");
+            notify_state(2, "wifiConnectFailed: Busy");
+            return;
+        }
+
         const char* ssid     = data["ssid"];
         const char* password = data["password"];
 
-        mclog::tagInfo("WifiConfigServer", "get wifi config: {} / {}", ssid, password);
+        mclog::tagInfo(_tag, "get wifi config: {} / {}", ssid, password);
 
         // Notify state: connecting
         notify_state(0, "wifiConnecting");
@@ -187,12 +217,16 @@ private:
         connect_wifi(ssid, password);
     }
 
+    void handle_handshake(std::string_view data)
+    {
+        auto token = secret_logic::generate_handshake_token(data);
+        notify_state(4, token.c_str());
+    }
+
     void connect_wifi(const char* ssid, const char* password)
     {
-        auto& wifi = StackChanWifiStation::GetInstance();
-
         // Save to NVS (compatible with Xiaozhi) and connect
-        wifi.AddAuth(ssid, password);
+        _wifi_station->AddAuth(ssid, password);
     }
 
     void notify_state(int type, const char* state)
@@ -208,16 +242,32 @@ private:
     }
 };
 
-static void _app_config_server_task(void* param)
-{
-    auto server = std::make_unique<WifiConfigServer>();
-    server->init();
-
-    while (1) {
-        server->update();
-        vTaskDelay(pdMS_TO_TICKS(50));
+class AppConfigServerWorker : public mooncake::BasicAbility {
+public:
+    void onCreate() override
+    {
+        _server = std::make_unique<WifiConfigServer>();
+        _server->init();
     }
-}
+
+    void onRunning() override
+    {
+        if (GetHAL().millis() - _last_tick < 50) {
+            return;
+        }
+        _last_tick = GetHAL().millis();
+        _server->update();
+    }
+
+    void onDestroy() override
+    {
+        _server.reset();
+    }
+
+private:
+    std::unique_ptr<WifiConfigServer> _server;
+    uint32_t _last_tick = 0;
+};
 
 void Hal::startAppConfigServer()
 {
@@ -225,7 +275,7 @@ void Hal::startAppConfigServer()
 
     ble_init();
 
-    xTaskCreate(_app_config_server_task, "appconfig", 6000, NULL, 10, NULL);
+    mooncake::GetMooncake().extensionManager()->createAbility(std::make_unique<AppConfigServerWorker>());
 }
 
 bool Hal::isAppConfiged()

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 #pragma once
-#include "../../utils/timer.h"
 #include "../avatar/decorator.h"
 #include <lvgl.h>
 #include <smooth_lvgl.hpp>
@@ -14,35 +13,10 @@
 namespace stackchan::avatar {
 
 /**
- * @brief Decorator with a timer
- *
- */
-class TimerDecorator : public Decorator {
-public:
-    void scheduleDestroy(uint32_t ms)
-    {
-        _timer.addTask(ms, 1, 0, [this]() { requestDestroy(); });
-    }
-
-    Timer& getTimer()
-    {
-        return _timer;
-    }
-
-    virtual void _update() override
-    {
-        _timer.update();
-    }
-
-private:
-    Timer _timer;
-};
-
-/**
  * @brief
  *
  */
-class HeartDecorator : public TimerDecorator {
+class HeartDecorator : public Decorator {
 public:
     /**
      * @brief
@@ -54,14 +28,22 @@ public:
     HeartDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 500);
     ~HeartDecorator();
 
+    void _update() override;
+
     using Element::setPosition;
 
     void setPosition(int x, int y);
-    void setRotation(int rotation);
+    void setRotation(int rotation) override;
     void setColor(lv_color_t color);
 
 private:
     std::unique_ptr<uitk::lvgl_cpp::Image> _heart;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
     int _animation_index = 0;
 };
 
@@ -69,7 +51,7 @@ private:
  * @brief
  *
  */
-class AngryDecorator : public TimerDecorator {
+class AngryDecorator : public Decorator {
 public:
     /**
      * @brief
@@ -81,14 +63,22 @@ public:
     AngryDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 500);
     ~AngryDecorator();
 
+    void _update() override;
+
     using Element::setPosition;
 
     void setPosition(int x, int y);
-    void setRotation(int rotation);
+    void setRotation(int rotation) override;
     void setColor(lv_color_t color);
 
 private:
     std::unique_ptr<uitk::lvgl_cpp::Image> _angry;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
     int _animation_index = 0;
 };
 
@@ -96,7 +86,7 @@ private:
  * @brief
  *
  */
-class SweatDecorator : public TimerDecorator {
+class SweatDecorator : public Decorator {
 public:
     /**
      * @brief
@@ -108,6 +98,8 @@ public:
     SweatDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 700);
     ~SweatDecorator();
 
+    void _update() override;
+
     using Element::setPosition;
 
     void setPosition(int x, int y);
@@ -117,6 +109,81 @@ public:
 
 private:
     std::unique_ptr<uitk::lvgl_cpp::Image> _sweat;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
+    int _animation_index = 0;
+};
+
+/**
+ * @brief
+ *
+ */
+class ShyDecorator : public Decorator {
+public:
+    /**
+     * @brief
+     *
+     * @param parent
+     * @param destroyAfterMs Destroy after milliseconds, 0 for infinite
+     */
+    ShyDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0);
+    ~ShyDecorator();
+
+    void _update() override;
+
+    using Element::setPosition;
+
+    void setPosition(int x, int y);
+    void setRotation(int rotation) override;
+    void setColor(lv_color_t color);
+    void setVisible(bool visible) override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Image> _left;
+    std::unique_ptr<uitk::lvgl_cpp::Image> _right;
+
+    uint32_t _destroy_at = 0;
+    bool _has_lifetime   = false;
+};
+
+/**
+ * @brief
+ *
+ */
+class DizzyDecorator : public Decorator {
+public:
+    /**
+     * @brief
+     *
+     * @param parent
+     * @param destroyAfterMs Destroy after milliseconds, 0 for infinite
+     * @param animationIntervalMs Animation update interval in milliseconds, 0 for none
+     */
+    DizzyDecorator(lv_obj_t* parent, uint32_t destroyAfterMs = 0, uint32_t animationIntervalMs = 500);
+    ~DizzyDecorator();
+
+    void _update() override;
+
+    using Element::setPosition;
+
+    void setPosition(int x, int y);
+    void setRotation(int rotation) override;
+    void setColor(lv_color_t color);
+    void setVisible(bool visible) override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Image> _left;
+    std::unique_ptr<uitk::lvgl_cpp::Image> _right;
+
+    uint32_t _destroy_at            = 0;
+    uint32_t _next_animation_tick   = 0;
+    uint32_t _animation_interval_ms = 0;
+    bool _has_lifetime              = false;
+
     int _animation_index = 0;
 };
 

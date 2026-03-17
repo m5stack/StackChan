@@ -8,8 +8,10 @@
 #include <cstdint>
 #include <string>
 #include <lvgl.h>
+#include <functional>
 #include <smooth_ui_toolkit.hpp>
 #include <uitk/short_namespace.hpp>
+#include <smooth_lvgl.hpp>
 #include <array>
 #include <lvgl_image.h>
 #include <string_view>
@@ -65,6 +67,60 @@ enum class AppConfigEvent {
  * @brief
  *
  */
+enum class CommonLogLevel {
+    Info = 0,
+    Warning,
+    Error,
+};
+
+/**
+ * @brief
+ *
+ */
+enum class WifiStatus {
+    None = 0,
+    Low,
+    Medium,
+    High,
+};
+
+/**
+ * @brief
+ *
+ */
+class BootLogo {
+public:
+    BootLogo()
+    {
+        _panel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());
+        _panel->setSize(320, 240);
+        _panel->setAlign(LV_ALIGN_CENTER);
+        _panel->setBorderWidth(0);
+        _panel->setBgOpa(0);
+
+        _label_logo = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
+        _label_logo->setTextFont(&lv_font_montserrat_24);
+        _label_logo->setTextColor(lv_color_hex(0xFFFFFF));
+        _label_logo->align(LV_ALIGN_CENTER, 0, -14);
+        _label_logo->setText("STACKCHAN");
+
+        _label_msg = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
+        _label_msg->setTextFont(&lv_font_montserrat_16);
+        _label_msg->setTextColor(lv_color_hex(0xBFBFBF));
+        _label_msg->align(LV_ALIGN_CENTER, 0, 14);
+        _label_msg->setText("Starting up ...");
+    }
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_logo;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_msg;
+};
+
+/**
+ * @brief
+ *
+ */
 class Hal {
 public:
     void init();
@@ -76,20 +132,35 @@ public:
     std::array<uint8_t, 6> getFactoryMac();
     std::string getFactoryMacString(std::string divider = "");
     void reboot();
+    void updateHeapStatusLog();
+    uint8_t getBatteryLevel();
+    bool isBatteryCharging();
+    void factoryReset();
 
     /* --------------------------------- Display -------------------------------- */
     lv_indev_t* lvTouchpad = nullptr;
+    std::unique_ptr<BootLogo> bootLogo;
     void lvglLock();
     void lvglUnlock();
+    void setBackLightBrightness(uint8_t brightness, bool permanent = false);
+    uint8_t getBackLightBrightness();
 
     /* --------------------------------- Xiaozhi -------------------------------- */
+    void requestXiaozhiStart()
+    {
+        _xiaozhi_start_requested = true;
+    }
+    bool isXiaozhiStartRequested()
+    {
+        return _xiaozhi_start_requested;
+    }
     void startXiaozhi();
 
     /* ----------------------------------- BLE ---------------------------------- */
     uitk::Signal<const char*> onBleMotionData;
     uitk::Signal<const char*> onBleAvatarData;
     uitk::Signal<const char*> onBleConfigData;
-    uitk::Signal<const char*> onBleAnimationData;
+    uitk::Signal<const char*> onBleRgbData;
     uitk::Signal<AppConfigEvent> onAppConfigEvent;
 
     void startBleServer();
@@ -122,16 +193,19 @@ public:
     uitk::Signal<bool> onWsVideoModeChange;
     uitk::Signal<std::shared_ptr<LvglImage>> onWsVideoFrame;
     uitk::Signal<std::string_view> onWsDanceData;
+    uitk::Signal<CommonLogLevel, std::string_view> onWsLog;
 
-    void startWebSocketAvatar();
-
-    /* -------------------------------- Reminder -------------------------------- */
-    uitk::Signal<int, std::string> onReminderTriggered;
-    int createReminder(int duration_s, const std::string& message);
-    void stopReminder(int id);
+    void startWebSocketAvatarService(std::function<void(std::string_view)> onStartLog);
 
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
+
+    /* ---------------------------------- Time ---------------------------------- */
+    void syncRtcTimeToSystem();
+    void syncSystemTimeToRtc();
+    void setTimezone(std::string_view tz);
+    std::string getTimezone();
+    void resetTimezoneConfig();
 
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;
@@ -139,7 +213,19 @@ public:
     bool espNowSend(const std::vector<uint8_t>& data, const uint8_t* destAddr = nullptr);
     void setLaserEnabled(bool enabled);
 
+    /* ------------------------------- Warm Reboot ------------------------------ */
+    void requestWarmReboot(int appIndex);
+    int getWarmRebootTarget();
+    void clearWarmRebootRequest();
+
+    /* --------------------------------- Network -------------------------------- */
+    void startNetwork(std::function<void(std::string_view)> onLog);
+    WifiStatus getWifiStatus();
+    void startSntp();
+
 private:
+    bool _xiaozhi_start_requested = false;
+
     void xiaozhi_board_init();
     void lvgl_init();
     void xiaozhi_mcp_init();
@@ -147,8 +233,8 @@ private:
     void servo_init();
     void head_touch_init();
     void io_expander_init();
-    void reminder_init();
     void imu_init();
+    void rtc_init();
 };
 
 Hal& GetHAL();

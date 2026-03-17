@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include <smooth_ui_toolkit.hpp>
+#include <uitk/short_namespace.hpp>
 #include <mooncake_log.h>
 #include <mooncake.h>
 #include <apps/apps.h>
@@ -35,6 +36,19 @@ extern "C" void app_main(void)
     // Main loop
     while (1) {
         GetHAL().feedTheDog();
+        GetHAL().updateHeapStatusLog();
+
         GetMooncake().update();
+
+        if (GetHAL().isXiaozhiStartRequested()) {
+            break;
+        }
     }
+
+    // Uninstall all apps and destroy mooncake
+    GetMooncake().uninstallAllApps();
+    DestroyMooncake();
+
+    // Start xiaozhi, never returns
+    GetHAL().startXiaozhi();
 }

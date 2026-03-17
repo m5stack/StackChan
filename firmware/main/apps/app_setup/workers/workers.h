@@ -44,12 +44,8 @@ public:
     void update() override;
 
 private:
-    std::unique_ptr<uitk::lvgl_cpp::Container> _pannel;
-    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_quit;
-    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
-    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_go_home;
-    bool _confirm_flag = false;
-    bool _go_home_flag = false;
+    std::unique_ptr<WorkerBase> _page_tips;
+    std::unique_ptr<WorkerBase> _page_calibration;
 };
 
 /**
@@ -81,25 +77,35 @@ private:
     int _app_config_signal_id             = -1;
 
     struct StateAppDownloadData {
+        std::unique_ptr<uitk::lvgl_cpp::Container> panel;
+        std::unique_ptr<uitk::lvgl_cpp::Label> title;
         std::unique_ptr<uitk::lvgl_cpp::Qrcode> qrcode;
-        std::unique_ptr<uitk::lvgl_cpp::Button> btn;
-        bool is_clicked = false;
+        std::unique_ptr<uitk::lvgl_cpp::Button> btn_next;
+        std::unique_ptr<uitk::lvgl_cpp::Label> info;
+        bool next_clicked = false;
 
         void reset()
         {
+            panel.reset();
+            title.reset();
             qrcode.reset();
-            btn.reset();
-            is_clicked = false;
+            btn_next.reset();
+            info.reset();
+            next_clicked = false;
         }
     };
     StateAppDownloadData _state_app_download_data;
 
     struct StateWaitAppConnectionData {
-        std::unique_ptr<uitk::lvgl_cpp::Button> id_btn;
+        std::unique_ptr<uitk::lvgl_cpp::Container> panel;
+        std::unique_ptr<uitk::lvgl_cpp::Button> btn_id;
+        std::unique_ptr<uitk::lvgl_cpp::Label> info;
 
         void reset()
         {
-            id_btn.reset();
+            panel.reset();
+            btn_id.reset();
+            info.reset();
         }
     };
     StateWaitAppConnectionData _state_wait_app_connection_data;
@@ -118,24 +124,127 @@ private:
  * @brief
  *
  */
-class AppBindCodeWorker : public WorkerBase {
-public:
-    AppBindCodeWorker();
-    ~AppBindCodeWorker();
-
-private:
-    std::unique_ptr<uitk::lvgl_cpp::Qrcode> _qrcode;
-    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_quit;
-};
-
 class RgbTestWorker : public WorkerBase {
 public:
     RgbTestWorker();
     ~RgbTestWorker();
 
 private:
-    std::unique_ptr<uitk::lvgl_cpp::Container> _pannel;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::vector<std::unique_ptr<uitk::lvgl_cpp::Button>> _buttons;
+};
+
+/**
+ * @brief
+ *
+ */
+class StartupWorker : public WorkerBase {
+public:
+    class PageStartup {
+    public:
+        PageStartup();
+
+        bool isSkipClicked() const
+        {
+            return _is_skip_clicked;
+        }
+
+        bool isStartClicked() const
+        {
+            return _is_start_clicked;
+        }
+
+    private:
+        std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+        std::unique_ptr<uitk::lvgl_cpp::Label> _info;
+        std::unique_ptr<uitk::lvgl_cpp::Button> _btn_skip;
+        std::unique_ptr<uitk::lvgl_cpp::Button> _btn_start;
+
+        bool _is_skip_clicked  = false;
+        bool _is_start_clicked = false;
+    };
+
+    StartupWorker();
+    ~StartupWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<PageStartup> _page_startup;
+    std::unique_ptr<WifiSetupWorker> _worker_wifi;
+};
+
+/**
+ * @brief
+ *
+ */
+class FwVersionWorker : public WorkerBase {
+public:
+    FwVersionWorker();
+    ~FwVersionWorker();
+    void update() override;
+
+private:
+    uint32_t _last_tick = 0;
+};
+
+/**
+ * @brief
+ *
+ */
+class BrightnessSetupWorker : public WorkerBase {
+public:
+    BrightnessSetupWorker();
+    ~BrightnessSetupWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_brightness;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+    int32_t _target_brightness = -1;
+};
+
+/**
+ * @brief
+ *
+ */
+class TimezoneWorker : public WorkerBase {
+public:
+    TimezoneWorker();
+    ~TimezoneWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Roller> _roller;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label;
+    bool _confirm_flag = false;
+};
+
+/**
+ * @brief
+ *
+ */
+class FactoryResetWorker : public WorkerBase {
+public:
+    FactoryResetWorker();
+    ~FactoryResetWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_info;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_cancel;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+
+    int _confirm_count = 0;
+    bool _cancel_flag  = false;
+    bool _confirm_flag = false;
+
+    void update_ui();
 };
 
 }  // namespace setup_workers

@@ -104,14 +104,8 @@ void display_setup_xiaozhi_ui()
 
 void xiaozhi_board_init()
 {
-    // Initialize the default event loop
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
     // Init board
     auto& board = Board::GetInstance();
-
-    // test
-    board.GetBacklight()->SetBrightness(100);
 }
 
 void start_xiaozhi_app()
@@ -120,9 +114,10 @@ void start_xiaozhi_app()
 
     set_xiaozhi_mode(true);
 
-    // Launch the application
+    // Initialize and run the application
     auto& app = Application::GetInstance();
-    app.Start();
+    app.Initialize();
+    app.Run();  // This function runs the main event loop and never returns
 }
 
 void app_play_sound(const std::string_view& sound)

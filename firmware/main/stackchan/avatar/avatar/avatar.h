@@ -97,6 +97,16 @@ public:
         }
     }
 
+    void setModifyLock(bool locked)
+    {
+        _is_modify_locked = locked;
+    }
+
+    bool isModifyLocked()
+    {
+        return _is_modify_locked;
+    }
+
     /* ---------------------------- Decorator helpers --------------------------- */
 
     int addDecorator(std::unique_ptr<Decorator> decorator)
@@ -120,6 +130,8 @@ protected:
     Emotion _emotion = Emotion::Neutral;
     KeyElements_t _key_elements;
     ObjectPool<Decorator> _decorator_pool;
+
+    bool _is_modify_locked = false;
 };
 
 }  // namespace stackchan::avatar

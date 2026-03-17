@@ -1,7 +1,6 @@
 # Define xiaozhi source directory
 set(XIAOZHI_MAIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../xiaozhi-esp32/main")
 
-
 file(GLOB_RECURSE STACK_CHAN_SOURCES
     "apps/*.c"
     "apps/*.cc"
@@ -47,6 +46,7 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lvgl_display/gif/lvgl_gif.cc"
             "display/lvgl_display/gif/gifdec.c"
             "display/lvgl_display/jpg/image_to_jpeg.cpp"
+            "display/lvgl_display/jpg/jpeg_to_image.c"
             "protocols/protocol.cc"
             "protocols/mqtt_protocol.cc"
             "protocols/websocket_protocol.cc"
@@ -55,8 +55,9 @@ set(SOURCES "audio/audio_codec.cc"
             "application.cc"
             "ota.cc"
             "settings.cc"
-            "device_state_event.cc"
+            "device_state_machine.cc"
             "assets.cc"
+            # "main.cc"
             )
 
 # Transform relative paths to absolute paths from xiaozhi-esp32/main
@@ -65,7 +66,6 @@ list(TRANSFORM SOURCES PREPEND "${XIAOZHI_MAIN_DIR}/")
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "protocols")
 # Transform include dirs to absolute paths from xiaozhi-esp32/main
 list(TRANSFORM INCLUDE_DIRS PREPEND "${XIAOZHI_MAIN_DIR}/")
-list(APPEND INCLUDE_DIRS)
 
 # Add board common files
 file(GLOB BOARD_COMMON_SOURCES ${XIAOZHI_MAIN_DIR}/boards/common/*.cc)
@@ -99,25 +99,28 @@ if(CONFIG_BOARD_TYPE_M5STACK_STACK_CHAN)
 endif()
 
 file(GLOB BOARD_SOURCES
+    ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.cc
+    ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.c
 )
 list(APPEND SOURCES ${BOARD_SOURCES})
 
 # Select audio processor according to Kconfig
 if(CONFIG_USE_AUDIO_PROCESSOR)
-    set(AUDIO_PROCESSOR_SRC "audio/processors/afe_audio_processor.cc")
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/audio/processors/afe_audio_processor.cc")
 else()
-    set(AUDIO_PROCESSOR_SRC "audio/processors/no_audio_processor.cc")
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/audio/processors/no_audio_processor.cc")
 endif()
-list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/${AUDIO_PROCESSOR_SRC}")
-
 if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
-    set(WAKE_WORD_SRCS "audio/wake_words/afe_wake_word.cc" "audio/wake_words/custom_wake_word.cc")
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/audio/wake_words/afe_wake_word.cc")
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/audio/wake_words/custom_wake_word.cc")
 else()
-    set(WAKE_WORD_SRCS "audio/wake_words/esp_wake_word.cc")
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/audio/wake_words/esp_wake_word.cc")
 endif()
-list(TRANSFORM WAKE_WORD_SRCS PREPEND "${XIAOZHI_MAIN_DIR}/")
-list(APPEND SOURCES ${WAKE_WORD_SRCS})
 
+# Auto Select Additional Sources
+if (CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING)
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/boards/common/blufi.cpp")
+endif ()
 # Select language directory according to Kconfig
 if(CONFIG_LANGUAGE_ZH_CN)
     set(LANG_DIR "zh-CN")
@@ -233,16 +236,14 @@ file(GLOB COMMON_SOUNDS
 
 # If target chip is ESP32, exclude specific files to avoid build errors
 if(CONFIG_IDF_TARGET_ESP32)
-    set(ESP32_EXCLUDE_FILES 
-        "audio/codecs/box_audio_codec.cc"
-        "audio/codecs/es8388_audio_codec.cc"
-        "audio/codecs/es8389_audio_codec.cc"
-        "led/gpio_led.cc"
-        "boards/common/esp32_camera.cc"
-        "display/lvgl_display/jpg/image_to_jpeg.cpp"
-    )
-    list(TRANSFORM ESP32_EXCLUDE_FILES PREPEND "${XIAOZHI_MAIN_DIR}/")
-    list(REMOVE_ITEM SOURCES ${ESP32_EXCLUDE_FILES})
+    list(REMOVE_ITEM SOURCES "audio/codecs/box_audio_codec.cc"
+                             "audio/codecs/es8388_audio_codec.cc"
+                             "audio/codecs/es8389_audio_codec.cc"
+                             "led/gpio_led.cc"
+                             "${XIAOZHI_MAIN_DIR}/boards/common/esp32_camera.cc"
+                             "display/lvgl_display/jpg/image_to_jpeg.cpp"
+                             "display/lvgl_display/jpg/jpeg_to_image.c"
+                             )
 endif()
 
 idf_component_register(SRCS ${SOURCES}
@@ -264,12 +265,12 @@ target_compile_definitions(${COMPONENT_LIB}
 # Add generation rules
 add_custom_command(
     OUTPUT ${LANG_HEADER}
-    COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/../xiaozhi-esp32/scripts/gen_lang.py
+    COMMAND python ${PROJECT_DIR}/xiaozhi-esp32/scripts/gen_lang.py
             --language "${LANG_DIR}"
             --output "${LANG_HEADER}"
     DEPENDS
         ${LANG_JSON}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../xiaozhi-esp32/scripts/gen_lang.py
+        ${PROJECT_DIR}/xiaozhi-esp32/scripts/gen_lang.py
     COMMENT "Generating ${LANG_DIR} language config"
 )
 
@@ -327,6 +328,7 @@ endforeach()
 
 endif()
 
+set(DEFAULT_ASSETS_EXTRA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/assets_bin") 
 
 # Function to build default assets based on configuration
 function(build_default_assets_bin)
@@ -360,10 +362,10 @@ function(build_default_assets_bin)
     # Create custom command to build assets
     add_custom_command(
         OUTPUT ${GENERATED_ASSETS_BIN}
-        COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/../xiaozhi-esp32/scripts/build_default_assets.py ${BUILD_ARGS}
+        COMMAND python ${PROJECT_DIR}/xiaozhi-esp32/scripts/build_default_assets.py ${BUILD_ARGS}
         DEPENDS
             ${SDKCONFIG}
-            ${CMAKE_CURRENT_SOURCE_DIR}/../xiaozhi-esp32/scripts/build_default_assets.py
+            ${PROJECT_DIR}/xiaozhi-esp32/scripts/build_default_assets.py
         COMMENT "Building default assets.bin based on configuration"
         VERBATIM
     )
@@ -421,7 +423,7 @@ function(get_assets_local_file assets_source assets_local_file_var)
         if(IS_ABSOLUTE "${assets_source}")
             set(ASSETS_LOCAL_FILE "${assets_source}")
         else()
-            set(ASSETS_LOCAL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${assets_source}")
+            set(ASSETS_LOCAL_FILE "${XIAOZHI_MAIN_DIR}/${assets_source}")
         endif()
         
         # Check if local file exists

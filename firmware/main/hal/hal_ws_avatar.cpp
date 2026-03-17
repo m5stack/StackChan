@@ -6,6 +6,7 @@
 #include "hal.h"
 #include <stackchan/stackchan.h>
 #include "board/hal_bridge.h"
+#include <mooncake.h>
 #include <mooncake_log.h>
 #include <board.h>
 #include <web_socket.h>
@@ -21,11 +22,13 @@
 #include <esp_heap_caps.h>
 #include <display.h>
 #include <lvgl_image.h>
+#include <wifi_manager.h>
 #include "utils/jpeg_to_image/jpeg_decoder.h"
+#include "audio/audio_service.h"
+#include "utils/secret_logic/secret_logic.h"
 
 static std::string _tag = "WS-Avatar";
 
-static const std::string _server                  = "ws://target-server:12800";
 static const std::string _setting_ns              = "stackchan";
 static const std::string _setting_device_name_key = "device_name";
 
@@ -50,6 +53,8 @@ public:
         VideoModeOn       = 0x12,
         VideoModeOff      = 0x13,
         DanceSequence     = 0x14,
+        StartAudioStream  = 0x18,
+        StopAudioStream   = 0x19,
     };
 
     struct ReceivedMessage {
@@ -59,7 +64,7 @@ public:
 
     void init()
     {
-        _url = fmt::format("{}/stackChan/ws?mac={}&deviceType=StackChan", _server, GetHAL().getFactoryMacString());
+        _url = fmt::format("{}/stackChan/ws?deviceType=StackChan", secret_logic::get_server_url());
 
         connect();
 
@@ -89,10 +94,15 @@ public:
             ESP_LOGI(_tag.c_str(), "Sending EndCall");
             sendPacket(DataType::EndCall, nullptr, 0);
         });
+
+        // Initialize audio service
+        setupAudio();
     }
 
     void connect()
     {
+        auto token = secret_logic::generate_auth_token();
+
         // 销毁旧实例，确保状态复位
         _websocket.reset();
 
@@ -107,22 +117,44 @@ public:
             return;
         }
 
+        // 设置认证头
+        _websocket->SetHeader("Authorization", token.c_str());
+
         // 设置回调
         _websocket->OnConnected([this]() {
             ESP_LOGI(_tag.c_str(), "Connected to server!");
+            // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Server connected");
+            _last_heartbeat_time = GetHAL().millis();
             _websocket->Send("{\"type\":\"hello\", \"msg\":\"Hello from StackChan!\"}");
         });
 
-        _websocket->OnDisconnected([this]() { ESP_LOGI(_tag.c_str(), "Disconnected!"); });
+        _websocket->OnDisconnected([this]() {
+            ESP_LOGI(_tag.c_str(), "Disconnected!");
+            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Server disconnected");
+        });
 
         _websocket->OnData([this](const char* data, size_t len, bool binary) {
+            // Fast path for Audio packets to avoid jitter from main thread loop
+            if (binary && len > 5 && static_cast<DataType>(data[0]) == DataType::Opus) {
+                // Determine raw pointer and size safely
+                const uint8_t* u_data = reinterpret_cast<const uint8_t*>(data);
+
+                // Directly construct and push to AudioService
+                auto packet = std::make_unique<AudioStreamPacket>();
+                packet->payload.assign(u_data + 5, u_data + len);
+                _audio_service.PushPacketToDecodeQueue(std::move(packet));
+                return;
+            }
+
             std::lock_guard<std::mutex> lock(_mutex);
             _msg_queue.push({binary, std::vector<uint8_t>(data, data + len)});
         });
 
-        ESP_LOGI(_tag.c_str(), "Connecting to %s...", _url.c_str());
+        // ESP_LOGI(_tag.c_str(), "Connecting to %s...", _url.c_str());
+        // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Connecting to server...");
         if (!_websocket->Connect(_url.c_str())) {
             ESP_LOGE(_tag.c_str(), "Failed to connect");
+            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Connect to server Failed");
         }
         _last_reconnect_attempt = GetHAL().millis();
     }
@@ -139,6 +171,14 @@ public:
             }
         } else {
             processMessages();
+
+            // Check heartbeat timeout
+            if (GetHAL().millis() - _last_heartbeat_time > 10000) {
+                ESP_LOGE(_tag.c_str(), "Heartbeat timeout!");
+                GetHAL().onWsLog.emit(CommonLogLevel::Error, "Heartbeat Timeout");
+                _last_heartbeat_time = GetHAL().millis();
+                return;
+            }
         }
 
         if (_is_streaming) {
@@ -173,6 +213,15 @@ public:
             ESP_LOGI(_tag.c_str(), "Received binary type: %d, len: %d", (int)type, (int)msg.data.size());
 
             switch (type) {
+                // Opus handled in OnData Fast Path
+                // case DataType::Opus: {
+                //     if (msg.data.size() > 5) {
+                //         auto packet = std::make_unique<AudioStreamPacket>();
+                //         packet->payload.assign(msg.data.begin() + 5, msg.data.end());
+                //         _audio_service.PushPacketToDecodeQueue(std::move(packet));
+                //     }
+                //     break;
+                // }
                 case DataType::StartCameraStream: {
                     ESP_LOGI(_tag.c_str(), "Start Camera Stream");
                     setStreamingEnabled(true);
@@ -239,6 +288,7 @@ public:
                 }
                 case DataType::HeartbeatPing: {
                     ESP_LOGI(_tag.c_str(), "HeartbeatPing");
+                    _last_heartbeat_time = GetHAL().millis();
                     sendPacket(DataType::HeartbeatPong, nullptr, 0);
                     break;
                 }
@@ -322,6 +372,16 @@ public:
                     }
                     break;
                 }
+                case DataType::StartAudioStream: {
+                    ESP_LOGI(_tag.c_str(), "Start Audio Stream");
+                    _is_audio_streaming = true;
+                    break;
+                }
+                case DataType::StopAudioStream: {
+                    ESP_LOGI(_tag.c_str(), "Stop Audio Stream");
+                    _is_audio_streaming = false;
+                    break;
+                }
                 default:
                     break;
             }
@@ -389,20 +449,59 @@ private:
     std::string _url;
     uint32_t _last_reconnect_attempt = 0;
     uint32_t _last_capture_time      = 0;
+    uint32_t _last_heartbeat_time    = 0;
     bool _is_streaming               = false;
     bool _is_video_mode              = false;
+    std::atomic<bool> _is_audio_streaming{false};
     std::mutex _mutex;
     std::queue<ReceivedMessage> _msg_queue;
 
+    // Audio
+    AudioService _audio_service;
+    std::mutex _send_mutex;
+
+    void setupAudio()
+    {
+        auto codec = Board::GetInstance().GetAudioCodec();
+        _audio_service.Initialize(codec);
+
+        AudioServiceCallbacks callbacks;
+        callbacks.on_send_queue_available = [this]() {
+            while (true) {
+                auto packet = _audio_service.PopPacketFromSendQueue();
+                if (!packet) {
+                    break;
+                }
+
+                // Only send audio if streaming is enabled
+                if (_is_audio_streaming) {
+                    if (!packet->payload.empty()) {
+                        sendPacket(DataType::Opus, packet->payload.data(), packet->payload.size());
+                    }
+                }
+            }
+        };
+
+        _audio_service.SetCallbacks(callbacks);
+
+        codec->SetInputGain(0.0f);
+        _audio_service.Start();
+        _audio_service.EnableVoiceProcessing(true);
+        _audio_service.EnableDeviceAec(true);
+    }
+
     void sendPacket(DataType type, const uint8_t* data, size_t len)
     {
+        std::lock_guard<std::mutex> lock(_send_mutex);
         if (!_websocket || !_websocket->IsConnected()) {
             return;
         }
 
-        static int64_t _time_count = 0;
-        static int64_t _interval   = 0;
-        _time_count                = esp_timer_get_time();
+        // mclog::info("sending packet type: {}, len: {}", (int)type, (int)len);
+
+        // static int64_t _time_count = 0;
+        // static int64_t _interval   = 0;
+        // _time_count                = esp_timer_get_time();
 
         std::vector<uint8_t> packet;
         packet.reserve(1 + 4 + len);
@@ -423,36 +522,53 @@ private:
             packet.insert(packet.end(), data, data + len);
         }
 
+        // _interval = esp_timer_get_time() - _time_count;
+        // mclog::info("pack time: {} ms, size: {}", _interval / 1000, packet.size());
+
         // _time_count = esp_timer_get_time();
         _websocket->Send(packet.data(), packet.size(), true);
-        _interval = esp_timer_get_time() - _time_count;
-        mclog::info("send time: {} ms, size: {}", _interval / 1000, packet.size());
+        // _interval = esp_timer_get_time() - _time_count;
+        // mclog::info("send time: {} ms, size: {}", _interval / 1000, packet.size());
     }
 };
 
-static void _websocket_task(void* param)
-{
-    ESP_LOGI(_tag.c_str(), "Start WebSocket Avatar Task");
-
-    // 等待网络连接
-    while (!WifiStation::GetInstance().IsConnected()) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+class WebsocketAvatarWorker : public mooncake::BasicAbility {
+public:
+    WebsocketAvatarWorker()
+    {
+        _service = std::make_unique<WebSocketAvatar>();
+        _service->init();
     }
-    ESP_LOGI(_tag.c_str(), "Network connected!");
 
-    static WebSocketAvatar ws_avatar;
-    ws_avatar.init();
-
-    while (true) {
-        ws_avatar.update();
-        GetHAL().delay(20);
+    void onCreate() override
+    {
     }
-}
 
-void Hal::startWebSocketAvatar()
+    void onRunning() override
+    {
+        if (GetHAL().millis() - _last_tick < 20) {
+            return;
+        }
+        _last_tick = GetHAL().millis();
+        _service->update();
+    }
+
+    void onDestroy() override
+    {
+        _service.reset();
+    }
+
+private:
+    std::unique_ptr<WebSocketAvatar> _service;
+    uint32_t _last_tick = 0;
+};
+
+void Hal::startWebSocketAvatarService(std::function<void(std::string_view)> onStartLog)
 {
-    auto& board = Board::GetInstance();
-    board.StartNetwork();
+    mclog::tagInfo(_tag, "start websocket avatar service");
 
-    xTaskCreate(_websocket_task, "ws_avatar_task", 8192, NULL, 5, NULL);
+    startNetwork(onStartLog);
+
+    onStartLog("Connecting to\nserver...");
+    mooncake::GetMooncake().extensionManager()->createAbility(std::make_unique<WebsocketAvatarWorker>());
 }

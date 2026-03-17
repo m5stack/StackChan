@@ -5,12 +5,14 @@
  */
 #include "app_espnow_ctrl.h"
 #include "view/page_selector.h"
+#include "view/view.h"
 #include <hal/hal.h>
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
 #include <stackchan/stackchan.h>
+#include <apps/common/common.h>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -26,7 +28,7 @@ AppEspnowControl::AppEspnowControl()
     // 配置 App 图标
     setAppInfo().icon = (void*)&icon_controller;
     // 配置 App 主题颜色
-    static uint32_t theme_color = 0xCCCC33;
+    static uint32_t theme_color = 0x7ACE74;
     setAppInfo().userData       = (void*)&theme_color;
 }
 
@@ -38,36 +40,27 @@ void AppEspnowControl::onCreate()
 static std::mutex _mutex;
 static std::vector<uint8_t> _received_data;
 static int _receiver_id  = 0;
+static int _wifi_channel = 0;
 static bool _is_receiver = false;
 
 void AppEspnowControl::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-    // Get role
-    std::vector<std::string> role_options = {"Receiver", "Sender"};
-    int role_selection                    = view::create_page_selector_and_wait("Select Role", role_options);
-    _is_receiver                          = (role_selection == 0);
-    mclog::tagInfo(getAppInfo().name, "selected role: {}", _is_receiver ? "Receiver" : "Sender");
+    // Default setup
+    _receiver_id  = 1;
+    _wifi_channel = 1;
 
-    // Get channel
-    std::vector<std::string> channel_options;
-    for (int i = 0; i < 13; i++) {
-        channel_options.push_back(std::to_string(i + 1));
+    // Start setup page
+    bool is_advanced = start_startup_page();
+    if (is_advanced) {
+        start_advanced_page();
     }
-    auto wifi_channel = view::create_page_selector_and_wait("Select WiFi Channel", channel_options) + 1;
-    mclog::tagInfo(getAppInfo().name, "selected wifi channel: {}", wifi_channel);
-
-    // Get id
-    std::vector<std::string> id_options;
-    for (int i = 0; i < 255; i++) {
-        id_options.push_back(std::to_string(i));
-    }
-    _receiver_id = view::create_page_selector_and_wait("Select ID", id_options);
-    mclog::tagInfo(getAppInfo().name, "selected id: {}", _receiver_id);
+    mclog::tagInfo(getAppInfo().name, "get setup: role {}, id {}, channel {}", _is_receiver ? "Receiver" : "Sender",
+                   _receiver_id, _wifi_channel);
 
     // Start espnow
-    GetHAL().startEspNow(wifi_channel);
+    GetHAL().startEspNow(_wifi_channel);
     GetHAL().onEspNowData.connect([](const std::vector<uint8_t>& data) {
         std::lock_guard<std::mutex> lock(_mutex);
         _received_data = data;
@@ -82,6 +75,7 @@ void AppEspnowControl::onOpen()
     avatar->init(lv_screen_active());
     stackchan.attachAvatar(std::move(avatar));
 
+    stackchan.clearModifiers();
     stackchan.addModifier(std::make_unique<BreathModifier>());
     stackchan.addModifier(std::make_unique<BlinkModifier>());
 
@@ -89,6 +83,75 @@ void AppEspnowControl::onOpen()
     stackchan.motion().setAutoAngleSyncEnabled(false);
 
     GetHAL().setLaserEnabled(false);
+
+    view::create_home_indicator([&]() { close(); }, 0xA0D99C, 0x154311);
+    view::create_status_bar(0xA0D99C, 0x154311);
+}
+
+bool AppEspnowControl::start_startup_page()
+{
+    GetHAL().lvglLock();
+    auto page = std::make_unique<view::EspnowRoleSelectorPage>();
+    GetHAL().lvglUnlock();
+    while (1) {
+        GetHAL().delay(50);
+        LvglLockGuard lock;
+        if (page->isSelected()) {
+            break;
+        }
+    }
+
+    bool is_advanced = false;
+    GetHAL().lvglLock();
+    if (page->selectedIndex() == 0) {
+        _is_receiver = true;
+    } else if (page->selectedIndex() == 1) {
+        _is_receiver = false;
+    } else {
+        is_advanced = true;
+    }
+    page.reset();
+    GetHAL().lvglUnlock();
+
+    return is_advanced;
+}
+
+void AppEspnowControl::start_advanced_page()
+{
+    // Get role
+    std::vector<std::string> role_options = {"Receiver", "Sender"};
+    int role_selection                    = view::create_page_selector_and_wait("Select Role", role_options);
+    _is_receiver                          = (role_selection == 0);
+    mclog::tagInfo(getAppInfo().name, "selected role: {}", _is_receiver ? "Receiver" : "Sender");
+
+    // Get wifi channel
+    std::vector<std::string> channel_options;
+    for (int i = 0; i < 13; i++) {
+        channel_options.push_back(std::to_string(i + 1));
+    }
+    _wifi_channel = view::create_page_selector_and_wait("Select WiFi Channel", channel_options) + 1;
+    mclog::tagInfo(getAppInfo().name, "selected wifi channel: {}", _wifi_channel);
+
+    // Get id
+    if (_is_receiver) {
+        std::vector<std::string> id_options;
+        for (int i = 1; i < 255; i++) {
+            id_options.push_back(std::to_string(i));
+        }
+        _receiver_id = view::create_page_selector_and_wait("Select Receiver ID", id_options) + 1;
+        mclog::tagInfo(getAppInfo().name, "selected receiver id: {}", _receiver_id);
+    } else {
+        std::vector<std::string> id_options;
+        for (int i = 0; i < 255; i++) {
+            if (i == 0) {
+                id_options.push_back("0 (Broadcast)");
+                continue;
+            }
+            id_options.push_back(std::to_string(i));
+        }
+        _receiver_id = view::create_page_selector_and_wait("Select Receiver ID", id_options);
+        mclog::tagInfo(getAppInfo().name, "selected target id: {}", _receiver_id);
+    }
 }
 
 void handle_received_data()
@@ -178,6 +241,9 @@ void AppEspnowControl::onRunning()
     }
 
     GetStackChan().update();
+
+    view::update_home_indicator();
+    view::update_status_bar();
 }
 
 void AppEspnowControl::onClose()
@@ -185,4 +251,9 @@ void AppEspnowControl::onClose()
     mclog::tagInfo(getAppInfo().name, "on close");
 
     LvglLockGuard lock;
+
+    view::destroy_home_indicator();
+    view::destroy_status_bar();
+
+    GetHAL().requestWarmReboot(2);
 }

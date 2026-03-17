@@ -36,25 +36,23 @@ void AppSetup::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-    LvglLockGuard lock;
+    // Reset state
+    _destroy_menu    = false;
+    _need_warm_reset = false;
+    _magic_count     = 0;
 
     _menu_sections = {{
                           "Connectivity",
-                          {
-                            // {"Set Up Wi-Fi",
-                            // [&]() {
-                            //     _destroy_menu = true;
-                            //     _worker       = std::make_unique<WifiSetupWorker>();
-                            // }},
-                           {"App Bind Code",
+                          {{"Set Up Wi-Fi",
                             [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<AppBindCodeWorker>();
+                                _destroy_menu    = true;
+                                _need_warm_reset = true;
+                                _worker          = std::make_unique<WifiSetupWorker>();
                             }}},
                       },
                       {
                           "Servo",
-                          {{"Zero Calibration",
+                          {{"Calibration",
                             [&]() {
                                 _destroy_menu = true;
                                 _worker       = std::make_unique<ZeroCalibrationWorker>();
@@ -66,15 +64,45 @@ void AppSetup::onOpen()
                             }}},
                       },
                       {
-                          "About",
-                          {{fmt::format("FW Version:  {}", common::FirmwareVersion), nullptr}},
+                          "Display",
+                          {{"Brightness",
+                            [&]() {
+                                _destroy_menu = true;
+                                _worker       = std::make_unique<BrightnessSetupWorker>();
+                            }}},
                       },
                       {
-                          "End",
-                          {{"Quit", [&]() { close(); }}},
+                          "System",
+                          {{"Timezone",
+                            [&]() {
+                                _destroy_menu = true;
+                                _worker       = std::make_unique<TimezoneWorker>();
+                            }}},
+                      },
+                      {
+                          "About",
+                          {{fmt::format("FW Version:  {}", common::FirmwareVersion),
+                            [&]() {
+                                _magic_count++;
+                                if (_magic_count >= 10) {
+                                    _magic_count  = 0;
+                                    _destroy_menu = true;
+                                    _worker       = std::make_unique<FwVersionWorker>();
+                                }
+                            }},
+                           {"Factory Reset",
+                            [&]() {
+                                _destroy_menu = true;
+                                _worker       = std::make_unique<FactoryResetWorker>();
+                            }}},
                       }};
 
+    LvglLockGuard lock;
+
     _menu_page = std::make_unique<view::SelectMenuPage>(_menu_sections);
+
+    view::create_home_indicator([&]() { close(); });
+    view::create_status_bar();
 }
 
 void AppSetup::onRunning()
@@ -99,6 +127,9 @@ void AppSetup::onRunning()
     }
 
     GetStackChan().update();
+
+    view::update_home_indicator();
+    view::update_status_bar();
 }
 
 void AppSetup::onClose()
@@ -107,5 +138,14 @@ void AppSetup::onClose()
 
     LvglLockGuard lock;
 
+    _menu_sections.clear();
     _menu_page.reset();
+    _worker.reset();
+
+    view::destroy_home_indicator();
+    view::destroy_status_bar();
+
+    if (_need_warm_reset) {
+        GetHAL().requestWarmReboot(3);
+    }
 }

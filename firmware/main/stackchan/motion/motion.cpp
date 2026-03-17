@@ -137,3 +137,13 @@ void Motion::setAutoAngleSyncEnabled(bool enabled)
     _yaw_servo->setAutoAngleSyncEnabled(enabled);
     _pitch_servo->setAutoAngleSyncEnabled(enabled);
 }
+
+void Motion::setModifyLock(bool locked)
+{
+    _is_modify_locked = locked;
+}
+
+bool Motion::isModifyLocked()
+{
+    return _is_modify_locked;
+}

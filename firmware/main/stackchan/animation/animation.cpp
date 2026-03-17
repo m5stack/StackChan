@@ -19,6 +19,7 @@ void Keyframe::apply()
         feat.setPosition(kf.position);
         feat.setRotation(kf.rotation);
         feat.setWeight(kf.weight);
+        feat.setSize(kf.size);
     };
     apply_feature(leftEye, avatar.leftEye());
     apply_feature(rightEye, avatar.rightEye());
@@ -27,6 +28,9 @@ void Keyframe::apply()
     auto apply_servo = [&](const ServoKeyframe& kf, motion::Servo& servo) { servo.moveWithSpeed(kf.angle, kf.speed); };
     apply_servo(yawServo, motion.yawServo());
     apply_servo(pitchServo, motion.pitchServo());
+
+    stackchan.leftNeonLight().setColor(leftRgbColor);
+    stackchan.rightNeonLight().setColor(rightRgbColor);
 }
 
 void Timeline::start()
