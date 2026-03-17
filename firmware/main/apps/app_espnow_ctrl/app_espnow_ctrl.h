@@ -19,4 +19,8 @@ public:
     void onOpen() override;
     void onRunning() override;
     void onClose() override;
+
+private:
+    bool start_startup_page();
+    void start_advanced_page();
 };

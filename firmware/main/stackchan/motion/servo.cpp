@@ -37,7 +37,7 @@ void Servo::init()
 
 void Servo::update()
 {
-    // Update at 50Hz
+    // Keep update in at most 50Hz
     if (GetHAL().millis() - _last_tick < 20) {
         return;
     }
@@ -45,7 +45,7 @@ void Servo::update()
 
     // Apply animation
     if (!_angle_anim.done()) {
-        _angle_anim.update();
+        _angle_anim.updateWithDelta(0.02f);  // Fixed delta time for consistency
         set_angle_impl(static_cast<int>(_angle_anim.directValue()));
     }
 
@@ -92,6 +92,11 @@ int Servo::getCurrentAngle()
     return _angle_anim.directValue();
 }
 
+bool Servo::isMoving()
+{
+    return _angle_anim.done() == false || is_moving_impl();
+}
+
 void Servo::apply_default_spring_options()
 {
     auto& options          = _angle_anim.springOptions();
@@ -102,6 +107,8 @@ void Servo::apply_default_spring_options()
 
 void Servo::update_angle_anim_target(int angle)
 {
+    angle = uitk::clamp(angle, _angle_limit.x, _angle_limit.y);
+
     if (_auto_angle_sync_enabled) {
         _angle_anim.teleport(getCurrentAngle());  // Use current angle as start
     }

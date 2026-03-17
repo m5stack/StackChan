@@ -28,5 +28,8 @@ private:
     std::vector<view::SelectMenuPage::MenuSection> _menu_sections;
     std::unique_ptr<view::SelectMenuPage> _menu_page;
     std::unique_ptr<setup_workers::WorkerBase> _worker;
-    bool _destroy_menu = false;
+
+    bool _destroy_menu    = false;
+    bool _need_warm_reset = false;
+    int _magic_count      = 0;
 };

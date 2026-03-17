@@ -31,20 +31,9 @@ private:
     struct BleHandlerData_t {
         bool update_flag = false;
         char* data_ptr   = nullptr;
-        int callback_id  = -1;
     };
     BleHandlerData_t _ble_avatar_data;
     BleHandlerData_t _ble_motion_data;
-
-    struct WsCallbackIds_t {
-        int avatar_id     = -1;
-        int motion_id     = -1;
-        int call_req_id   = -1;
-        int call_end_id   = -1;
-        int text_msg_id   = -1;
-        int dance_data_id = -1;
-    };
-    WsCallbackIds_t _ws_callback_ids;
 
     int _ws_call_view_id = -1;
 

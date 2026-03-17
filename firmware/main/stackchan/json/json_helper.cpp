@@ -157,6 +157,9 @@ static FeatureKeyframe parse_feature(ArduinoJson::JsonObject jsonObject)
     if (jsonObject["weight"].is<int>()) {
         kf.weight = jsonObject["weight"];
     }
+    if (jsonObject["size"].is<int>()) {
+        kf.size = jsonObject["size"];
+    }
     return kf;
 }
 
@@ -210,6 +213,12 @@ KeyframeSequence parse_sequence_from_json(const char* jsonContent)
         if (kfObj["pitchServo"].is<ArduinoJson::JsonObject>()) {
             kf.pitchServo = parse_servo(kfObj["pitchServo"]);
         }
+        if (kfObj["leftRgbColor"].is<const char*>()) {
+            kf.leftRgbColor = kfObj["leftRgbColor"].as<std::string>();
+        }
+        if (kfObj["rightRgbColor"].is<const char*>()) {
+            kf.rightRgbColor = kfObj["rightRgbColor"].as<std::string>();
+        }
         if (kfObj["durationMs"].is<int>()) {
             kf.durationMs = kfObj["durationMs"];
         }
@@ -221,3 +230,35 @@ KeyframeSequence parse_sequence_from_json(const char* jsonContent)
 }
 
 }  // namespace stackchan::animation
+
+namespace stackchan::addon {
+
+void update_neon_light_from_json(NeonLight* left, NeonLight* right, const char* jsonContent)
+{
+    if (!left || !right || !jsonContent) {
+        return;
+    }
+
+    ArduinoJson::JsonDocument doc;
+    auto error = ArduinoJson::deserializeJson(doc, jsonContent);
+    if (error) {
+        mclog::tagError(_tag, "deserializeJson failed: {}", error.c_str());
+        return;
+    }
+
+    if (doc["leftRgbDuration"].is<float>()) {
+        left->setDuration(doc["leftRgbDuration"].as<float>());
+    }
+    if (doc["leftRgbColor"].is<std::string>()) {
+        left->setColor(doc["leftRgbColor"].as<std::string>());
+    }
+
+    if (doc["rightRgbDuration"].is<float>()) {
+        right->setDuration(doc["rightRgbDuration"].as<float>());
+    }
+    if (doc["rightRgbColor"].is<std::string>()) {
+        right->setColor(doc["rightRgbColor"].as<std::string>());
+    }
+}
+
+}  // namespace stackchan::addon

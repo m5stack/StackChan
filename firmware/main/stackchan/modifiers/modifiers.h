@@ -10,5 +10,6 @@
 #include "speaking.h"
 #include "head_pet.h"
 #include "idle_motion.h"
+#include "idle_expression.h"
 #include "dance.h"
 #include "imu.h"

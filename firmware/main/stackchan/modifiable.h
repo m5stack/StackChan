@@ -6,6 +6,7 @@
 #pragma once
 #include "avatar/avatar.h"
 #include "motion/motion.h"
+#include "addons/neon_light/neon_light.h"
 #include "utils/object_pool.h"
 
 namespace stackchan {
@@ -23,6 +24,12 @@ public:
     virtual avatar::Avatar& avatar() = 0;
 
     virtual bool hasAvatar() = 0;
+
+    // virtual bool hasMotion() = 0; // Motion must be always present
+
+    virtual addon::NeonLight& leftNeonLight() = 0;
+
+    virtual addon::NeonLight& rightNeonLight() = 0;
 };
 
 /**

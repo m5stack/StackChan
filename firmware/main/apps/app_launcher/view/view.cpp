@@ -7,6 +7,7 @@
 #include <mooncake_log.h>
 #include <assets/assets.h>
 #include <functional>
+#include <hal/hal.h>
 #include <cstdint>
 #include <vector>
 
@@ -134,12 +135,13 @@ public:
     {
         _last_index = _current_index;
 
-        _current_index = (scrollValue + _page_gap / 2) / _page_gap;
+        // Calculate absolute index
+        int abs_index = (scrollValue + _page_gap / 2) / _page_gap;
+
+        // Map to 0 ~ N-1
+        _current_index = abs_index % _page_num;
         if (_current_index < 0) {
-            _current_index = 0;
-        }
-        if (_current_index >= _page_num) {
-            _current_index = _page_num - 1;
+            _current_index += _page_num;
         }
 
         if (_last_index != _current_index) {
@@ -282,6 +284,9 @@ private:
 
 static std::string _tag        = "LauncherView";
 static constexpr int _icon_gap = 320;
+// Create 5 copies: [0:Backup] [1:Buffer] [2:Main] [3:Buffer] [4:Backup]
+static constexpr int _loop_copies       = 5;
+static constexpr int _center_copy_index = 2;
 
 static int _last_clicked_icon_pos_x = -1;
 static std::unique_ptr<DynamicBgColor> _dynamic_bg_color;
@@ -323,53 +328,54 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     int icon_x = 0;
     int icon_y = 0;
     std::vector<std::string> icon_label_texts;
-    for (const auto& props : appPorps) {
-        // mclog::tagInfo(_tag, "name: {}, id: {}", props.info.name, props.appID);
+    std::vector<uint32_t> step_colors;
 
-        // Icon panel
-        _icon_panels.push_back(std::make_unique<Container>(_panel->get()));
-        _icon_panels.back()->setAlign(LV_ALIGN_CENTER);
-        _icon_panels.back()->setSize(190, 160);
-        _icon_panels.back()->setPos(icon_x, icon_y);
-        _icon_panels.back()->setBorderWidth(0);
-        _icon_panels.back()->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
-        _icon_panels.back()->setBgOpa(0);
+    // Loop multiple times to create fake infinite scroll
+    for (int loop = 0; loop < _loop_copies; loop++) {
+        for (const auto& props : appPorps) {
+            // Icon panel
+            _icon_panels.push_back(std::make_unique<Container>(_panel->get()));
+            _icon_panels.back()->setAlign(LV_ALIGN_CENTER);
+            _icon_panels.back()->setSize(190, 160);
+            _icon_panels.back()->setPos(icon_x, icon_y);
+            _icon_panels.back()->setBorderWidth(0);
+            _icon_panels.back()->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+            _icon_panels.back()->setBgOpa(0);
 
-        // Icon click callback
-        auto app_id = props.appID;
-        auto pos_x  = icon_x;
-        _icon_panels.back()->onClick().connect([&, app_id, pos_x]() {
-            _clicked_app_id          = app_id;
-            _last_clicked_icon_pos_x = pos_x;
-        });
+            // Icon click callback
+            auto app_id = props.appID;
+            auto pos_x  = icon_x;
+            _icon_panels.back()->onClick().connect([&, app_id, pos_x]() {
+                _clicked_app_id          = app_id;
+                _last_clicked_icon_pos_x = pos_x;
+            });
 
-        // Collect icon label texts
-        icon_label_texts.push_back(props.info.name);
+            // Keep track of data for helpers
+            icon_label_texts.push_back(props.info.name);
 
-        // Icon image
-        if (props.info.icon != nullptr) {
-            _icon_images.push_back(std::make_unique<Image>(_icon_panels.back()->get()));
-            _icon_images.back()->setSrc(props.info.icon);
-            _icon_images.back()->setAlign(LV_ALIGN_CENTER);
+            uint32_t color = 0xDADADA;
+            if (props.info.userData != nullptr) {
+                color = *(uint32_t*)props.info.userData;
+            }
+            step_colors.push_back(color);
+
+            // Icon image
+            if (props.info.icon != nullptr) {
+                _icon_images.push_back(std::make_unique<Image>(_icon_panels.back()->get()));
+                _icon_images.back()->setSrc(props.info.icon);
+                _icon_images.back()->setAlign(LV_ALIGN_CENTER);
+            }
+
+            icon_x += _icon_gap;
         }
-
-        icon_x += _icon_gap;
     }
 
     /* ------------------------------ LR indicators ----------------------------- */
-    // Scroll to nearby icon handler with wrap-around
-    int total_icons            = appPorps.size();
-    auto scroll_to_nearby_icon = [&, total_icons](int direction) {
+    // Scroll to nearby icon handler
+    auto scroll_to_nearby_icon = [&](int direction) {
         auto current_scroll_x = _panel->getScrollX();
         int current_index     = (current_scroll_x + _icon_gap / 2) / _icon_gap;
         int target_index      = current_index + direction;
-
-        // Wrap around at boundaries
-        if (target_index < 0) {
-            target_index = total_icons - 1;
-        } else if (target_index >= total_icons) {
-            target_index = 0;
-        }
 
         int target_x        = target_index * _icon_gap;
         int scroll_distance = target_x - current_scroll_x;
@@ -409,16 +415,6 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     /* ---------------------------- Dynamic bg color ---------------------------- */
     _dynamic_bg_color = std::make_unique<DynamicBgColor>();
 
-    std::vector<uint32_t> step_colors;
-    step_colors.resize(appPorps.size());
-    for (size_t i = 0; i < appPorps.size(); i++) {
-        uint32_t color = 0xDADADA;
-        if (appPorps[i].info.userData != nullptr) {
-            color = *(uint32_t*)appPorps[i].info.userData;
-        }
-        step_colors[i] = color;
-    }
-
     _dynamic_bg_color->onBgColorChanged = [&](const uint32_t& bgColor) {
         // mclog::tagInfo(_tag, "bg color changed to {:06X}", bgColor);
         _panel->setBgColor(lv_color_hex(bgColor));
@@ -428,6 +424,7 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
 
     /* ------------------------------ Page indicator ---------------------------- */
     _page_indicator = std::make_unique<PageIndicator>();
+    // Page indicator only needs to know the real app count (N), not N * copies
     _page_indicator->init(appPorps.size(), _icon_gap, _panel->get(), 0, 103);
 
     /* --------------------------- Dynamic icon label --------------------------- */
@@ -435,20 +432,51 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     _dynamic_icon_label->init(icon_label_texts, _icon_gap, _panel->get());
 
     /* ----------------------------- History restore ---------------------------- */
+    bool need_restore      = false;
+    int restore_icon_pos_x = -1;
+
+    // Normal start pos (Center of the repeated sets)
+    int base_offset_rounds = _center_copy_index * appPorps.size();
+    int default_start_x    = base_offset_rounds * _icon_gap;
+
+    // If warm boot was requested
+    if (GetHAL().getWarmRebootTarget() >= 0) {
+        auto app_index = GetHAL().getWarmRebootTarget();
+        mclog::tagInfo(_tag, "warm boot was requested, app index: {}", app_index);
+        app_index = uitk::clamp(app_index, 0, static_cast<int>(appPorps.size()) - 1);
+
+        // Restore to center set
+        restore_icon_pos_x = (base_offset_rounds + app_index) * _icon_gap;
+        need_restore       = true;
+        GetHAL().clearWarmRebootRequest();
+    }
+
     if (_last_clicked_icon_pos_x != -1) {
+        // Just restore where they left off, it should be in a valid range
         // mclog::tagInfo(_tag, "navigate to last clicked icon, pos x: {}", _last_clicked_icon_pos_x);
-        _panel->scrollBy(-_last_clicked_icon_pos_x, 0, LV_ANIM_OFF);
-
-        _dynamic_bg_color->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-        _page_indicator->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-        _dynamic_icon_label->jumpTo(_last_clicked_icon_pos_x / _icon_gap);
-
+        restore_icon_pos_x       = _last_clicked_icon_pos_x;
+        need_restore             = true;
         _last_clicked_icon_pos_x = -1;
-        _state                   = STATE_NORMAL;
+    }
+
+    if (need_restore) {
+        _panel->scrollBy(-restore_icon_pos_x, 0, LV_ANIM_OFF);
+
+        _dynamic_bg_color->jumpTo(restore_icon_pos_x / _icon_gap);
+        _page_indicator->jumpTo(restore_icon_pos_x / _icon_gap);
+        _dynamic_icon_label->jumpTo(restore_icon_pos_x / _icon_gap);
+
+        _state = STATE_NORMAL;
     }
 
     // If first create
     else {
+        // Init at Center Set
+        _panel->scrollBy(-default_start_x, 0, LV_ANIM_OFF);
+        _dynamic_bg_color->jumpTo(default_start_x / _icon_gap);
+        _page_indicator->jumpTo(default_start_x / _icon_gap);
+        _dynamic_icon_label->jumpTo(default_start_x / _icon_gap);
+
         // Setup startup animation
         // x for pos_y, y for radius
         _startup_anim = std::make_unique<AnimateVector2>();
@@ -461,11 +489,13 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
         _startup_anim->teleport(240, 120);
         _panel->setY(_startup_anim->directValue().x);
         _panel->setRadius(_startup_anim->directValue().y);
-
         _startup_anim->move(0, 0);
 
         _state = STATE_STARTUP;
     }
+
+    // Destory boot logo label
+    GetHAL().bootLogo.reset();
 }
 
 void LauncherView::update()
@@ -502,6 +532,43 @@ void LauncherView::handle_state_normal()
             onAppClicked(_clicked_app_id);
         }
         _clicked_app_id = -1;
+    }
+
+    // We get total size from underlying icons count / copies
+    int total_icons   = _icon_panels.size();
+    int icons_per_set = total_icons / _loop_copies;
+    int set_width_px  = icons_per_set * _icon_gap;
+
+    // Check boundaries
+    // If we are mostly in Copy 1, jump to Copy 2
+    // If we are mostly in Copy 3, jump to Copy 2
+    // Copy Index: 0 1 [2] 3 4
+
+    int current_scroll_x = _panel->getScrollX();
+
+    // Define safe zone (Copy 2)
+    int center_set_start_x = _center_copy_index * set_width_px;
+
+    // Thresholds: midpoint of Wrap sets
+    int left_trigger_limit  = 1 * set_width_px + (set_width_px / 2);  // Middle of Set 1
+    int right_trigger_limit = 3 * set_width_px + (set_width_px / 2);  // Middle of Set 3
+
+    // Wrap-around Logic
+    // Only perform teleport if we are NOT in an automated scroll animation
+    // (To avoid interrupting the snap/scroll-to animation which would leave us stuck between icons)
+    // However, if the user is manually dragging (PRESSED), we MUST teleport to allow infinite drag.
+    bool is_auto_scrolling = lv_obj_is_scrolling(_panel->get()) && !lv_obj_has_state(_panel->get(), LV_STATE_PRESSED);
+
+    if (!is_auto_scrolling) {
+        if (current_scroll_x < left_trigger_limit) {
+            // Too far left (Set 1), warp right to Set 2
+            // scrollBy(-val) increases scroll_x
+            _panel->scrollBy(-set_width_px, 0, LV_ANIM_OFF);
+        } else if (current_scroll_x > right_trigger_limit) {
+            // Too far right (Set 3), warp left to Set 2
+            // scrollBy(+val) decreases scroll_x
+            _panel->scrollBy(set_width_px, 0, LV_ANIM_OFF);
+        }
     }
 
     int scroll_x = _panel->getScrollX();

@@ -56,8 +56,8 @@ struct ble_gatt_register_ctxt;
 #define STACKCHAN_CHR_CONFIG_UUID \
     0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12, 0xe3, 0xe5, 0xe5, 0xe2
 
-// Animation Characteristic UUID: e2e5e5e4-1234-5678-1234-56789abcdef0
-#define STACKCHAN_CHR_ANIMATION_UUID \
+// RGB Characteristic UUID: e2e5e5e4-1234-5678-1234-56789abcdef0
+#define STACKCHAN_CHR_RGB_UUID \
     0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12, 0xe4, 0xe5, 0xe5, 0xe2
 
 /** Maximum JSON payload size for Stack-Chan characteristics */
@@ -74,7 +74,7 @@ struct ble_gatt_register_ctxt;
 typedef int (*stackchan_ble_motion_callback_t)(const char *json_data, uint16_t len, uint16_t conn_handle);
 typedef int (*stackchan_ble_avatar_callback_t)(const char *json_data, uint16_t len, uint16_t conn_handle);
 typedef int (*stackchan_ble_config_callback_t)(const char *json_data, uint16_t len, uint16_t conn_handle);
-typedef int (*stackchan_ble_animation_callback_t)(const char *json_data, uint16_t len, uint16_t conn_handle);
+typedef int (*stackchan_ble_rgb_callback_t)(const char *json_data, uint16_t len, uint16_t conn_handle);
 
 /**
  * Battery level callback function type
@@ -90,7 +90,7 @@ typedef struct {
     stackchan_ble_motion_callback_t motion_cb;
     stackchan_ble_avatar_callback_t avatar_cb;
     stackchan_ble_config_callback_t config_cb;
-    stackchan_ble_animation_callback_t animation_cb;
+    stackchan_ble_rgb_callback_t rgb_cb;
     stackchan_ble_battery_read_callback_t battery_read_cb;
 } stackchan_ble_callbacks_t;
 
@@ -129,13 +129,13 @@ int stackchan_ble_notify_avatar(const char *json_data, uint16_t len);
 int stackchan_ble_notify_config(const char *json_data, uint16_t len);
 
 /**
- * Send animation data notification to connected client
+ * Send rgb data notification to connected client
  *
  * @param json_data  JSON string to send
  * @param len        Length of JSON string
  * @return           0 on success, error code otherwise
  */
-int stackchan_ble_notify_animation(const char *json_data, uint16_t len);
+int stackchan_ble_notify_rgb(const char *json_data, uint16_t len);
 
 /**
  * Update battery level and notify if subscribed

@@ -86,10 +86,7 @@ public:
      * @return true
      * @return false
      */
-    virtual bool isMoving()
-    {
-        return false;
-    }
+    bool isMoving();
 
     /**
      * @brief
@@ -139,6 +136,14 @@ public:
     {
     }
 
+    /**
+     * @brief
+     *
+     */
+    virtual void resetZeroCalibration()
+    {
+    }
+
 protected:
     Servo()
     {
@@ -155,8 +160,12 @@ protected:
      * @param angle
      */
     virtual void set_angle_impl(int angle) = 0;
+    virtual bool is_moving_impl()
+    {
+        return false;
+    }
 
-private:
+protected:
     uitk::Vector2i _angle_limit;
     uitk::AnimateValue _angle_anim;
 

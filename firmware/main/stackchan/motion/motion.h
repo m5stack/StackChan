@@ -156,9 +156,13 @@ public:
     void setAutoTorqueReleaseEnabled(bool enabled);
     void setAutoAngleSyncEnabled(bool enabled);
 
+    void setModifyLock(bool locked);
+    bool isModifyLocked();
+
 private:
     std::unique_ptr<Servo> _yaw_servo;
     std::unique_ptr<Servo> _pitch_servo;
+    bool _is_modify_locked = false;
 
     static constexpr float RAD_TO_DEG = 180.0f / M_PI;
 

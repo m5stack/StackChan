@@ -8,6 +8,7 @@
 #include <uitk/short_namespace.hpp>
 #include <cstdint>
 #include <vector>
+#include <string>
 
 namespace stackchan::animation {
 
@@ -19,6 +20,7 @@ struct FeatureKeyframe {
     uitk::Vector2i position;
     int rotation;
     int weight;
+    int size;
 
     FeatureKeyframe(int x = 0, int y = 0, int rotation = 0, int weight = 0)
         : position(x, y), rotation(rotation), weight(weight)
@@ -49,6 +51,8 @@ struct Keyframe {
     FeatureKeyframe mouth;
     ServoKeyframe yawServo;
     ServoKeyframe pitchServo;
+    std::string leftRgbColor;
+    std::string rightRgbColor;
     uint32_t durationMs = 0;
 
     Keyframe()

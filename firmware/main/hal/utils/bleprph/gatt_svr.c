@@ -41,7 +41,7 @@ static const ble_uuid128_t stackchan_chr_avatar_uuid = BLE_UUID128_INIT(STACKCHA
 
 static const ble_uuid128_t stackchan_chr_config_uuid = BLE_UUID128_INIT(STACKCHAN_CHR_CONFIG_UUID);
 
-static const ble_uuid128_t stackchan_chr_animation_uuid = BLE_UUID128_INIT(STACKCHAN_CHR_ANIMATION_UUID);
+static const ble_uuid128_t stackchan_chr_rgb_uuid = BLE_UUID128_INIT(STACKCHAN_CHR_RGB_UUID);
 
 /* Stack-Chan characteristic data buffers */
 static char *stackchan_motion_data   = NULL;
@@ -56,9 +56,9 @@ static char *stackchan_config_data   = NULL;
 static uint16_t stackchan_config_len = 0;
 static uint16_t stackchan_config_handle;
 
-static char *stackchan_animation_data   = NULL;
-static uint16_t stackchan_animation_len = 0;
-static uint16_t stackchan_animation_handle;
+static char *stackchan_rgb_data   = NULL;
+static uint16_t stackchan_rgb_len = 0;
+static uint16_t stackchan_rgb_handle;
 
 /* Battery level */
 static uint8_t battery_level = 100;
@@ -105,11 +105,11 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                                             .val_handle = &stackchan_config_handle,
                                         },
                                         {
-                                            /* Animation Characteristic - Read/Write/Notify */
-                                            .uuid      = &stackchan_chr_animation_uuid.u,
+                                            /* RGB Characteristic - Read/Write/Notify */
+                                            .uuid      = &stackchan_chr_rgb_uuid.u,
                                             .access_cb = stackchan_svc_access,
                                             .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
-                                            .val_handle = &stackchan_animation_handle,
+                                            .val_handle = &stackchan_rgb_handle,
                                         },
                                         {
                                             0, /* No more characteristics */
@@ -184,8 +184,8 @@ static int stackchan_svc_access(uint16_t conn_handle, uint16_t attr_handle, stru
             } else if (attr_handle == stackchan_config_handle) {
                 rc = os_mbuf_append(ctxt->om, stackchan_config_data, stackchan_config_len);
                 return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
-            } else if (attr_handle == stackchan_animation_handle) {
-                rc = os_mbuf_append(ctxt->om, stackchan_animation_data, stackchan_animation_len);
+            } else if (attr_handle == stackchan_rgb_handle) {
+                rc = os_mbuf_append(ctxt->om, stackchan_rgb_data, stackchan_rgb_len);
                 return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
             }
             break;
@@ -233,18 +233,15 @@ static int stackchan_svc_access(uint16_t conn_handle, uint16_t attr_handle, stru
                     }
                 }
                 return rc;
-            } else if (attr_handle == stackchan_animation_handle) {
-                rc = gatt_svr_write(ctxt->om, 0, STACKCHAN_MAX_JSON_LEN, stackchan_animation_data,
-                                    &stackchan_animation_len);
+            } else if (attr_handle == stackchan_rgb_handle) {
+                rc = gatt_svr_write(ctxt->om, 0, STACKCHAN_MAX_JSON_LEN, stackchan_rgb_data, &stackchan_rgb_len);
                 if (rc == 0) {
-                    stackchan_animation_data[stackchan_animation_len] = '\0';
-                    MODLOG_DFLT(INFO, "Animation data received (%d bytes): %s", stackchan_animation_len,
-                                stackchan_animation_data);
+                    stackchan_rgb_data[stackchan_rgb_len] = '\0';
+                    // MODLOG_DFLT(INFO, "RGB data received (%d bytes): %s", stackchan_rgb_len, stackchan_rgb_data);
 
                     /* Call user callback if registered */
-                    if (g_stackchan_callbacks.animation_cb) {
-                        g_stackchan_callbacks.animation_cb(stackchan_animation_data, stackchan_animation_len,
-                                                           conn_handle);
+                    if (g_stackchan_callbacks.rgb_cb) {
+                        g_stackchan_callbacks.rgb_cb(stackchan_rgb_data, stackchan_rgb_len, conn_handle);
                     }
                 }
                 return rc;
@@ -329,12 +326,12 @@ int gatt_svr_init(void)
     int rc;
 
     /* Allocate buffers in PSRAM */
-    stackchan_motion_data    = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
-    stackchan_avatar_data    = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
-    stackchan_config_data    = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
-    stackchan_animation_data = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
+    stackchan_motion_data = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
+    stackchan_avatar_data = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
+    stackchan_config_data = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
+    stackchan_rgb_data    = (char *)heap_caps_malloc(STACKCHAN_MAX_JSON_LEN, MALLOC_CAP_SPIRAM);
 
-    if (!stackchan_motion_data || !stackchan_avatar_data || !stackchan_config_data || !stackchan_animation_data) {
+    if (!stackchan_motion_data || !stackchan_avatar_data || !stackchan_config_data || !stackchan_rgb_data) {
         MODLOG_DFLT(ERROR, "Failed to allocate memory for Stack-Chan characteristics\n");
         return BLE_HS_ENOMEM;
     }
@@ -362,8 +359,8 @@ int gatt_svr_init(void)
     strcpy(stackchan_config_data, "{}");
     stackchan_config_len = 2;
 
-    strcpy(stackchan_animation_data, "{}");
-    stackchan_animation_len = 2;
+    strcpy(stackchan_rgb_data, "{}");
+    stackchan_rgb_len = 2;
 
     return 0;
 }
@@ -434,19 +431,19 @@ int stackchan_ble_notify_config(const char *json_data, uint16_t len)
     return 0;
 }
 
-int stackchan_ble_notify_animation(const char *json_data, uint16_t len)
+int stackchan_ble_notify_rgb(const char *json_data, uint16_t len)
 {
     if (!json_data || len == 0 || len >= STACKCHAN_MAX_JSON_LEN) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
 
-    memcpy(stackchan_animation_data, json_data, len);
-    stackchan_animation_len       = len;
-    stackchan_animation_data[len] = '\0';
+    memcpy(stackchan_rgb_data, json_data, len);
+    stackchan_rgb_len       = len;
+    stackchan_rgb_data[len] = '\0';
 
     if (g_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-        ble_gatts_chr_updated(stackchan_animation_handle);
-        MODLOG_DFLT(INFO, "Animation notification sent");
+        ble_gatts_chr_updated(stackchan_rgb_handle);
+        MODLOG_DFLT(INFO, "RGB notification sent");
     }
 
     return 0;

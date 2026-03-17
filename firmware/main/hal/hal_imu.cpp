@@ -10,13 +10,14 @@
 #include <mooncake_log.h>
 #include <memory>
 
-static const std::string _tag = "HAL-IMU";
+static const std::string_view _tag = "HAL-IMU";
 
 static std::unique_ptr<BMI270> _bmi270;
 
 static void _imu_task(void* param)
 {
     auto motion_detector = std::make_unique<MotionDetector>();
+    motion_detector->setShakeThreshold(16.0f);
 
     while (1) {
         if (_bmi270 && _bmi270->update()) {
@@ -29,10 +30,10 @@ static void _imu_task(void* param)
                 mclog::tagInfo(_tag, "Shake Detected!");
                 GetHAL().onImuMotionEvent.emit(ImuMotionEvent::Shake);
             }
-            if (motion_detector->isPickUpDetected()) {
-                mclog::tagInfo(_tag, "Pick Up Detected!");
-                GetHAL().onImuMotionEvent.emit(ImuMotionEvent::PickUp);
-            }
+            // if (motion_detector->isPickUpDetected()) {
+            //     mclog::tagInfo(_tag, "Pick Up Detected!");
+            //     GetHAL().onImuMotionEvent.emit(ImuMotionEvent::PickUp);
+            // }
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -52,5 +53,5 @@ void Hal::imu_init()
     }
     mclog::tagInfo(_tag, "BMI270 init ok");
 
-    // xTaskCreate(_imu_task, "imu", 4096, NULL, 5, NULL);
+    xTaskCreateWithCaps(_imu_task, "imu", 4096, NULL, 5, NULL, MALLOC_CAP_SPIRAM);
 }

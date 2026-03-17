@@ -9,6 +9,8 @@
 #include <mooncake_log.h>
 #include <assets/assets.h>
 #include <smooth_lvgl.hpp>
+#include <stackchan/stackchan.h>
+#include <apps/common/common.h>
 
 using namespace mooncake;
 using namespace smooth_ui_toolkit::lvgl_cpp;
@@ -36,7 +38,9 @@ void AppAiAgent::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-    GetHAL().startXiaozhi();
+    // Request to start Xiaozhi service
+    // All apps will be uninstall in next mooncake update
+    GetHAL().requestXiaozhiStart();
 }
 
 // Called repeatedly while the App is running

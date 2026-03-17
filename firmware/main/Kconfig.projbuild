@@ -153,6 +153,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_ESP_SPOT_S3
         bool "Espressif Spot-S3"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_ESP_SPOT_C5
+        bool "Espressif Spot-C5"
+        depends on IDF_TARGET_ESP32C5
     config BOARD_TYPE_ESP_HI
         bool "Espressif ESP-HI"
         depends on IDF_TARGET_ESP32C3
@@ -249,6 +252,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_WAVESHARE_S3_TOUCH_AMOLED_2_06
         bool "Waveshare ESP32-S3-Touch-AMOLED-2.06"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_WAVESHARE_C6_TOUCH_AMOLED_2_06
+        bool "Waveshare ESP32-C6-Touch-AMOLED-2.06"
+        depends on IDF_TARGET_ESP32C6
     config BOARD_TYPE_WAVESHARE_S3_TOUCH_AMOLED_1_75
         bool "Waveshare ESP32-S3-Touch-AMOLED-1.75"
         depends on IDF_TARGET_ESP32S3
@@ -270,6 +276,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_WAVESHARE_C6_LCD_1_69
         bool "Waveshare ESP32-C6-LCD-1.69"
         depends on IDF_TARGET_ESP32C6
+    config BOARD_TYPE_WAVESHARE_C6_TOUCH_LCD_1_83
+        bool "Waveshare ESP32-C6-Touch-LCD-1.83"
+        depends on IDF_TARGET_ESP32C6
     config BOARD_TYPE_WAVESHARE_C6_TOUCH_AMOLED_1_43
         bool "Waveshare ESP32-C6-Touch-AMOLOED-1.43"
         depends on IDF_TARGET_ESP32C6
@@ -284,6 +293,9 @@ choice BOARD_TYPE
         depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_WAVESHARE_S3_TOUCH_LCD_3_5
         bool "Waveshare ESP32-S3-Touch-LCD-3.5"
+        depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_WAVESHARE_S3_ePaper_1_54
+        bool "Waveshare ESP32-S3-ePaper-1.54"
         depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_WAVESHARE_S3_TOUCH_LCD_3_5B
         bool "Waveshare ESP32-S3-Touch-LCD-3.5B"
@@ -324,6 +336,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_MOVECALL_MOJI_ESP32S3
         bool "Movecall Moji 小智AI衍生版"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_MOVECALL_MOJI2_ESP32C5
+        bool "Movecall Moji2.0 小智AI衍生版"
+        depends on IDF_TARGET_ESP32C5
     config BOARD_TYPE_MOVECALL_CUICAN_ESP32S3
         bool "Movecall CuiCan 璀璨·AI吊坠"
         depends on IDF_TARGET_ESP32S3
@@ -371,6 +386,9 @@ choice BOARD_TYPE
         depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_XINGZHI_CUBE_1_54TFT_ML307
         bool "无名科技星智1.54(ML307)"
+        depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_XINGZHI_METAL_1_54_WIFI
+        bool "无名科技星智1.54 METAL(wifi)"
         depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_SEEED_STUDIO_SENSECAP_WATCHER
         bool "Seeed Studio SenseCAP Watcher"
@@ -432,6 +450,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_AIPI_LITE
         bool "AIPI-Lite"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_HU_087
+        bool "HU-087"
+        depends on IDF_TARGET_ESP32S3
 endchoice
 
 choice
@@ -465,7 +486,7 @@ choice ESP_S3_LCD_EV_Board_Version_TYPE
 endchoice
 
 choice DISPLAY_OLED_TYPE
-    depends on BOARD_TYPE_BREAD_COMPACT_WIFI || BOARD_TYPE_BREAD_COMPACT_ML307 || BOARD_TYPE_BREAD_COMPACT_ESP32
+    depends on BOARD_TYPE_BREAD_COMPACT_WIFI || BOARD_TYPE_BREAD_COMPACT_ML307 || BOARD_TYPE_BREAD_COMPACT_ESP32 || BOARD_TYPE_HU_087
     prompt "OLED Type"
     default OLED_SSD1306_128X32
     help
@@ -659,18 +680,35 @@ config USE_AUDIO_DEBUGGER
     help
         Enable audio debugger, send audio data through UDP to the host machine
 
+menu "WiFi Configuration Method"
+    help
+        WiFi Configuration Method Selection
+    config USE_HOTSPOT_WIFI_PROVISIONING
+        bool "Hotspot"
+        default y
+        help
+            Use WiFi Hotspot to transmit WiFi configuration data
+    config USE_ACOUSTIC_WIFI_PROVISIONING
+        bool "Acoustic"
+        help
+            Use audio signal to transmit WiFi configuration data
+
+    config USE_ESP_BLUFI_WIFI_PROVISIONING
+        bool "Esp Blufi"
+        help
+            Use esp blufi protocol to transmit WiFi configuration data
+        select BT_ENABLED
+        select BT_BLE_42_FEATURES_SUPPORTED
+        select BT_BLE_BLUFI_ENABLE
+        select MBEDTLS_DHM_C
+endmenu
+
 config AUDIO_DEBUG_UDP_SERVER
     string "Audio Debug UDP Server Address"
     default "192.168.2.100:8000"
     depends on USE_AUDIO_DEBUGGER
     help
         UDP server address, format: IP:PORT, used to receive audio debugging data
-
-config USE_ACOUSTIC_WIFI_PROVISIONING
-    bool "Enable Acoustic WiFi Provisioning"
-    default n
-    help
-        Enable acoustic WiFi provisioning, use audio signal to transmit WiFi configuration data
 
 config RECEIVE_CUSTOM_MESSAGE
     bool "Enable Custom Message Reception"
@@ -683,12 +721,30 @@ menu "Camera Configuration"
 
     comment "Warning: Please read the help text before modifying these settings."
 
+    config XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
+        bool "Allow JPEG Input"
+        default n
+        help
+            Allow JPEG Input format for the camera.
+
+            This option may need to be enabled when using a USB camera.
+
+            Not currently supported when used simultaneously with XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE.
+
     config XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
         bool "Enable Hardware JPEG Encoder"
         default y
         depends on SOC_JPEG_ENCODE_SUPPORTED
         help
             Use hardware JPEG encoder on ESP32-P4 to encode image to JPEG.
+            See https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/peripherals/jpeg.html for more details.
+
+    config XIAOZHI_ENABLE_HARDWARE_JPEG_DECODER
+        bool "Enable Hardware JPEG Decoder"
+        default n
+        depends on SOC_JPEG_DECODE_SUPPORTED && XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
+        help
+            Use hardware JPEG decoder on ESP32-P4 to decode JPEG to image.
             See https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/peripherals/jpeg.html for more details.
 
     config XIAOZHI_ENABLE_CAMERA_DEBUG_MODE
@@ -699,7 +755,7 @@ menu "Camera Configuration"
             Only works on boards that support camera.
 
     config XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
-        bool "Enable software camera buffer endianness swapping (USE WITH CAUTION)"
+        bool "Enable software camera buffer endianness swapping"
         default n
         depends on !CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER
         help
@@ -714,11 +770,14 @@ menu "Camera Configuration"
     menuconfig XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
         bool "Enable Camera Image Rotation"
         default n
+        depends on !XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
         help
             Enable camera image rotation, rotate the camera image to the correct orientation.
             - On ESP32-P4, rotation is handled by PPA hardware.
             - On other chips, rotation is done in software with performance cost.
             - For 180° rotation, use HFlip + VFlip instead of this option.
+
+            Not currently supported when used simultaneously with XIAOZHI_CAMERA_ALLOW_JPEG_INPUT.
 
     if XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
         choice XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #pragma once
-#include "timed.h"
+#include "../modifiable.h"
 #include "../avatar/decorators/decorators.h"
 #include "../utils/random.h"
 #include <smooth_ui_toolkit.hpp>
@@ -14,22 +14,20 @@
 
 namespace stackchan {
 
-class HeadPetModifier : public TimerModifier {
+/**
+ * @brief
+ *
+ */
+class HeadPetModifier : public Modifier {
 public:
     HeadPetModifier(uint32_t restoreDelayMs = 3000) : _restore_delay_ms(restoreDelayMs)
     {
+        // 绑定信号
         _signal_connection = GetHAL().onHeadPetGesture.connect([this](HeadPetGesture gesture) {
-            LvglLockGuard lock;
-
             if (gesture == HeadPetGesture::SwipeForward || gesture == HeadPetGesture::SwipeBackward) {
-                _trigger_happy   = true;
-                _trigger_release = false;
-
-                // 每次抚摸都打断恢复倒计时
-                _should_restore       = false;
-                _restore_timer_active = false;
+                _event_swipe = true;
             } else if (gesture == HeadPetGesture::Release) {
-                _trigger_release = true;
+                _event_release = true;
             }
         });
     }
@@ -41,105 +39,124 @@ public:
 
     void _update(Modifiable& stackchan) override
     {
-        TimerModifier::_update(stackchan);
+        uint32_t now = GetHAL().millis();
 
-        if (_trigger_happy) {
-            _trigger_happy = false;
-
-            // 1. 首次进入记录当前位置
-            if (!_in_happy_state) {
-                _prev_emotion   = stackchan.avatar().getEmotion();
-                _prev_pitch     = stackchan.motion().getCurrentPitchAngle();
-                _prev_yaw       = stackchan.motion().getCurrentYawAngle();
-                _in_happy_state = true;
-            }
-
-            // 2. 表情反馈
-            stackchan.avatar().setEmotion(avatar::Emotion::Happy);
-            int duration = Random::getInstance().getInt(1500, 2500);
-            stackchan.avatar().addDecorator(
-                std::make_unique<avatar::HeartDecorator>(lv_screen_active(), duration, 500));
-
-            // 3. 执行随机动作
-            perform_random_motion(stackchan);
+        // 处理“被抚摸中”事件
+        if (_event_swipe) {
+            _event_swipe = false;
+            handle_swipe(stackchan);
+            // 只要在摸，就推迟恢复时间
+            _is_waiting_restore = false;
         }
 
-        if (_trigger_release) {
-            _trigger_release = false;
+        // 处理“手松开”事件
+        if (_event_release) {
+            _event_release = false;
             if (_in_happy_state) {
-                // 启动恢复计时
-                _restore_timer_active = true;
-                getTimer().addTask(_restore_delay_ms, 1, 0, [this]() { _should_restore = true; });
+                _is_waiting_restore = true;
+                _restore_tick       = now + _restore_delay_ms;
             }
         }
 
-        if (_should_restore) {
-            _should_restore = false;
-            if (_restore_timer_active && _in_happy_state) {
-                // 恢复原状
-                stackchan.avatar().setEmotion(_prev_emotion);
-
-                auto& motion = stackchan.motion();
-
-                motion.moveWithSpeed(_prev_yaw, _prev_pitch, 200);
-
-                _in_happy_state       = false;
-                _restore_timer_active = false;
-            }
+        // 处理恢复逻辑
+        if (_is_waiting_restore && now >= _restore_tick) {
+            _is_waiting_restore = false;
+            restore_original_state(stackchan);
         }
     }
 
 private:
-    void perform_random_motion(Modifiable& stackchan)
+    void handle_swipe(Modifiable& stackchan)
     {
-        int action   = Random::getInstance().getInt(0, 2);
+        auto& avatar = stackchan.avatar();
+
+        // 首次进入开心状态，记录原始信息
+        if (!_in_happy_state) {
+            _in_happy_state = true;
+            _prev_emotion   = avatar.getEmotion();
+            auto angles     = stackchan.motion().getCurrentAngles();
+            _prev_yaw       = angles.x;
+            _prev_pitch     = angles.y;
+        }
+
+        // 视觉反馈
+        avatar.setEmotion(avatar::Emotion::Happy);
+
+        // 添加爱心装饰
+        int duration = Random::getInstance().getInt(1500, 2500);
+        avatar.removeDecorator(_heart_decorator_id);
+        avatar.removeDecorator(_shy_decorator_id);
+        _heart_decorator_id =
+            avatar.addDecorator(std::make_unique<avatar::HeartDecorator>(lv_screen_active(), duration, 500));
+        _shy_decorator_id = avatar.addDecorator(std::make_unique<avatar::ShyDecorator>(lv_screen_active(), duration));
+
+        // 动作反馈
+        perform_pet_motion(stackchan);
+    }
+
+    void restore_original_state(Modifiable& stackchan)
+    {
+        if (!_in_happy_state) {
+            return;
+        }
+
+        stackchan.avatar().setEmotion(_prev_emotion);
+        stackchan.motion().moveWithSpeed(_prev_yaw, _prev_pitch, 200);
+
+        _in_happy_state = false;
+    }
+
+    void perform_pet_motion(Modifiable& stackchan)
+    {
         auto& motion = stackchan.motion();
+        if (motion.isModifyLocked() || motion.isMoving()) {
+            return;
+        }
 
-        int speed = Random::getInstance().getInt(400, 800);
+        int action = Random::getInstance().getInt(0, 2);
+        int speed  = Random::getInstance().getInt(300, 500);
 
-        int32_t target_pitch = _prev_pitch;
         int32_t target_yaw   = _prev_yaw;
+        int32_t target_pitch = _prev_pitch;
 
-        // 角度限制: 10 units = 1度
         switch (action) {
-            case 0:  // 舒服地蹭手/抬头
+            case 0:  // 抬头
                 target_pitch += Random::getInstance().getInt(150, 250);
-                target_yaw += Random::getInstance().getInt(-50, 50);  // 微调 Yaw
+                target_yaw += Random::getInstance().getInt(-50, 50);
                 break;
-
-            case 1:                                                   // 开心歪头/摇晃
-                target_pitch -= Random::getInstance().getInt(0, 50);  // 略微低头
-                if (Random::getInstance().getInt(0, 1) == 0) {
-                    target_yaw += Random::getInstance().getInt(100, 200);
-                } else {
-                    target_yaw -= Random::getInstance().getInt(100, 200);
-                }
+            case 1:  // 歪头
+                target_pitch -= Random::getInstance().getInt(0, 50);
+                target_yaw += (Random::getInstance().getInt(0, 1) == 0 ? 150 : -150);
                 break;
-
-            case 2:  // 兴奋大幅度抬头
+            case 2:  // 大幅度开心
                 target_pitch += Random::getInstance().getInt(250, 400);
                 break;
         }
 
-        target_pitch = uitk::clamp(target_pitch, 0, 900);
-        target_yaw   = uitk::clamp(target_yaw, -1280, 1280);
+        // 自然范围限制
+        target_pitch = uitk::clamp(target_pitch, 0, 540);
+        target_yaw   = uitk::clamp(target_yaw, -512, 512);
 
         motion.moveWithSpeed(target_yaw, target_pitch, speed);
     }
 
+    // 信号相关
     int _signal_connection;
+    volatile bool _event_swipe   = false;
+    volatile bool _event_release = false;
+
+    // 状态机相关
+    bool _in_happy_state     = false;
+    bool _is_waiting_restore = false;
+    uint32_t _restore_tick   = 0;
     uint32_t _restore_delay_ms;
+    int _heart_decorator_id = -1;
+    int _shy_decorator_id   = -1;
 
-    bool _trigger_happy   = false;
-    bool _trigger_release = false;
-
-    bool _in_happy_state       = false;
-    bool _restore_timer_active = false;
-    bool _should_restore       = false;
-
+    // 记忆相关
     avatar::Emotion _prev_emotion = avatar::Emotion::Neutral;
-    int32_t _prev_pitch           = 0;
     int32_t _prev_yaw             = 0;
+    int32_t _prev_pitch           = 0;
 };
 
 }  // namespace stackchan

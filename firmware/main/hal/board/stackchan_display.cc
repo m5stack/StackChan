@@ -130,7 +130,7 @@ StackChanAvatarDisplay::StackChanAvatarDisplay(esp_lcd_panel_io_handle_t panel_i
         .panel_handle   = panel_,
         .control_handle = nullptr,
         .buffer_size    = static_cast<uint32_t>(width_ * 20),
-        .double_buffer  = true,
+        .double_buffer  = false,
         .trans_size     = 0,
         .hres           = static_cast<uint32_t>(width_),
         .vres           = static_cast<uint32_t>(height_),
@@ -177,6 +177,18 @@ StackChanAvatarDisplay::StackChanAvatarDisplay(esp_lcd_panel_io_handle_t panel_i
     };
     esp_timer_create(&preview_timer_args, &preview_timer_);
 
+    // Create boot logo label if not warm boot
+    if (GetHAL().getWarmRebootTarget() < 0) {
+        ESP_LOGI(TAG, "Create boot logo label");
+        Lock();
+        {
+            uitk::lvgl_cpp::ScreenActive screen;
+            screen.setBgColor(lv_color_hex(0x000000));
+        }
+        GetHAL().bootLogo = std::make_unique<BootLogo>();
+        Unlock();
+    }
+
     // Robot will be created later in SetupXiaoZhiUI()
 }
 
@@ -214,6 +226,8 @@ lv_disp_t* StackChanAvatarDisplay::GetLvglDisplay()
     return display_;
 }
 
+#include <hal/board/hal_bridge.h>
+
 void StackChanAvatarDisplay::SetupXiaoZhiUI()
 {
     auto& stackchan = GetStackChan();
@@ -229,19 +243,20 @@ void StackChanAvatarDisplay::SetupXiaoZhiUI()
 
     auto avatar = std::make_unique<DefaultAvatar>();
     avatar->init(lv_screen_active());
+    avatar->getPanel()->onClick().connect([]() { hal_bridge::toggle_xiaozhi_chat_state(); });
 
     stackchan.attachAvatar(std::move(avatar));
     stackchan.addModifier(std::make_unique<BreathModifier>());
     blink_modifier_id_ = stackchan.addModifier(std::make_unique<BlinkModifier>());
     stackchan.addModifier(std::make_unique<HeadPetModifier>());
-    // stackchan.addModifier(std::make_unique<IMUMotionModifier>());
+    stackchan.addModifier(std::make_unique<ImuEventModifier>());
 
     preview_image_ = lv_image_create(lv_screen_active());
-    lv_obj_set_size(preview_image_, 192, 144);
-    lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, -25);
+    lv_obj_set_size(preview_image_, 320, 240);
+    lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
 
-    GetHAL().startStackChanAutoUpdate(24);
+    // GetHAL().startStackChanAutoUpdate(24);
 
     ESP_LOGI(TAG, "Avatar created and started");
 }
@@ -296,6 +311,8 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
         if (idle_motion_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_motion_modifier_id_);
             idle_motion_modifier_id_ = -1;
+            stackchan.removeModifier(idle_expression_modifier_id_);
+            idle_expression_modifier_id_ = -1;
         }
 
         // Return to default pose
@@ -381,6 +398,13 @@ void StackChanAvatarDisplay::SetTheme(Theme* theme)
     stackchan.avatar().setSpeechTextFont((void*)text_font);
 }
 
+#include <hal/board/hal_bridge.h>
+static bool _is_xiaozhi_ready = false;
+bool hal_bridge::is_xiaozhi_ready()
+{
+    return _is_xiaozhi_ready;
+}
+
 void StackChanAvatarDisplay::SetStatus(const char* status)
 {
     ESP_LOGE(TAG, "SetStatus: %s", status);
@@ -413,6 +437,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         GetHAL().refreshRgb();
 
     } else if (strcmp(status, Lang::Strings::STANDBY) == 0) {
+        _is_xiaozhi_ready = true;
+
         if (speaking_modifier_id_ >= 0) {
             // Stop speaking
             stackchan.removeModifier(speaking_modifier_id_);
@@ -432,13 +458,16 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
         GetHAL().setRgbColor(0, 0, 0, 50);
         GetHAL().refreshRgb();
+    } else {
+        avatar.setSpeech(status);
     }
 
     if (is_idle) {
         // Start idle motion
         ESP_LOGW(TAG, "Start idle motion");
         if (idle_motion_modifier_id_ < 0) {
-            idle_motion_modifier_id_ = stackchan.addModifier(std::make_unique<IdleMotionModifier>());
+            idle_motion_modifier_id_     = stackchan.addModifier(std::make_unique<IdleMotionModifier>());
+            idle_expression_modifier_id_ = stackchan.addModifier(std::make_unique<IdleExpressionModifier>());
         }
     } else {
         // Stop idle motion
@@ -446,6 +475,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         if (idle_motion_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_motion_modifier_id_);
             idle_motion_modifier_id_ = -1;
+            stackchan.removeModifier(idle_expression_modifier_id_);
+            idle_expression_modifier_id_ = -1;
         }
 
         // if (!is_listening) {

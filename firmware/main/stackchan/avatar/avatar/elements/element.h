@@ -19,7 +19,7 @@ public:
     virtual ~Element() = default;
 
     /**
-     * @brief (-100~100, -100~100)
+     * @brief (-100 ~ 100, -100 ~ 100)
      *
      * @param position
      */
