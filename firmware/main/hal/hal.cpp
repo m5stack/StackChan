@@ -164,7 +164,7 @@ void Hal::startXiaozhi()
     });
 
     // Start stackchan update task
-    xTaskCreate(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL);
+    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL, 1);
 
     hal_bridge::start_xiaozhi_app();
 }
