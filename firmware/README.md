@@ -1,4 +1,3 @@
-# StackChan Firmware
 
 ## Build
 
@@ -10,7 +9,7 @@ python3 ./fetch_repos.py
 
 ### Tool Chains
 
-[ESP-IDF v5.5.1](https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32s3/index.html)
+[ESP-IDF v5.5.4](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/index.html)
 
 ### Build
 

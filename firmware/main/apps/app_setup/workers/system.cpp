@@ -33,6 +33,74 @@ static const std::vector<TimezoneOption_t> _timezone_list = {
     {"Tokyo (UTC+9)", "JST-9"},       {"Sydney (UTC+10)", "AEST-10"},      {"Noumea (UTC+11)", "SBT-11"},
     {"Auckland (UTC+12)", "NZST-12"}, {"Fiji (UTC+13)", "FJT-13"},         {"Line Islands (UTC+14)", "LINT-14"}};
 
+VolumeSetupWorker::VolumeSetupWorker()
+{
+    mclog::info("VolumeSetupWorker start");
+
+    for (int volume = 0; volume <= 100; volume += 5) {
+        _volume_levels.push_back(volume);
+    }
+
+    uint8_t current_volume = GetHAL().getSpeakerVolume();
+    int current_index      = _volume_levels.size() - 1;
+    for (size_t i = 0; i < _volume_levels.size(); i++) {
+        if (_volume_levels[i] >= current_volume) {
+            current_index = static_cast<int>(i);
+            break;
+        }
+    }
+
+    _panel = std::make_unique<Container>(lv_screen_active());
+    _panel->setBgColor(lv_color_hex(0xEDF4FF));
+    _panel->align(LV_ALIGN_CENTER, 0, 0);
+    _panel->setBorderWidth(0);
+    _panel->setSize(320, 240);
+    _panel->setRadius(0);
+    _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_volume = std::make_unique<Label>(*_panel);
+    _label_volume->setText(fmt::format("{}%", _volume_levels[current_index]));
+    _label_volume->setTextFont(&lv_font_montserrat_24);
+    _label_volume->setTextColor(lv_color_hex(0x26206A));
+    _label_volume->align(LV_ALIGN_CENTER, 0, -70);
+
+    _slider = std::make_unique<Slider>(*_panel);
+    _slider->align(LV_ALIGN_CENTER, 0, -12);
+    _slider->setRange(0, _volume_levels.size() - 1);
+    _slider->setSize(250, 18);
+    _slider->setBgColor(lv_color_hex(0x615B9E), LV_PART_KNOB);
+    _slider->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR);
+    _slider->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _slider->setBgOpa(255);
+    _slider->setValue(current_index);
+    _slider->onValueChanged().connect([this](int32_t value) {
+        _label_volume->setText(fmt::format("{}%", _volume_levels[value]));
+        _target_volume = _volume_levels[value];
+    });
+
+    _btn_confirm = std::make_unique<Button>(*_panel);
+    apply_button_common_style(*_btn_confirm);
+    _btn_confirm->align(LV_ALIGN_CENTER, 0, 60);
+    _btn_confirm->setSize(150, 50);
+    _btn_confirm->label().setText("Confirm");
+    _btn_confirm->onClick().connect([this]() { _is_done = true; });
+}
+
+VolumeSetupWorker::~VolumeSetupWorker()
+{
+    auto volume = _volume_levels[_slider->getValue()];
+    mclog::tagInfo(_tag, "final volume: {}", volume);
+    GetHAL().setSpeakerVolume(volume, true);
+}
+
+void VolumeSetupWorker::update()
+{
+    if (_target_volume != -1) {
+        GetHAL().setSpeakerVolume(_target_volume, false);
+        _target_volume = -1;
+    }
+}
+
 TimezoneWorker::TimezoneWorker()
 {
     _panel = std::make_unique<uitk::lvgl_cpp::Container>(lv_screen_active());

@@ -35,8 +35,9 @@ public:
         _msg_panel->setSize(296, 156);
         _msg_panel->setRadius(18);
 
-        _bell = std::make_unique<uitk::lvgl_cpp::Image>(_msg_panel->get());
-        _bell->setSrc(&icon_bell);
+        _bell      = std::make_unique<uitk::lvgl_cpp::Image>(_msg_panel->get());
+        _icon_bell = assets::get_image("icon_bell.bin");
+        _bell->setSrc(&_icon_bell);
         _bell->align(LV_ALIGN_CENTER, -122, -59);
         _bell->setRotation(150);
 
@@ -91,6 +92,7 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Label> _title;
     std::unique_ptr<uitk::lvgl_cpp::Label> _msg;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_ok;
+    lv_image_dsc_t _icon_bell;
 
     uint32_t _anim_tick = 0;
     bool _anim_flag     = false;

@@ -10,6 +10,7 @@
 #include <hal/hal.h>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 namespace setup_workers {
 
@@ -52,6 +53,21 @@ private:
  * @brief
  *
  */
+class ServoTestWorker : public WorkerBase {
+public:
+    ServoTestWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<WorkerBase> _page_tips;
+    std::unique_ptr<WorkerBase> _page_test;
+    std::unique_ptr<WorkerBase> _page_done;
+};
+
+/**
+ * @brief
+ *
+ */
 class WifiSetupWorker : public WorkerBase {
 public:
     WifiSetupWorker();
@@ -79,19 +95,29 @@ private:
     struct StateAppDownloadData {
         std::unique_ptr<uitk::lvgl_cpp::Container> panel;
         std::unique_ptr<uitk::lvgl_cpp::Label> title;
-        std::unique_ptr<uitk::lvgl_cpp::Qrcode> qrcode;
+        std::unique_ptr<uitk::lvgl_cpp::Qrcode> qrcode_ios;
+        std::unique_ptr<uitk::lvgl_cpp::Qrcode> qrcode_android;
+        std::unique_ptr<uitk::lvgl_cpp::Label> label_ios;
+        std::unique_ptr<uitk::lvgl_cpp::Label> label_android;
         std::unique_ptr<uitk::lvgl_cpp::Button> btn_next;
+        std::unique_ptr<uitk::lvgl_cpp::Button> btn_quit;
         std::unique_ptr<uitk::lvgl_cpp::Label> info;
         bool next_clicked = false;
+        bool quit_clicked = false;
 
         void reset()
         {
             panel.reset();
             title.reset();
-            qrcode.reset();
+            qrcode_ios.reset();
+            qrcode_android.reset();
+            label_ios.reset();
+            label_android.reset();
             btn_next.reset();
+            btn_quit.reset();
             info.reset();
             next_clicked = false;
+            quit_clicked = false;
         }
     };
     StateAppDownloadData _state_app_download_data;
@@ -170,6 +196,7 @@ public:
 
 private:
     std::unique_ptr<PageStartup> _page_startup;
+    std::unique_ptr<ServoTestWorker> _worker_servo_test;
     std::unique_ptr<WifiSetupWorker> _worker_wifi;
 };
 
@@ -191,6 +218,17 @@ private:
  * @brief
  *
  */
+class SystemUpdateWorker : public WorkerBase {
+public:
+    SystemUpdateWorker();
+    ~SystemUpdateWorker();
+    void update() override;
+};
+
+/**
+ * @brief
+ *
+ */
 class BrightnessSetupWorker : public WorkerBase {
 public:
     BrightnessSetupWorker();
@@ -203,6 +241,25 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Slider> _slider;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
     int32_t _target_brightness = -1;
+};
+
+/**
+ * @brief
+ *
+ */
+class VolumeSetupWorker : public WorkerBase {
+public:
+    VolumeSetupWorker();
+    ~VolumeSetupWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_volume;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+    std::vector<uint8_t> _volume_levels;
+    int32_t _target_volume = -1;
 };
 
 /**
@@ -245,6 +302,57 @@ private:
     bool _confirm_flag = false;
 
     void update_ui();
+};
+
+/**
+ * @brief
+ *
+ */
+class AccountWorker : public WorkerBase {
+public:
+    class PanelInfo {
+    public:
+        PanelInfo(lv_obj_t* parent, int posY, std::string_view title, std::string_view info);
+
+    private:
+        std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+        std::unique_ptr<uitk::lvgl_cpp::Label> _label_title;
+        std::unique_ptr<uitk::lvgl_cpp::Label> _label_info;
+    };
+
+    class PageAccount {
+    public:
+        PageAccount(std::string_view username, std::string_view deviceName);
+
+        bool isUnbindClicked() const
+        {
+            return _is_unbind_clicked;
+        }
+
+        bool isQuitClicked() const
+        {
+            return _is_quit_clicked;
+        }
+
+    private:
+        std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+        std::unique_ptr<uitk::lvgl_cpp::Label> _label_title;
+        std::unique_ptr<PanelInfo> _panel_username;
+        std::unique_ptr<PanelInfo> _panel_device_name;
+        std::unique_ptr<uitk::lvgl_cpp::Button> _btn_unbind;
+        std::unique_ptr<uitk::lvgl_cpp::Button> _btn_quit;
+
+        bool _is_unbind_clicked = false;
+        bool _is_quit_clicked   = false;
+    };
+
+    AccountWorker();
+    ~AccountWorker();
+    void update() override;
+
+private:
+    std::unique_ptr<PageAccount> _page_account;
+    std::unique_ptr<FactoryResetWorker> _worker_reset;
 };
 
 }  // namespace setup_workers

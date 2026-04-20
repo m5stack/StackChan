@@ -170,7 +170,7 @@ void Hal::servo_init()
 
     ServoConfig_t yaw_servo_config;
     yaw_servo_config.id                     = 1;
-    yaw_servo_config.defaultZeroPos         = 450;
+    yaw_servo_config.defaultZeroPos         = 460;
     yaw_servo_config.angleLimit             = Vector2i(-1280, 1280);
     yaw_servo_config.rawPosLimit            = Vector2i(0, 1000);
     yaw_servo_config.settingNs              = "servo";
@@ -179,7 +179,7 @@ void Hal::servo_init()
 
     ServoConfig_t pitch_servo_config;
     pitch_servo_config.id                     = 2;
-    pitch_servo_config.defaultZeroPos         = 125;
+    pitch_servo_config.defaultZeroPos         = 620;
     pitch_servo_config.angleLimit             = Vector2i(0, 900);
     pitch_servo_config.rawPosLimit            = Vector2i(0, 1000);
     pitch_servo_config.settingNs              = "servo";

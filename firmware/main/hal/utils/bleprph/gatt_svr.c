@@ -33,7 +33,8 @@
 #define MAX_NOTIFY 5
 
 /* Stack-Chan Service */
-static const ble_uuid128_t stackchan_svc_uuid = BLE_UUID128_INIT(STACKCHAN_SVC_UUID_BASE);
+static const ble_uuid128_t stackchan_svc_uuid     = BLE_UUID128_INIT(STACKCHAN_SVC_UUID_BASE);
+static const ble_uuid128_t stackchan_svc_uuid_alt = BLE_UUID128_INIT(STACKCHAN_SVC_UUID_BASE_ALT);
 
 static const ble_uuid128_t stackchan_chr_motion_uuid = BLE_UUID128_INIT(STACKCHAN_CHR_MOTION_UUID);
 
@@ -77,7 +78,7 @@ static int stackchan_svc_access(uint16_t conn_handle, uint16_t attr_handle, stru
 
 static int battery_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 
-static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
+static struct ble_gatt_svc_def gatt_svr_svcs[] = {
     {
         /*** Stack-Chan Service ***/
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
@@ -321,7 +322,7 @@ void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
     }
 }
 
-int gatt_svr_init(void)
+int gatt_svr_init(bool use_alt_uuid)
 {
     int rc;
 
@@ -338,6 +339,12 @@ int gatt_svr_init(void)
 
     ble_svc_gap_init();
     ble_svc_gatt_init();
+
+    if (use_alt_uuid) {
+        gatt_svr_svcs[0].uuid = &stackchan_svc_uuid_alt.u;
+    } else {
+        gatt_svr_svcs[0].uuid = &stackchan_svc_uuid.u;
+    }
 
     rc = ble_gatts_count_cfg(gatt_svr_svcs);
     if (rc != 0) {

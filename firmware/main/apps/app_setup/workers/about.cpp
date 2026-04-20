@@ -13,6 +13,7 @@
 #include <hal/hal.h>
 #include <functional>
 #include <vector>
+#include <apps/common/loading_page/loading_page.h>
 
 using namespace uitk;
 using namespace uitk::lvgl_cpp;
@@ -293,4 +294,36 @@ void FwVersionWorker::update()
         _last_tick = GetHAL().millis();
         _egg->update();
     }
+}
+
+SystemUpdateWorker::SystemUpdateWorker()
+{
+    auto loading_page = std::make_unique<view::LoadingPage>(0xF6F6F6, 0x26206A);
+    GetHAL().lvglUnlock();
+
+    // Start network
+    GetHAL().startNetwork([&](std::string_view msg) {
+        LvglLockGuard lock;
+        loading_page->setMessage(msg);
+    });
+
+    // Update Firmware
+    bool result = GetHAL().updateFirmware([&](std::string_view msg) {
+        LvglLockGuard lock;
+        loading_page->setMessage(msg);
+    });
+
+    // Hold the result for a while
+    GetHAL().delay(3000);
+
+    GetHAL().lvglLock();
+    _is_done = true;
+}
+
+SystemUpdateWorker::~SystemUpdateWorker()
+{
+}
+
+void SystemUpdateWorker::update()
+{
 }

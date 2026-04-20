@@ -16,7 +16,6 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_ili9341.h>
 #include <esp_timer.h>
-// #include "esp32_camera.h"
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
 
@@ -59,6 +58,7 @@ public:
         WriteReg(0x90, 0xBF);
         WriteReg(0x94, 33 - 5);
         WriteReg(0x95, 33 - 5);
+        WriteReg(0x27, 0x00);
 
         auto ret = setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_700MA);
         if (!ret) {
@@ -539,6 +539,28 @@ uint8_t hal_bridge::board_get_backlight_brightness()
     } else {
         return 0;
     }
+}
+
+void hal_bridge::board_set_speaker_volume(uint8_t volume, bool permanent)
+{
+    auto& board      = Board::GetInstance();
+    auto audio_codec = board.GetAudioCodec();
+    if (audio_codec) {
+        if (permanent) {
+            audio_codec->SetOutputVolume(volume);
+        }
+    }
+}
+
+uint8_t hal_bridge::board_get_speaker_volume()
+{
+    int volume = 70;
+    Settings settings("audio", false);
+    volume = settings.GetInt("output_volume", volume);
+    if (volume <= 0) {
+        volume = 10;
+    }
+    return volume;
 }
 
 void hal_bridge::toggle_xiaozhi_chat_state()

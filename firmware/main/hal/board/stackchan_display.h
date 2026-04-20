@@ -38,11 +38,14 @@ public:
     // Override Display methods to control Robot
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
+    virtual void ClearChatMessages() override;
     virtual void SetPreviewImage(std::unique_ptr<LvglImage> image) override;
+    virtual void UpdateStatusBar(bool update_all = false) override;
+    virtual void SetupUI() override;
     virtual void SetTheme(Theme* theme) override;
     virtual void SetStatus(const char* status) override;
+    virtual void ShowNotification(const char* notification, int duration_ms = 3000) override;
 
-    void SetupXiaoZhiUI();
     void LvglLock();
     void LvglUnlock();
     lv_disp_t* GetLvglDisplay();

@@ -121,7 +121,8 @@ public:
 
         _icon = std::make_unique<Image>(_btn->get());
         _icon->align(LV_ALIGN_CENTER, 0, -10);
-        _icon->setSrc(&icon_home);
+        _icon_home = assets::get_image("icon_home.bin");
+        _icon->setSrc(&_icon_home);
         _icon->setImageRecolorOpa(LV_OPA_COVER);
         _icon->setImageRecolor(lv_color_hex(colorBorder));
 
@@ -185,6 +186,7 @@ private:
     bool _is_hidden      = false;
     bool _is_clicked     = false;
     bool _hide_mask_flag = false;
+    lv_image_dsc_t _icon_home;
 };
 
 /**

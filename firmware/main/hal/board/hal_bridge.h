@@ -37,7 +37,6 @@ void toggle_xiaozhi_chat_state();
 void disply_lvgl_lock();
 void disply_lvgl_unlock();
 lv_disp_t* display_get_lvgl_display();
-void display_setup_xiaozhi_ui();
 
 void xiaozhi_board_init();
 void start_xiaozhi_app();
@@ -49,6 +48,8 @@ int board_get_battery_level();
 bool board_is_battery_charging();
 void board_set_backlight_brightness(uint8_t brightness, bool permanent = false);
 uint8_t board_get_backlight_brightness();
+void board_set_speaker_volume(uint8_t volume, bool permanent = false);
+uint8_t board_get_speaker_volume();
 
 void app_play_sound(const std::string_view& sound);
 

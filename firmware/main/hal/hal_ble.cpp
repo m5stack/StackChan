@@ -48,7 +48,7 @@ static uint8_t _handle_ble_battery_read(void)
     return 96;
 }
 
-void Hal::ble_init()
+void Hal::ble_init(bool useAltUuid)
 {
     mclog::tagInfo(_tag, "init");
 
@@ -61,7 +61,7 @@ void Hal::ble_init()
     };
     stackchan_ble_register_callbacks(&ble_callbacks);
 
-    ble_prph_init();
+    ble_prph_init(useAltUuid);
 
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
@@ -72,7 +72,7 @@ void Hal::ble_init()
 void Hal::startBleServer()
 {
     mclog::tagInfo(_tag, "start ble server");
-    ble_init();
+    ble_init(false);
 }
 
 bool Hal::isBleConnected()
@@ -273,7 +273,7 @@ void Hal::startAppConfigServer()
 {
     mclog::tagInfo(_tag, "start app config server");
 
-    ble_init();
+    ble_init(true);
 
     mooncake::GetMooncake().extensionManager()->createAbility(std::make_unique<AppConfigServerWorker>());
 }
@@ -282,4 +282,10 @@ bool Hal::isAppConfiged()
 {
     Settings settings("app_config", false);
     return settings.GetBool("is_configed", false);
+}
+
+void Hal::resetAppConfiged()
+{
+    Settings settings("app_config", true);
+    settings.SetBool("is_configed", false);
 }

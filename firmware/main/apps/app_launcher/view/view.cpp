@@ -394,6 +394,7 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     _lr_indicator_panels.back()->onClick().connect([scroll_to_nearby_icon]() { scroll_to_nearby_icon(-1); });
 
     _lr_indicators_images.push_back(std::make_unique<Image>(_lr_indicator_panels.back()->get()));
+    static auto icon_indicator_left = assets::get_image("icon_indicator_left.bin");
     _lr_indicators_images.back()->setSrc(&icon_indicator_left);
     _lr_indicators_images.back()->align(LV_ALIGN_CENTER, 0, 0);
 
@@ -409,6 +410,7 @@ void LauncherView::init(std::vector<mooncake::AppProps_t> appPorps)
     _lr_indicator_panels.back()->onClick().connect([scroll_to_nearby_icon]() { scroll_to_nearby_icon(1); });
 
     _lr_indicators_images.push_back(std::make_unique<Image>(_lr_indicator_panels.back()->get()));
+    static auto icon_indicator_right = assets::get_image("icon_indicator_right.bin");
     _lr_indicators_images.back()->setSrc(&icon_indicator_right);
     _lr_indicators_images.back()->align(LV_ALIGN_CENTER, 0, 0);
 

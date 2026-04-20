@@ -26,7 +26,8 @@ AppEspnowControl::AppEspnowControl()
     // 配置 App 名
     setAppInfo().name = "ESPNOW.REMOTE";
     // 配置 App 图标
-    setAppInfo().icon = (void*)&icon_controller;
+    static auto icon  = assets::get_image("icon_controller.bin");
+    setAppInfo().icon = (void*)&icon;
     // 配置 App 主题颜色
     static uint32_t theme_color = 0x7ACE74;
     setAppInfo().userData       = (void*)&theme_color;

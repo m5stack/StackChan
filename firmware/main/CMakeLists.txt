@@ -23,6 +23,7 @@ list(APPEND STACK_CHAN_SOURCES main.cpp)
 # Define source files
 set(SOURCES "audio/audio_codec.cc"
             "audio/audio_service.cc"
+            "audio/demuxer/ogg_demuxer.cc"
             "audio/codecs/no_audio_codec.cc"
             "audio/codecs/box_audio_codec.cc"
             "audio/codecs/es8311_audio_codec.cc"
@@ -38,7 +39,7 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lcd_display.cc"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
-            "display/emote_display.cc"
+            # "display/emote_display.cc"
             "display/lvgl_display/emoji_collection.cc"
             "display/lvgl_display/lvgl_theme.cc"
             "display/lvgl_display/lvgl_font.cc"
@@ -63,14 +64,33 @@ set(SOURCES "audio/audio_codec.cc"
 # Transform relative paths to absolute paths from xiaozhi-esp32/main
 list(TRANSFORM SOURCES PREPEND "${XIAOZHI_MAIN_DIR}/")
 
-set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "protocols")
+set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols")
 # Transform include dirs to absolute paths from xiaozhi-esp32/main
 list(TRANSFORM INCLUDE_DIRS PREPEND "${XIAOZHI_MAIN_DIR}/")
 
 # Add board common files
-file(GLOB BOARD_COMMON_SOURCES ${XIAOZHI_MAIN_DIR}/boards/common/*.cc)
-list(APPEND SOURCES ${BOARD_COMMON_SOURCES} ${STACK_CHAN_SOURCES})
+list(APPEND SOURCES
+    "${XIAOZHI_MAIN_DIR}/boards/common/board.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/wifi_board.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/ml307_board.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/nt26_board.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/dual_network_board.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/adc_battery_monitor.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/afsk_demod.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/axp2101.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/backlight.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/button.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/i2c_device.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/knob.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/power_save_timer.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/press_to_talk_mcp_tool.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/sleep_timer.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/sy6970.cc"
+    "${XIAOZHI_MAIN_DIR}/boards/common/system_reset.cc"
+    ${STACK_CHAN_SOURCES}
+)
 list(APPEND INCLUDE_DIRS ${XIAOZHI_MAIN_DIR}/boards/common ${STACK_CHAN_INCLUDE_DIRS})
+
 
 idf_build_get_property(build_components BUILD_COMPONENTS)
 # Function to find component dynamically by pattern
@@ -89,6 +109,8 @@ endfunction()
 set(BUILTIN_TEXT_FONT font_puhui_14_1)
 set(BUILTIN_ICON_FONT font_awesome_14_1)
 
+set(EMOTE_RESOLUTION "320_240")
+
 # Add board files according to BOARD_TYPE
 # Set default assets if the board uses partition table V2
 if(CONFIG_BOARD_TYPE_M5STACK_STACK_CHAN)
@@ -98,10 +120,17 @@ if(CONFIG_BOARD_TYPE_M5STACK_STACK_CHAN)
     set(DEFAULT_EMOJI_COLLECTION twemoji_64)
 endif()
 
-file(GLOB BOARD_SOURCES
-    ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.cc
-    ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.c
-)
+if(MANUFACTURER)
+    file(GLOB BOARD_SOURCES
+        ${XIAOZHI_MAIN_DIR}/boards/${MANUFACTURER}/${BOARD_TYPE}/*.cc
+        ${XIAOZHI_MAIN_DIR}/boards/${MANUFACTURER}/${BOARD_TYPE}/*.c
+    )
+else()
+    file(GLOB BOARD_SOURCES
+        ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.cc
+        ${XIAOZHI_MAIN_DIR}/boards/${BOARD_TYPE}/*.c
+    )
+endif()
 list(APPEND SOURCES ${BOARD_SOURCES})
 
 # Select audio processor according to Kconfig
@@ -119,7 +148,7 @@ endif()
 
 # Auto Select Additional Sources
 if (CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING)
-    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/boards/common/blufi.cpp")
+    list(APPEND SOURCES "boards/common/blufi.cpp")
 endif ()
 # Select language directory according to Kconfig
 if(CONFIG_LANGUAGE_ZH_CN)
@@ -228,7 +257,7 @@ if(NOT LANG_DIR STREQUAL "en-US")
     endforeach()
 endif()
 
-# file(GLOB COMMON_SOUNDS ${XIAOZHI_MAIN_DIR}/assets/common/*.ogg)
+# file(GLOB COMMON_SOUNDS ${CMAKE_CURRENT_SOURCE_DIR}/assets/common/*.ogg)
 file(GLOB COMMON_SOUNDS 
     ${XIAOZHI_MAIN_DIR}/assets/common/*.ogg
     assets/sfx/*.ogg
@@ -240,16 +269,53 @@ if(CONFIG_IDF_TARGET_ESP32)
                              "audio/codecs/es8388_audio_codec.cc"
                              "audio/codecs/es8389_audio_codec.cc"
                              "led/gpio_led.cc"
-                             "${XIAOZHI_MAIN_DIR}/boards/common/esp32_camera.cc"
                              "display/lvgl_display/jpg/image_to_jpeg.cpp"
                              "display/lvgl_display/jpg/jpeg_to_image.c"
+                             "boards/common/nt26_board.cc"
+                             "boards/common/ml307_board.cc"
+                             "boards/common/dual_network_board.cc"
                              )
+endif()
+
+# Include EspVideo if target is ESP32S3 or ESP32P4
+if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/boards/common/esp_video.cc"
+                        "${XIAOZHI_MAIN_DIR}/boards/common/rndis_board.cc"
+                        )
+endif()
+
+# Include Esp32Camera if target is ESP32S3
+if(CONFIG_IDF_TARGET_ESP32S3)
+    list(APPEND SOURCES "${XIAOZHI_MAIN_DIR}/boards/common/esp32_camera.cc")
 endif()
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
+                    PRIV_REQUIRES
+                        esp_pm
+                        esp_psram
+                        esp_netif
+                        esp_driver_gpio
+                        esp_driver_uart
+                        esp_driver_spi
+                        esp_driver_i2c
+                        esp_driver_i2s
+                        esp_driver_jpeg
+                        esp_driver_ppa
+                        esp_app_format
+                        app_update
+                        spi_flash
+                        console
+                        efuse
+                        bt
+                        fatfs
+                        ArduinoJson
+                        esp-now
+                        mooncake
+                        mooncake_log
+                        smooth_ui_toolkit
                     )
 
 # Use target_compile_definitions to define BOARD_TYPE, BOARD_NAME
@@ -265,12 +331,12 @@ target_compile_definitions(${COMPONENT_LIB}
 # Add generation rules
 add_custom_command(
     OUTPUT ${LANG_HEADER}
-    COMMAND python ${PROJECT_DIR}/xiaozhi-esp32/scripts/gen_lang.py
+    COMMAND python ${XIAOZHI_MAIN_DIR}/../scripts/gen_lang.py
             --language "${LANG_DIR}"
             --output "${LANG_HEADER}"
     DEPENDS
         ${LANG_JSON}
-        ${PROJECT_DIR}/xiaozhi-esp32/scripts/gen_lang.py
+        ${XIAOZHI_MAIN_DIR}/../scripts/gen_lang.py
     COMMENT "Generating ${LANG_DIR} language config"
 )
 
@@ -328,7 +394,7 @@ endforeach()
 
 endif()
 
-set(DEFAULT_ASSETS_EXTRA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/assets_bin") 
+set(DEFAULT_ASSETS_EXTRA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/assets_bin")
 
 # Function to build default assets based on configuration
 function(build_default_assets_bin)
@@ -362,10 +428,10 @@ function(build_default_assets_bin)
     # Create custom command to build assets
     add_custom_command(
         OUTPUT ${GENERATED_ASSETS_BIN}
-        COMMAND python ${PROJECT_DIR}/xiaozhi-esp32/scripts/build_default_assets.py ${BUILD_ARGS}
+        COMMAND python ${XIAOZHI_MAIN_DIR}/../scripts/build_default_assets.py ${BUILD_ARGS}
         DEPENDS
             ${SDKCONFIG}
-            ${PROJECT_DIR}/xiaozhi-esp32/scripts/build_default_assets.py
+            ${XIAOZHI_MAIN_DIR}/../scripts/build_default_assets.py
         COMMENT "Building default assets.bin based on configuration"
         VERBATIM
     )
@@ -452,6 +518,14 @@ if ("${size}" AND "${offset}")
         get_assets_local_file("${CONFIG_CUSTOM_ASSETS_FILE}" ASSETS_LOCAL_FILE)
         esptool_py_flash_to_partition(flash "assets" "${ASSETS_LOCAL_FILE}")
         message(STATUS "Custom assets flash configured: ${ASSETS_LOCAL_FILE} -> assets partition")
+    elseif(CONFIG_FLASH_EXPRESSION_ASSETS)
+        set(ASSETS_NAME "expression_assets")
+        set(ASSETS_PARTITION "assets")
+        set(ASSETS_FILE "${CMAKE_BINARY_DIR}/${ASSETS_NAME}.bin")
+
+        build_speaker_assets_bin("${ASSETS_PARTITION}" ${EMOTE_RESOLUTION} ${ASSETS_FILE} ${CONFIG_MMAP_FILE_NAME_LENGTH})
+        message(STATUS "Generated emote assets: ${ASSETS_FILE} -> ${ASSETS_PARTITION} partition")
+        esptool_py_flash_to_partition(flash "${ASSETS_PARTITION}" "${ASSETS_FILE}")
     elseif(CONFIG_FLASH_NONE_ASSETS)
         message(STATUS "Assets flashing disabled (FLASH_NONE_ASSETS)")
     endif()

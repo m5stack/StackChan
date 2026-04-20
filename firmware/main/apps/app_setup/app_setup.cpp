@@ -20,7 +20,8 @@ AppSetup::AppSetup()
     // 配置 App 名
     setAppInfo().name = "SETUP";
     // 配置 App 图标
-    setAppInfo().icon = (void*)&icon_setup;
+    static auto icon  = assets::get_image("icon_setup.bin");
+    setAppInfo().icon = (void*)&icon;
     // 配置 App 主题颜色
     static uint32_t theme_color = 0xB3B3B3;
     setAppInfo().userData       = (void*)&theme_color;
@@ -41,61 +42,82 @@ void AppSetup::onOpen()
     _need_warm_reset = false;
     _magic_count     = 0;
 
-    _menu_sections = {{
-                          "Connectivity",
-                          {{"Set Up Wi-Fi",
-                            [&]() {
-                                _destroy_menu    = true;
-                                _need_warm_reset = true;
-                                _worker          = std::make_unique<WifiSetupWorker>();
-                            }}},
-                      },
-                      {
-                          "Servo",
-                          {{"Calibration",
-                            [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<ZeroCalibrationWorker>();
-                            }},
-                           {"LED Strips Test",
-                            [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<RgbTestWorker>();
-                            }}},
-                      },
-                      {
-                          "Display",
-                          {{"Brightness",
-                            [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<BrightnessSetupWorker>();
-                            }}},
-                      },
-                      {
-                          "System",
-                          {{"Timezone",
-                            [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<TimezoneWorker>();
-                            }}},
-                      },
-                      {
-                          "About",
-                          {{fmt::format("FW Version:  {}", common::FirmwareVersion),
-                            [&]() {
-                                _magic_count++;
-                                if (_magic_count >= 10) {
-                                    _magic_count  = 0;
-                                    _destroy_menu = true;
-                                    _worker       = std::make_unique<FwVersionWorker>();
-                                }
-                            }},
-                           {"Factory Reset",
-                            [&]() {
-                                _destroy_menu = true;
-                                _worker       = std::make_unique<FactoryResetWorker>();
-                            }}},
-                      }};
+    _menu_sections = {
+        {
+            "Wi-Fi",
+            {{"Change Wi-Fi",
+              [&]() {
+                  _destroy_menu    = true;
+                  _need_warm_reset = true;
+                  _worker          = std::make_unique<WifiSetupWorker>();
+              }}},
+        },
+        {
+            "Device",
+            {{"Brightness",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<BrightnessSetupWorker>();
+              }},
+             {"Volume",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<VolumeSetupWorker>();
+              }},
+             {"Timezone",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<TimezoneWorker>();
+              }}},
+        },
+        {
+            "Hardware Test",
+            {{"Servo",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<ZeroCalibrationWorker>();
+              }},
+             {"RGB Strip",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<RgbTestWorker>();
+              }}},
+        },
+        {
+            "Account",
+            {{"Unbind & Reset",
+              [&]() {
+                  _destroy_menu    = true;
+                  _need_warm_reset = true;
+                  _worker          = std::make_unique<AccountWorker>();
+              }}},
+        },
+        {
+            "Firmware",
+            {
+                {fmt::format("Version:  {}", common::FirmwareVersion),
+                 [&]() {
+                     _magic_count++;
+                     if (_magic_count >= 10) {
+                         _magic_count  = 0;
+                         _destroy_menu = true;
+                         _worker       = std::make_unique<FwVersionWorker>();
+                     }
+                 }},
+                {"Check for Updates",
+                 [&]() {
+                     _destroy_menu    = true;
+                     _need_warm_reset = true;
+                     _worker          = std::make_unique<SystemUpdateWorker>();
+                 }},
+                //  {"Factory Reset",
+                //   [&]() {
+                //       _destroy_menu = true;
+                //       _worker       = std::make_unique<FactoryResetWorker>();
+                //   }}
+            },
+        },
+    };
 
     LvglLockGuard lock;
 
@@ -146,6 +168,6 @@ void AppSetup::onClose()
     view::destroy_status_bar();
 
     if (_need_warm_reset) {
-        GetHAL().requestWarmReboot(3);
+        GetHAL().requestWarmReboot(6);
     }
 }

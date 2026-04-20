@@ -15,8 +15,10 @@
 #include <ctime>
 #include <sys/time.h>
 #include <esp_sntp.h>
+#include <atomic>
 
-static std::string _tag = "Network";
+static std::string _tag           = "Network";
+static bool _is_network_connected = false;
 
 static void time_sync_notification_cb(struct timeval* tv)
 {
@@ -44,6 +46,11 @@ void Hal::startSntp()
 
 void Hal::startNetwork(std::function<void(std::string_view)> onLog)
 {
+    if (_is_network_connected) {
+        mclog::tagInfo(_tag, "network already connected");
+        return;
+    }
+
     std::atomic<bool> network_connected = false;
 
     auto& board = Board::GetInstance();
@@ -108,6 +115,8 @@ void Hal::startNetwork(std::function<void(std::string_view)> onLog)
     board.SetNetworkEventCallback(nullptr);
 
     startSntp();
+
+    _is_network_connected = true;
 }
 
 WifiStatus Hal::getWifiStatus()

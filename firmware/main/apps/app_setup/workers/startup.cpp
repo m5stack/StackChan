@@ -67,6 +67,15 @@ void StartupWorker::update()
             _is_done = true;
         } else if (_page_startup->isStartClicked()) {
             _page_startup.reset();
+            mclog::tagInfo(_tag, "start servo test");
+            _worker_servo_test = std::make_unique<ServoTestWorker>();
+        }
+    }
+    // Servo test
+    else if (_worker_servo_test) {
+        _worker_servo_test->update();
+        if (_worker_servo_test->isDone()) {
+            _worker_servo_test.reset();
             mclog::tagInfo(_tag, "start wifi setup");
             _worker_wifi = std::make_unique<WifiSetupWorker>();
         }
@@ -76,8 +85,8 @@ void StartupWorker::update()
         _worker_wifi->update();
         if (_worker_wifi->isDone()) {
             _worker_wifi.reset();
-            mclog::tagInfo(_tag, "startup done");
-            _is_done = true;
+            mclog::tagInfo(_tag, "startup back");
+            _page_startup = std::make_unique<PageStartup>();
         }
     }
 }

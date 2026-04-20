@@ -20,7 +20,8 @@ AppAiAgent::AppAiAgent()
     // Configure App name
     setAppInfo().name = "AI.AGENT";
     // Configure App icon
-    setAppInfo().icon = (void*)&icon_ai_agent;
+    static auto icon  = assets::get_image("icon_ai_agent.bin");
+    setAppInfo().icon = (void*)&icon;
     // Configure App theme color
     static uint32_t theme_color = 0x33CC99;
     setAppInfo().userData       = (void*)&theme_color;

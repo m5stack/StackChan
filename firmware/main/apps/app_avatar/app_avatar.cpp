@@ -47,7 +47,8 @@ AppAvatar::AppAvatar()
     // 配置 App 名
     setAppInfo().name = "AVATAR";
     // 配置 App 图标
-    setAppInfo().icon = (void*)&icon_sentinel;
+    static auto icon  = assets::get_image("icon_sentinel.bin");
+    setAppInfo().icon = (void*)&icon;
     // 配置 App 主题颜色
     static uint32_t theme_color = 0xFF6699;
     setAppInfo().userData       = (void*)&theme_color;

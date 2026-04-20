@@ -15,6 +15,7 @@
 #include <memory>
 #include <vector>
 #include <lvgl.h>
+#include <src/draw/lv_image_dsc.h>
 
 using namespace smooth_ui_toolkit;
 using namespace smooth_ui_toolkit::lvgl_cpp;
@@ -159,8 +160,9 @@ public:
         _bar->setOutlineColor(lv_color_hex(colorPrimary));
         _bar->setRadius(3, LV_PART_INDICATOR);
 
-        _lightning_icon = std::make_unique<uitk::lvgl_cpp::Image>(parent);
-        _lightning_icon->setSrc(&icon_bat_lightning);
+        _lightning_icon     = std::make_unique<uitk::lvgl_cpp::Image>(parent);
+        _icon_bat_lightning = assets::get_image("icon_bat_lightning.bin");
+        _lightning_icon->setSrc(&_icon_bat_lightning);
         _lightning_icon->setImageRecolor(lv_color_hex(colorPrimary));
         _lightning_icon->setImageRecolorOpa(LV_OPA_COVER);
         _lightning_icon->setHidden(true);
@@ -193,6 +195,7 @@ private:
     std::unique_ptr<Bar> _bar;
     std::unique_ptr<Container> _bat_top;
     std::unique_ptr<Image> _lightning_icon;
+    lv_image_dsc_t _icon_bat_lightning;
 
     uint32_t _color_primary = 0;
 };
@@ -235,6 +238,11 @@ public:
         _wifi_icon->setImageRecolor(lv_color_hex(colorPrimary));
         _wifi_icon->setImageRecolorOpa(LV_OPA_COVER);
 
+        _icon_wifi_low    = assets::get_image("icon_wifi_low.bin");
+        _icon_wifi_medium = assets::get_image("icon_wifi_medium.bin");
+        _icon_wifi_high   = assets::get_image("icon_wifi_high.bin");
+        _icon_wifi_slash  = assets::get_image("icon_wifi_slash.bin");
+
         update();
     }
 
@@ -246,22 +254,26 @@ public:
                 _wifi_icon->setSrc(NULL);
                 break;
             case WifiStatus::Low:
-                _wifi_icon->setSrc(&icon_wifi_low);
+                _wifi_icon->setSrc(&_icon_wifi_low);
                 break;
             case WifiStatus::Medium:
-                _wifi_icon->setSrc(&icon_wifi_medium);
+                _wifi_icon->setSrc(&_icon_wifi_medium);
                 break;
             case WifiStatus::High:
-                _wifi_icon->setSrc(&icon_wifi_high);
+                _wifi_icon->setSrc(&_icon_wifi_high);
                 break;
             default:
-                _wifi_icon->setSrc(&icon_wifi_slash);
+                _wifi_icon->setSrc(&_icon_wifi_slash);
                 break;
         }
     }
 
 private:
     std::unique_ptr<Image> _wifi_icon;
+    lv_image_dsc_t _icon_wifi_low;
+    lv_image_dsc_t _icon_wifi_medium;
+    lv_image_dsc_t _icon_wifi_high;
+    lv_image_dsc_t _icon_wifi_slash;
 };
 
 class StatusBarView {

@@ -10,6 +10,7 @@
 #include <esp_psram.h>
 #include <vector>
 #include <cstring>
+#include <src/misc/cache/lv_cache.h>
 #include <settings.h>
 #include <lvgl.h>
 #include <lvgl_theme.h>
@@ -228,8 +229,16 @@ lv_disp_t* StackChanAvatarDisplay::GetLvglDisplay()
 
 #include <hal/board/hal_bridge.h>
 
-void StackChanAvatarDisplay::SetupXiaoZhiUI()
+void StackChanAvatarDisplay::SetupUI()
 {
+    // Prevent duplicate calls - if already called, return early
+    if (setup_ui_called_) {
+        ESP_LOGW(TAG, "SetupUI() called multiple times, skipping duplicate call");
+        return;
+    }
+
+    Display::SetupUI();  // Mark SetupUI as called
+
     auto& stackchan = GetStackChan();
 
     if (stackchan.hasAvatar()) {
@@ -243,7 +252,11 @@ void StackChanAvatarDisplay::SetupXiaoZhiUI()
 
     auto avatar = std::make_unique<DefaultAvatar>();
     avatar->init(lv_screen_active());
-    avatar->getPanel()->onClick().connect([]() { hal_bridge::toggle_xiaozhi_chat_state(); });
+    avatar->getPanel()->onClick().connect([]() {
+        if (hal_bridge::is_xiaozhi_ready()) {
+            hal_bridge::toggle_xiaozhi_chat_state();
+        }
+    });
 
     stackchan.attachAvatar(std::move(avatar));
     stackchan.addModifier(std::make_unique<BreathModifier>());
@@ -283,7 +296,7 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
 
     DisplayLockGuard lock(this);
 
-    ESP_LOGE(TAG, "SetEmotion: %s", emotion);
+    // ESP_LOGE(TAG, "SetEmotion: %s", emotion);
 
     auto& avatar = stackchan.avatar();
 
@@ -335,12 +348,16 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
 
 void StackChanAvatarDisplay::SetChatMessage(const char* role, const char* content)
 {
+    if (!setup_ui_called_) {
+        ESP_LOGW(TAG, "SetChatMessage('%s', '%s') called before SetupUI() - message will be lost!", role, content);
+    }
+
     auto& stackchan = GetStackChan();
     if (!stackchan.hasAvatar()) {
         return;
     }
 
-    ESP_LOGE(TAG, "SetChatMessage: role=%s, content=%s", role ? role : "null", content ? content : "null");
+    // ESP_LOGE(TAG, "SetChatMessage: role=%s, content=%s", role ? role : "null", content ? content : "null");
 
     DisplayLockGuard lock(this);
 
@@ -349,6 +366,20 @@ void StackChanAvatarDisplay::SetChatMessage(const char* role, const char* conten
     } else if (strcmp(role, "assistant") == 0) {
         stackchan.avatar().setSpeech(content);
     }
+}
+
+void StackChanAvatarDisplay::ClearChatMessages()
+{
+    auto& stackchan = GetStackChan();
+    if (!stackchan.hasAvatar()) {
+        return;
+    }
+
+    DisplayLockGuard lock(this);
+
+    stackchan.avatar().clearSpeech();
+
+    ESP_LOGI(TAG, "Chat messages cleared");
 }
 
 void StackChanAvatarDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image)
@@ -380,6 +411,10 @@ void StackChanAvatarDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image)
     ESP_ERROR_CHECK(esp_timer_start_once(preview_timer_, 6000 * 1000));
 }
 
+void StackChanAvatarDisplay::UpdateStatusBar(bool update_all)
+{
+}
+
 void StackChanAvatarDisplay::SetTheme(Theme* theme)
 {
     ESP_LOGI(TAG, "SetTheme: %s", theme->name().c_str());
@@ -407,9 +442,7 @@ bool hal_bridge::is_xiaozhi_ready()
 
 void StackChanAvatarDisplay::SetStatus(const char* status)
 {
-    ESP_LOGE(TAG, "SetStatus: %s", status);
-
-    LvglDisplay::SetStatus(status);
+    // ESP_LOGE(TAG, "SetStatus: %s", status);
 
     auto& stackchan = GetStackChan();
     if (!stackchan.hasAvatar()) {
@@ -490,4 +523,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
     if (is_sleeping_) {
         avatar.setSpeech("");
     }
+}
+
+void StackChanAvatarDisplay::ShowNotification(const char* notification, int duration_ms)
+{
 }

@@ -48,6 +48,7 @@ void Hal::init()
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <system_info.h>
+#include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <esp_mac.h>
@@ -86,8 +87,38 @@ void Hal::reboot()
     esp_restart();
 }
 
+static void _confirm_ota_image_if_stable()
+{
+    constexpr uint32_t ota_confirm_delay_ms = 20000;
+    static bool ota_confirm_checked         = false;
+    if (ota_confirm_checked || GetHAL().millis() < ota_confirm_delay_ms) {
+        return;
+    }
+    ota_confirm_checked = true;
+
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    if (running == nullptr) {
+        mclog::tagError(_tag, "failed to get running partition for ota confirmation");
+        return;
+    }
+
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) != ESP_OK) {
+        mclog::tagError(_tag, "failed to get ota state for partition: {}", running->label);
+        return;
+    }
+
+    mclog::tagInfo(_tag, "ota confirm check: partition={}, state={}", running->label, static_cast<int>(ota_state));
+    if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+        mclog::tagInfo(_tag, "ota image is stable, marking current app valid");
+        esp_ota_mark_app_valid_cancel_rollback();
+    }
+}
+
 void Hal::updateHeapStatusLog()
 {
+    _confirm_ota_image_if_stable();
+
     static uint32_t last_log_tick = 0;
     if (millis() - last_log_tick < 10000) {
         return;
@@ -164,7 +195,7 @@ void Hal::startXiaozhi()
     });
 
     // Start stackchan update task
-    xTaskCreate(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL);
+    xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 5, NULL, 1);
 
     hal_bridge::start_xiaozhi_app();
 }
@@ -211,6 +242,16 @@ uint8_t Hal::getBackLightBrightness()
     return hal_bridge::board_get_backlight_brightness();
 }
 
+void Hal::setSpeakerVolume(uint8_t volume, bool permanent)
+{
+    hal_bridge::board_set_speaker_volume(volume, permanent);
+}
+
+uint8_t Hal::getSpeakerVolume()
+{
+    return hal_bridge::board_get_speaker_volume();
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                    Lvgl                                    */
 /* -------------------------------------------------------------------------- */
@@ -250,33 +291,6 @@ void Hal::lvgl_init()
     lv_indev_set_display(lvTouchpad, hal_bridge::display_get_lvgl_display());
 
     hal_bridge::disply_lvgl_unlock();
-}
-
-lv_timer_t* _timer_stackchan_update = NULL;
-
-void Hal::startStackChanAutoUpdate(int fps)
-{
-    mclog::tagInfo(_tag, "start stack chan auto update with fps: {}", fps);
-
-    if (_timer_stackchan_update) {
-        mclog::tagWarn(_tag, "stack chan auto update already started");
-        return;
-    }
-
-    _timer_stackchan_update = lv_timer_create([](lv_timer_t* timer) { GetStackChan().update(); }, 1000 / fps, NULL);
-}
-
-void Hal::stopStackChanAutoUpdate()
-{
-    mclog::tagInfo(_tag, "stop stack chan auto update");
-
-    if (!_timer_stackchan_update) {
-        mclog::tagWarn(_tag, "stack chan auto update already stopped");
-        return;
-    }
-
-    lv_timer_delete(_timer_stackchan_update);
-    _timer_stackchan_update = NULL;
 }
 
 /* -------------------------------------------------------------------------- */

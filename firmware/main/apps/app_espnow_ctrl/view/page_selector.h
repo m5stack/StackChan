@@ -80,7 +80,7 @@ private:
  * @param options
  * @return int Selected option index
  */
-static inline int create_page_selector_and_wait(std::string_view label, const std::vector<std::string> options)
+static inline int create_page_selector_and_wait(std::string_view label, const std::vector<std::string>& options)
 {
     GetHAL().lvglLock();
     auto page_selector = std::make_unique<view::PageSelector>(label, options);

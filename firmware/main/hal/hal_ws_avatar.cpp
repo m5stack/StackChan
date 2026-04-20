@@ -24,7 +24,6 @@
 #include <lvgl_image.h>
 #include <wifi_manager.h>
 #include "utils/jpeg_to_image/jpeg_decoder.h"
-#include "audio/audio_service.h"
 #include "utils/secret_logic/secret_logic.h"
 
 static std::string _tag = "WS-Avatar";
@@ -94,9 +93,6 @@ public:
             ESP_LOGI(_tag.c_str(), "Sending EndCall");
             sendPacket(DataType::EndCall, nullptr, 0);
         });
-
-        // Initialize audio service
-        setupAudio();
     }
 
     void connect()
@@ -134,18 +130,6 @@ public:
         });
 
         _websocket->OnData([this](const char* data, size_t len, bool binary) {
-            // Fast path for Audio packets to avoid jitter from main thread loop
-            if (binary && len > 5 && static_cast<DataType>(data[0]) == DataType::Opus) {
-                // Determine raw pointer and size safely
-                const uint8_t* u_data = reinterpret_cast<const uint8_t*>(data);
-
-                // Directly construct and push to AudioService
-                auto packet = std::make_unique<AudioStreamPacket>();
-                packet->payload.assign(u_data + 5, u_data + len);
-                _audio_service.PushPacketToDecodeQueue(std::move(packet));
-                return;
-            }
-
             std::lock_guard<std::mutex> lock(_mutex);
             _msg_queue.push({binary, std::vector<uint8_t>(data, data + len)});
         });
@@ -373,13 +357,9 @@ public:
                     break;
                 }
                 case DataType::StartAudioStream: {
-                    ESP_LOGI(_tag.c_str(), "Start Audio Stream");
-                    _is_audio_streaming = true;
                     break;
                 }
                 case DataType::StopAudioStream: {
-                    ESP_LOGI(_tag.c_str(), "Stop Audio Stream");
-                    _is_audio_streaming = false;
                     break;
                 }
                 default:
@@ -452,43 +432,10 @@ private:
     uint32_t _last_heartbeat_time    = 0;
     bool _is_streaming               = false;
     bool _is_video_mode              = false;
-    std::atomic<bool> _is_audio_streaming{false};
     std::mutex _mutex;
     std::queue<ReceivedMessage> _msg_queue;
 
-    // Audio
-    AudioService _audio_service;
     std::mutex _send_mutex;
-
-    void setupAudio()
-    {
-        auto codec = Board::GetInstance().GetAudioCodec();
-        _audio_service.Initialize(codec);
-
-        AudioServiceCallbacks callbacks;
-        callbacks.on_send_queue_available = [this]() {
-            while (true) {
-                auto packet = _audio_service.PopPacketFromSendQueue();
-                if (!packet) {
-                    break;
-                }
-
-                // Only send audio if streaming is enabled
-                if (_is_audio_streaming) {
-                    if (!packet->payload.empty()) {
-                        sendPacket(DataType::Opus, packet->payload.data(), packet->payload.size());
-                    }
-                }
-            }
-        };
-
-        _audio_service.SetCallbacks(callbacks);
-
-        codec->SetInputGain(0.0f);
-        _audio_service.Start();
-        _audio_service.EnableVoiceProcessing(true);
-        _audio_service.EnableDeviceAec(true);
-    }
 
     void sendPacket(DataType type, const uint8_t* data, size_t len)
     {

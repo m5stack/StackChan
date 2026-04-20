@@ -92,12 +92,6 @@ void disply_lvgl_unlock()
     display->LvglUnlock();
 }
 
-void display_setup_xiaozhi_ui()
-{
-    auto display = static_cast<DISPLAY_TYPE*>(Board::GetInstance().GetDisplay());
-    display->SetupXiaoZhiUI();
-}
-
 /* -------------------------------------------------------------------------- */
 /*                                 Application                                */
 /* -------------------------------------------------------------------------- */
@@ -110,8 +104,6 @@ void xiaozhi_board_init()
 
 void start_xiaozhi_app()
 {
-    display_setup_xiaozhi_ui();
-
     set_xiaozhi_mode(true);
 
     // Initialize and run the application
