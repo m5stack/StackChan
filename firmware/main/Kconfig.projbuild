@@ -1,3 +1,20 @@
+menu "StackChan Features"
+
+config USE_EZDATA
+    bool "Enable EzData integration"
+    default y
+    help
+        When enabled (default, production behaviour), the firmware installs
+        the EzData Mooncake app and connects to M5Stack's cloud at
+        uiflow2.m5stack.com (MQTT) and ezdata2.m5stack.com (HTTP) for
+        cross-device parameter sync.
+
+        Disable when self-hosting the StackChan backend and you do not
+        need EzData. This avoids retry noise in the logs and prevents any
+        traffic from leaving for M5Stack cloud services.
+
+endmenu
+
 menu "Xiaozhi Assistant"
 
 config OTA_URL
