@@ -76,15 +76,22 @@ class AppState: ObservableObject {
         }
         BlufiUtil.shared.characteristicCallback = { characteristic in
             if characteristic.properties.contains(.write) || characteristic.properties.contains(.writeWithoutResponse) {
-                
+
                 if characteristic.uuid.uuidString == "E2E5E5E2-1234-5678-1234-56789ABCDEF0" {
                     BlufiUtil.shared.writeExpressionCharacteristic = characteristic
                     print("✏️ Expression writable characteristic assigned: \(characteristic.uuid)")
                 }
-                
+
                 if characteristic.uuid.uuidString == "E2E5E5E1-1234-5678-1234-56789ABCDEF0" {
                     BlufiUtil.shared.writeHeadCharacteristic = characteristic
                     print("✏️ Head writable characteristic assigned: \(characteristic.uuid)")
+                }
+
+                // Config characteristic — used for Wi-Fi provisioning (SSID + password JSON)
+                // during pairing. Firmware handler is _handle_ble_config_write in hal_ble.cpp.
+                if characteristic.uuid.uuidString == "E2E5E5E3-1234-5678-1234-56789ABCDEF0" {
+                    BlufiUtil.shared.writeWifiSetCharacteristic = characteristic
+                    print("✏️ Config/Wifi writable characteristic assigned: \(characteristic.uuid)")
                 }
             }
         }

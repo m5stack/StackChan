@@ -279,23 +279,38 @@ struct ScanningEquipment : View {
     }
     
     private func confirmWifi() {
-        
+
         if !BlufiUtil.shared.blueSwitch {
             appState.alertTitle = "Please turn on Bluetooth"
             appState.showAlert = true
             return
         }
-        
+
         if wifiName.isEmpty || wifiPassword.isEmpty {
             appState.alertTitle = "Please enter Wi-Fi name and password"
             appState.showAlert = true
             return
         }
-        
+
+        // Push the Wi-Fi credentials to the StackChan over BLE.
+        // The firmware expects {"ssid":..., "password":...} on the Config
+        // characteristic (see hal_ble.cpp:_handle_ble_config_write).
+        let payload: [String: String] = [
+            "ssid": wifiName,
+            "password": wifiPassword,
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: payload),
+           let json = String(data: data, encoding: .utf8) {
+            BlufiUtil.shared.sendWifiSetData(json)
+            print("➡️ Wi-Fi credentials sent to device")
+        } else {
+            print("⚠️ Failed to serialise Wi-Fi payload")
+        }
+
         withAnimation{
             pairingStatus = .DistributionNetwork
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             withAnimation{
                 pairingStatus = .ChangeTheName
