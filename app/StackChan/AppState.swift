@@ -251,9 +251,9 @@ class AppState: ObservableObject {
                 if let msgType = result.0 {
                     switch msgType {
                     case MsgType.deviceOnline:
-                        self.deviceIsOnline = false
-                    case MsgType.deviceOffline:
                         self.deviceIsOnline = true
+                    case MsgType.deviceOffline:
+                        self.deviceIsOnline = false
                     default:
                         break
                     }
