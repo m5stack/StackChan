@@ -1,2 +1,24 @@
+# macOS / editor noise
 .DS_Store
 .idea/
+
+# Xcode per-user state (user-specific UI snapshots should not ship with the repo)
+**/xcuserdata/
+*.xcuserstate
+
+# ESP-IDF firmware build artefacts
+firmware/build/
+firmware/managed_components/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/sdkconfig.local
+firmware/sdkconfig.defaults.local
+firmware/dependencies.lock.local
+
+# Go server build artefacts
+server/StackChan
+server/StackChan.exe
+
+# Environment files for docker/compose and local overrides
+.env
+.env.local
