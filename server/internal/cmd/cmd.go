@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"stackChan/internal/controller/app"
 	"stackChan/internal/controller/dance"
 	"stackChan/internal/controller/device"
 	"stackChan/internal/controller/file"
@@ -67,7 +68,7 @@ var (
 
 			s.Group("/stackChan", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse)
-				group.Bind(device.NewV1(), friend.NewV1(), dance.NewV1(), file.NewV1(), post.NewV1())
+				group.Bind(device.NewV1(), friend.NewV1(), dance.NewV1(), file.NewV1(), post.NewV1(), app.NewV1())
 			})
 			s.Run()
 			return nil

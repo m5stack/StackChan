@@ -39,7 +39,7 @@ type GetRandomDeviceRes []entity.Device
 
 type GetDeviceInfoReq struct {
 	g.Meta `path:"/device/info" method:"get" tags:"Device" summary:"Device Info Get request"`
-	Mac    string `json:"mac" v:"required" description:"Mac address"`
+	Mac    string `json:"mac" description:"Mac address. Optional: when empty, returns an empty device info placeholder so authenticated firmware calls that do not carry a mac still receive a well-formed response."`
 }
 
 type GetDeviceInfoRes model.DeviceInfo
@@ -51,3 +51,17 @@ type UpdateDeviceInfoReq struct {
 }
 
 type UpdateDeviceInfoRes string
+
+type GetUserAccountInfoReq struct {
+	g.Meta `path:"/device/user" method:"get" tags:"Device" summary:"Get the user account bound to the authenticated device"`
+}
+
+type GetUserAccountInfoRes struct {
+	Username string `json:"username" dc:"Username bound to the device"`
+}
+
+type UnbindAccountReq struct {
+	g.Meta `path:"/device/unbind" method:"post" tags:"Device" summary:"Unbind the authenticated device from its user account"`
+}
+
+type UnbindAccountRes struct{}
