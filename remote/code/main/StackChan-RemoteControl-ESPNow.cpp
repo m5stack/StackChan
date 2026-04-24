@@ -71,7 +71,9 @@ void app_main(void)
     }
 
     M5.begin();
-    M5.Imu.init(&M5.In_I2C);  // init IMU with internal I2C port
+    M5.Power.begin();
+    M5.Power.Axp192.setLDO2(2800);  // set LDO2 to 2.8V for external devices
+    M5.Imu.init(&M5.In_I2C);        // init IMU with internal I2C port
     printf("IN_I2C port: %d\n", M5.In_I2C.getPort());
     printf("M5 Display width: %ld, height: %ld\n", M5.Display.width(), M5.Display.height());
 
