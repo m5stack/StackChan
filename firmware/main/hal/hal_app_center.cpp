@@ -5,6 +5,7 @@
  */
 #include "hal.h"
 #include "utils/ota/ota.h"
+#include "utils/secret_logic/secret_logic.h"
 #include <mooncake_log.h>
 #include <memory>
 #include <board.h>
@@ -12,7 +13,10 @@
 
 static const std::string_view _tag = "HAL-AppCenter";
 
-static const std::string_view _app_info_list_url = "http://47.113.125.164:12800/stackChan/apps";
+static std::string get_app_info_list_url()
+{
+    return secret_logic::get_server_url() + "/stackChan/apps";
+}
 
 static const char *get_json_string(cJSON *item, std::initializer_list<const char *> keys)
 {
@@ -33,7 +37,7 @@ app_center::AppInfoList_t Hal::fetchAppList()
     auto network = board.GetNetwork();
 
     auto http = network->CreateHttp(0);
-    if (!http->Open("GET", std::string(_app_info_list_url))) {
+    if (!http->Open("GET", get_app_info_list_url())) {
         mclog::tagError(_tag, "failed to open http connection");
         return app_list;
     }
