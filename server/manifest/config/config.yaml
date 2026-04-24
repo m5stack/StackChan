@@ -12,4 +12,4 @@ logger:
 # https://goframe.org/docs/core/gdb-config-file
 database:
   default:
-    link: "sqlite::@file(/stackChan.sqlite)"
+    link: "sqlite::@file(./stackChan.sqlite)"
