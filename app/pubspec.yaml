@@ -1,0 +1,80 @@
+name: stack_chan
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.1.0+6
+
+environment:
+  sdk: ^3.11.5
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons:
+  web_socket:
+  encrypt:
+  pointycastle:
+  shared_preferences:
+  get:
+  liquid_glass_renderer:
+  flutter_blue_plus:
+  hydro_glass_nav_bar:
+  uuid:
+  three_js:
+  flex_color_picker:
+  flutter_svg:
+  camera:
+  google_mlkit_face_detection:
+  flutter_slidable:
+  opencv_dart:
+  pull_down_button:
+  dio:
+  mobile_scanner:
+  network_info_plus:
+  permission_handler:
+  image:
+  just_audio:
+  path_provider:
+  music_feature_analyzer:
+  ffmpeg_kit_flutter_new:
+  path:
+  intl:
+  file_picker: ^11.0.2
+  opus_codec_dart:
+  opus_codec:
+  webview_flutter:
+  video_player:
+  geolocator:
+  package_info_plus:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+
+hooks:
+  user_defines:
+    dartcv4:
+      include_modules:
+        - imgproc
+        - imgcodecs
+      exclude_modules:
+        - calib3d
+        - features2d
+        - flann
+        - dnn
+        - freetype
+        - highgui
+        - video
+        - videoio
+        - objdetect
+        - photo
+        - aruco
+        - img_hash
+        - quality
+        - wechat_qrcode
+        - ximgproc
+        - xobjdetect
+        - stitching
