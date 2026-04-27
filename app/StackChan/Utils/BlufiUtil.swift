@@ -32,8 +32,14 @@ class BlufiUtil: NSObject,CBCentralManagerDelegate,CBPeripheralDelegate {
     
     var wifiSetCharacteristicCall: ((Data) -> Void)? = nil
     
-    /// Service UUID
-    private let targetServiceUUIDs: [CBUUID] = [CBUUID(string: "e2e5e5e0-1234-5678-1234-56789abcdef0")]
+    /// Service UUIDs. The firmware advertises two distinct 128-bit UUIDs:
+    /// - Base  (e2e5e5e0-...) exposed by startBleServer() — runtime control
+    /// - Alt   (e2e5e5ff-...) exposed by startAppConfigServer() — pairing/Wi-Fi setup
+    /// Scanning for both lets the app find the device in both modes.
+    private let targetServiceUUIDs: [CBUUID] = [
+        CBUUID(string: "e2e5e5e0-1234-5678-1234-56789abcdef0"),
+        CBUUID(string: "e2e5e5ff-1234-5678-1234-56789abcdef0"),
+    ]
     
     private let scanOptions: [String: Any] = [
         CBCentralManagerScanOptionAllowDuplicatesKey: true
