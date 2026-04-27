@@ -1,9 +1,7 @@
-#SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-#SPDX-License-Identifier: MIT
 gfcli:
   gen:
     dao:
-      - link: "sqlite::@file(/stackChan.sqlite)"
+      - link: ""
         descriptionTag: true
 
   docker:

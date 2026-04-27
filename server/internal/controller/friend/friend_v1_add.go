@@ -8,18 +8,25 @@ package friend
 import (
 	"context"
 	"stackChan/internal/dao"
+	"stackChan/internal/model"
 	"stackChan/internal/model/entity"
 
+	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 
 	"stackChan/api/friend/v1"
 )
 
 func (c *ControllerV1) Add(ctx context.Context, req *v1.AddReq) (res *v1.AddRes, err error) {
-	if req.Mac == req.FriendMac {
+	mac := g.RequestFromCtx(ctx).GetCtxVar(model.Mac).String()
+	if mac == "" {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter)
+	}
+	if mac == req.FriendMac {
 		return nil, gerror.New("You cannot add yourself as a friend")
 	}
-	macA := req.Mac
+	macA := mac
 	macB := req.FriendMac
 	var friend entity.DeviceFriend
 	err = dao.DeviceFriend.Ctx(ctx).

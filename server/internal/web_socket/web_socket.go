@@ -7,12 +7,16 @@ package web_socket
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"math/rand"
 	"net"
 	"net/http"
+	"stackChan/internal/model"
 	"stackChan/internal/service"
+	"stackChan/utility"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +54,11 @@ const (
 
 	DeviceOffline byte = 0x16
 	DeviceOnline  byte = 0x17
+
+	OnAudio  byte = 0x18
+	OffAudio byte = 0x19
+
+	AimedTakePhoto byte = 0x1A
 )
 
 var (
@@ -62,33 +71,53 @@ var (
 	logger              = g.Log()
 	stackChanClientPool = sync.Map{}
 	appClientPool       = sync.Map{}
+	appClientMu         sync.Mutex
 )
 
-// AppClient indicates a WebSocket client connection on the App side
-type AppClient struct {
-	Mac      string
-	Conn     *websocket.Conn
-	mu       *sync.RWMutex
-	DeviceId string
-	LastTime time.Time
+// GetMac get MAC address from request header
+func GetMac(r *ghttp.Request) (string, error) {
+	if token := r.Header.Get(model.Authorization); token != "" {
+		decodedToken, err := base64.StdEncoding.DecodeString(token)
+		if err != nil {
+			logger.Errorf(r.Context(), "Error base64 decoding token: %v", err)
+			return "", err
+		}
+		decrypted, err := utility.RSADecrypt(decodedToken)
+		if err != nil {
+			logger.Errorf(r.Context(), "Error decrypting token: %v", err)
+			return "", err
+		}
+		tokenStr := string(decrypted)
+		parts := strings.Split(tokenStr, "|")
+		if len(parts) < 2 {
+			return "", errors.New("invalid token")
+		}
+		mac := parts[0]
+		tsStr := parts[2]
+		ts, err := strconv.ParseInt(tsStr, 10, 64)
+		if err != nil {
+			return "", errors.New("invalid timestamp")
+		}
+		now := time.Now().Unix()
+		if now-ts > 10 || ts-now > 10 {
+			return "", errors.New("token expired or not yet valid")
+		}
+		return mac, nil
+	}
+	return "", nil
 }
 
-// StackChanClient indicates a WebSocket client connection for the device end of a StackChan
-type StackChanClient struct {
-	Mac                    string
-	Conn                   *websocket.Conn
-	mu                     *sync.RWMutex
-	CameraSubscriptionList []*AppClient
-	CallAppClient          *AppClient
-	phoneScreen            bool
-	LastTime               time.Time
-}
-
+// Handler WebSocket handler function
 func Handler(r *ghttp.Request) {
 	ctx := r.Context()
-	mac := r.Get("mac").String()
+	mac, err := GetMac(r)
+	if err != nil || mac == "" {
+		r.Response.WriteHeader(http.StatusUnauthorized) // Return 401
+		r.Response.Write("Unauthorized: invalid or missing MAC")
+		return
+	}
 	deviceType := r.Get("deviceType").String()
-	if mac == "" || deviceType == "" {
+	if deviceType == "" {
 		r.Response.Write("The mac and deviceType parameters are empty.")
 		return
 	}
@@ -101,56 +130,55 @@ func Handler(r *ghttp.Request) {
 
 	if deviceType == "StackChan" {
 		isHave := false
-		var client *StackChanClient
+		var client *model.StackChanClient
 
 		stackChanClientPool.Range(func(key, value any) bool {
 			macAddr := key.(string)
-			stackChanClient := value.(*StackChanClient)
+			stackChanClient := value.(*model.StackChanClient)
 
 			if macAddr == mac {
 				isHave = true
 				client = stackChanClient
-				client.mu.Lock()
-				client.Conn = ws
-				if client.CallAppClient != nil {
+				client.SetConn(ws)
+				if client.GetCallAppClient() != nil {
 					reconnectMsg := createStringMessage(TextMessage, "The equipment has been reconnected.")
-					msgType := websocket.BinaryMessage
-					forwardMessage(ctx, client.CallAppClient.Conn, &msgType, reconnectMsg, client.CallAppClient.mu)
+					stackChanSendMessage(ctx, client, new(websocket.BinaryMessage), reconnectMsg)
 				}
-				if len(client.CameraSubscriptionList) > 0 {
+				if len(client.GetCameraSubscriptionList()) > 0 {
 					onMsg := createMessage(OnCamera, nil)
-					onType := websocket.BinaryMessage
-					forwardMessage(ctx, client.Conn, &onType, onMsg, client.mu)
+					stackChanSendMessage(ctx, client, new(websocket.BinaryMessage), onMsg)
 				}
-				client.LastTime = time.Now()
-				client.mu.Unlock()
+				if len(client.GetAudioSubscriptionList()) > 0 {
+					onMsg := createMessage(OnAudio, nil)
+					stackChanSendMessage(ctx, client, new(websocket.BinaryMessage), onMsg)
+				}
+				client.SetLastTime(time.Now())
 				return false
 			}
 			return true
 		})
 
 		if !isHave {
-			client = &StackChanClient{
-				Mac:         mac,
-				Conn:        ws,
-				mu:          &sync.RWMutex{},
-				phoneScreen: false,
-				LastTime:    time.Now(),
-			}
+			client = model.NewStackChanClient(mac, ws, make([]*model.AppClient, 0), nil, false)
 			addStackChenClient(ctx, client)
-		} else {
-			// notify app
-			onlineMsg := createStringMessage(DeviceOnline, "Your StackChan has been launched.")
-			msgType := websocket.BinaryMessage
-			// Notify App
-			appClients := getAppClients(client.Mac)
-			for _, appClient := range appClients {
-				forwardMessage(ctx, appClient.Conn, &msgType, onlineMsg, appClient.mu)
-			}
 		}
-		logger.Info(ctx, "There is a StackChen connected to the service.", client.Mac)
+
+		// send Online
+		onlineMsg := createStringMessage(DeviceOnline, "Your StackChan has been launched.")
+		msgType := websocket.BinaryMessage
+		// Notify App
+		appClients := getAppClients(client.GetMac())
+		for _, appClient := range appClients {
+			appSendMessage(ctx, appClient, &msgType, onlineMsg)
+		}
+
+		logger.Info(ctx, "There is a StackChen connected to the service.", client.GetMac())
 		defer func() {
 			logger.Info(ctx, "There is a StackChan that has disconnected.", mac, deviceType)
+			if client.GetConn() != nil {
+				_ = client.GetConn().Close()
+				client.SetConn(nil)
+			}
 		}()
 		for {
 			messageType, msg, err := ws.ReadMessage()
@@ -160,8 +188,7 @@ func Handler(r *ghttp.Request) {
 					break
 				}
 
-				var ne net.Error
-				if errors.As(err, &ne) && ne.Temporary() {
+				if ne, ok := errors.AsType[net.Error](err); ok && ne.Temporary() {
 					logger.Infof(ctx, "StackChan Temporary network error. Continue reading.: mac=%s,deviceType=%s,Error=%v", mac, deviceType, err)
 					continue
 				}
@@ -169,7 +196,7 @@ func Handler(r *ghttp.Request) {
 				logger.Errorf(ctx, "StackChan Abnormal disconnection: mac=%s, deviceType=%s, Error=%v", mac, deviceType, err)
 				break
 			}
-			//logger.Infof(ctx, "收到StackChan端消息%d", len(msg))
+			client.SetLastTime(time.Now())
 			readStackChanMessage(ctx, client, &messageType, &msg)
 		}
 	} else if deviceType == "App" {
@@ -178,47 +205,41 @@ func Handler(r *ghttp.Request) {
 			r.Response.Write("The deviceId parameter in the App end is empty.")
 			return
 		}
-		var client *AppClient
+		var client *model.AppClient
 		found := false
 		clients := getAppClients(mac)
 		for _, appClient := range clients {
-			if appClient.DeviceId == deviceId && appClient.Mac == mac {
+			if appClient.GetDeviceId() == deviceId && appClient.GetMac() == mac {
 				// Already available. Update the connection.
 				client = appClient
-				client.mu.Lock()
-				client.Conn = ws
-				client.mu.Unlock()
-				client.LastTime = time.Now()
+				client.SetConn(ws)
+				client.SetLastTime(time.Now())
 				found = true
 				break
 			}
 		}
 		if !found {
-			client = &AppClient{
-				Mac:      mac,
-				Conn:     ws,
-				DeviceId: deviceId,
-				mu:       &sync.RWMutex{},
-				LastTime: time.Now(),
-			}
+			client = model.NewAppClient(mac, ws, deviceId)
 			addAppClient(client)
 		}
-		logger.Info(ctx, "There is an App connected to the service.", client.Mac)
+		logger.Info(ctx, "There is an App connected to the service.", client.GetMac())
 
 		// check StackChan status
-		stackChanClient := getStackChanClient(client.Mac)
-		if stackChanClient == nil {
+		stackChanClient := getStackChanClient(client.GetMac())
+		if stackChanClient == nil || stackChanClient.GetConn() == nil {
 			offlineMsg := createStringMessage(DeviceOffline, "Your StackChan is offline.")
-			msgType := websocket.BinaryMessage
-			forwardMessage(ctx, client.Conn, &msgType, offlineMsg, client.mu)
+			appSendMessage(ctx, client, new(websocket.BinaryMessage), offlineMsg)
 		} else {
 			onlineMsg := createStringMessage(DeviceOnline, "Your StackChan has been launched.")
-			msgType := websocket.BinaryMessage
-			forwardMessage(ctx, client.Conn, &msgType, onlineMsg, client.mu)
+			appSendMessage(ctx, client, new(websocket.BinaryMessage), onlineMsg)
 		}
 
 		defer func() {
 			logger.Info(ctx, "There is an App that has disconnected.", mac, deviceType)
+			if client.GetConn() != nil {
+				_ = client.GetConn().Close()
+				client.SetConn(nil)
+			}
 		}()
 		for {
 			messageType, msg, err := ws.ReadMessage()
@@ -239,48 +260,50 @@ func Handler(r *ghttp.Request) {
 				logger.Errorf(ctx, "App Abnormal disconnection: mac=%s, deviceType=%s, Error=%v", mac, deviceType, err)
 				break
 			}
-			client.LastTime = time.Now()
+			client.SetLastTime(time.Now())
 			readAppClientMessage(ctx, client, &messageType, &msg)
 		}
 	}
 }
 
-// addStackChenClient adds a StackChan client to the connection pool and ensures the MAC is registered
-func addStackChenClient(ctx context.Context, c *StackChanClient) {
-	stackChanClientPool.Store(c.Mac, c)
-	_, _ = service.CreateMacIfNotExists(ctx, c.Mac)
+// Handle WebSocket connection requests from StackChan devices
+func addStackChenClient(ctx context.Context, c *model.StackChanClient) {
+	stackChanClientPool.Store(c.GetMac(), c)
+	_, _ = service.CreateMacIfNotExists(ctx, c.GetMac())
 }
 
-// addAppClient adds an App client to the App connection pool (multiple Apps per MAC allowed)
-func addAppClient(c *AppClient) {
-	val, _ := appClientPool.Load(c.Mac)
-	var clients []*AppClient
-	if val == nil {
-		clients = []*AppClient{c}
+// Handle WebSocket connection requests from App devices
+func addAppClient(c *model.AppClient) {
+	appClientMu.Lock()
+	defer appClientMu.Unlock()
+
+	val, _ := appClientPool.Load(c.GetMac())
+	var clients []*model.AppClient
+	if val != nil {
+		clients = append(val.([]*model.AppClient), c)
 	} else {
-		clients = val.([]*AppClient)
-		clients = append(clients, c)
+		clients = []*model.AppClient{c}
 	}
-	appClientPool.Store(c.Mac, clients)
+	appClientPool.Store(c.GetMac(), clients)
 }
 
-// getAppClients gets all App clients for the specified MAC address
-func getAppClients(mac string) []*AppClient {
+// Get all App clients with specified MAC address
+func getAppClients(mac string) []*model.AppClient {
 	if val, ok := appClientPool.Load(mac); ok {
-		return val.([]*AppClient)
+		return val.([]*model.AppClient)
 	}
 	return nil
 }
 
-// getStackChanClient gets the StackChan client corresponding to the specified MAC address
-func getStackChanClient(mac string) *StackChanClient {
+// Get StackChan client with specified MAC address
+func getStackChanClient(mac string) *model.StackChanClient {
 	if val, ok := stackChanClientPool.Load(mac); ok {
-		return val.(*StackChanClient)
+		return val.(*model.StackChanClient)
 	}
 	return nil
 }
 
-// parseBinaryMessage parses a custom binary protocol message, returns type, length, payload, and success status
+// Parse custom binary protocol messages, return message type, data length, payload and success status
 func parseBinaryMessage(ctx context.Context, msg *[]byte) (byte, int, []byte, bool) {
 	if len(*msg) < 1+4 {
 		logger.Warning(ctx, "Message too short, cannot parse header, message not forwarded")
@@ -299,94 +322,8 @@ func parseBinaryMessage(ctx context.Context, msg *[]byte) (byte, int, []byte, bo
 	return msgType, dataLen, payload, true
 }
 
-// StartPingTime sends Ping messages to all connected clients for heartbeat detection
-func StartPingTime(ctx context.Context) {
-	message := createMessage(ping, nil)
-	messageType := websocket.BinaryMessage
-
-	// Iterate over StackChanClientPool
-	stackChanClientPool.Range(func(_, value any) bool {
-		client := value.(*StackChanClient)
-		forwardMessage(ctx, client.Conn, &messageType, message, client.mu)
-		return true // continue iteration
-	})
-
-	// Iterate over AppClientPool
-	appClientPool.Range(func(_, value any) bool {
-		clients := value.([]*AppClient)
-		for _, client := range clients {
-			forwardMessage(ctx, client.Conn, &messageType, message, client.mu)
-		}
-		return true // continue iteration
-	})
-}
-
-// CheckExpiredLinks checks and cleans up App client connections that have been inactive for over 60 seconds
-func CheckExpiredLinks(ctx context.Context) {
-	now := time.Now()
-	var expiredClients []*AppClient
-
-	// First, iterate over AppClientPool
-	appClientPool.Range(func(mac, value any) bool {
-		clients := value.([]*AppClient)
-		newClients := clients[:0]
-		for _, client := range clients {
-			if now.Sub(client.LastTime) > time.Second*15 {
-				// Found expired client
-				// Iterate over StackChanClientPool to clean up CallAppClient and CameraSubscriptionList
-				stackChanClientPool.Range(func(_, scValue any) bool {
-					stackChanClient, ok := scValue.(*StackChanClient)
-					stackChanClient.mu.Lock()
-					if !ok {
-						return true
-					}
-					// Clean up CallAppClient
-					if stackChanClient.CallAppClient == client {
-						stackChanClient.CallAppClient = nil
-					}
-
-					// Update camera subscription list
-					newCamera := stackChanClient.CameraSubscriptionList[:0]
-					removedCamera := false
-					for _, sub := range stackChanClient.CameraSubscriptionList {
-						if sub != client {
-							newCamera = append(newCamera, sub)
-						} else {
-							removedCamera = true
-						}
-					}
-					stackChanClient.CameraSubscriptionList = newCamera
-					stackChanClient.mu.Unlock()
-					if removedCamera && len(newCamera) == 0 {
-						msg := createMessage(OffCamera, nil)
-						msgType := websocket.BinaryMessage
-						forwardMessage(ctx, stackChanClient.Conn, &msgType, msg, stackChanClient.mu)
-					}
-					return true
-				})
-				expiredClients = append(expiredClients, client)
-			} else {
-				newClients = append(newClients, client)
-			}
-		}
-		if len(newClients) == 0 {
-			appClientPool.Delete(mac)
-		} else {
-			appClientPool.Store(mac, newClients)
-		}
-		return true
-	})
-
-	for _, client := range expiredClients {
-		logger.Infof(ctx, "Kicked out an expired App client: %s", client.Mac)
-		err := client.Conn.Close()
-		if err != nil {
-		}
-	}
-}
-
-// readStackChanMessage handles messages from the StackChan device side
-func readStackChanMessage(ctx context.Context, client *StackChanClient, messageType *int, msg *[]byte) {
+// Handle WebSocket messages from StackChan devices
+func readStackChanMessage(ctx context.Context, client *model.StackChanClient, messageType *int, msg *[]byte) {
 	if *messageType == websocket.BinaryMessage {
 		msgType, _, _, ok := parseBinaryMessage(ctx, msg)
 		if !ok {
@@ -398,56 +335,69 @@ func readStackChanMessage(ctx context.Context, client *StackChanClient, messageT
 		case ControlAvatar, ControlMotion, OnCamera, OffCamera:
 			break
 		case RefuseCall:
-			// Refused call, remove and notify appClient
-			appClient := client.CallAppClient
+			// Reject call, remove and notify App client
+			appClient := client.GetCallAppClient()
 			if appClient != nil {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
-				client.mu.Lock()
-				client.CallAppClient = nil
-				client.mu.Unlock()
+				appSendMessage(ctx, appClient, messageType, msg)
+				client.SetCallAppClient(nil)
 			}
 			break
 		case AgreeCall:
-			// Agreed to call
-			appClient := client.CallAppClient
+			// Accept call, add App client to subscription list
+			appClient := client.GetCallAppClient()
 			if appClient != nil {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
-				client.mu.Lock()
-				client.CameraSubscriptionList = append(client.CameraSubscriptionList, appClient)
-				client.mu.Unlock()
-				if len(client.CameraSubscriptionList) == 1 {
+				appSendMessage(ctx, appClient, messageType, msg)
+				client.AppendCameraSubscriptionList(appClient)
+				if len(client.GetCameraSubscriptionList()) == 1 {
 					onMsg := createMessage(OnCamera, nil)
 					onType := websocket.BinaryMessage
-					forwardMessage(ctx, client.Conn, &onType, onMsg, client.mu)
+					stackChanSendMessage(ctx, client, &onType, onMsg)
+				}
+				client.SetAudioSubscriptionList(append(client.GetAudioSubscriptionList(), appClient))
+				if len(client.GetAudioSubscriptionList()) == 1 {
+					onMsg := createMessage(OnAudio, nil)
+					onType := websocket.BinaryMessage
+					stackChanSendMessage(ctx, client, &onType, onMsg)
 				}
 			}
 			break
 		case HangupCall:
-			// Hang up call
-			appClient := client.CallAppClient
+			// Hang up call, remove App client and update subscription list
+			appClient := client.GetCallAppClient()
 			if appClient != nil {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
+				appSendMessage(ctx, appClient, messageType, msg)
 				// Remove the client from the subscription list
-				newList := client.CameraSubscriptionList[:0]
-				for _, subClient := range client.CameraSubscriptionList {
+				newList := client.GetCameraSubscriptionList()[:0]
+				for _, subClient := range client.GetCameraSubscriptionList() {
 					if subClient != appClient {
 						newList = append(newList, subClient)
 					}
 				}
-				client.mu.Lock()
-				client.CameraSubscriptionList = newList
-				client.mu.Unlock()
+				client.SetCameraSubscriptionList(newList)
 				// If the subscription list is empty, notify to turn off the camera
-				if len(client.CameraSubscriptionList) == 0 {
+				if len(client.GetCameraSubscriptionList()) == 0 {
 					offMsg := createMessage(OffCamera, nil)
 					offType := websocket.BinaryMessage
-					forwardMessage(ctx, client.Conn, &offType, offMsg, client.mu)
+					stackChanSendMessage(ctx, client, &offType, offMsg)
+				}
+
+				newAudioList := client.GetAudioSubscriptionList()[:0]
+				for _, subClient := range client.GetAudioSubscriptionList() {
+					if subClient != appClient {
+						newAudioList = append(newAudioList, subClient)
+					}
+				}
+				client.SetAudioSubscriptionList(newAudioList)
+				if len(client.GetAudioSubscriptionList()) == 0 {
+					onMsg := createMessage(OnAudio, nil)
+					onType := websocket.BinaryMessage
+					stackChanSendMessage(ctx, client, &onType, onMsg)
 				}
 			}
 			break
 		case GetDeviceName:
 			// Query device name
-			name, err := service.GetDeviceName(ctx, client.Mac)
+			name, err := service.GetDeviceName(ctx, client.GetMac())
 			if err != nil {
 				return
 			}
@@ -456,50 +406,72 @@ func readStackChanMessage(ctx context.Context, client *StackChanClient, messageT
 				return
 			}
 			newMsg := createStringMessage(GetDeviceName, name)
-			forwardMessage(ctx, client.Conn, messageType, newMsg, client.mu)
+			stackChanSendMessage(ctx, client, messageType, newMsg)
 			break
 		case Opus:
-
+			subscribers := client.GetAudioSubscriptionList()
+			if len(subscribers) > 0 {
+				var isAll = true
+				for _, subClient := range client.GetAudioSubscriptionList() {
+					if subClient.GetConn() != nil {
+						isAll = false
+					}
+					appSendMessage(ctx, subClient, messageType, msg)
+				}
+				if isAll {
+					msg = createMessage(OffAudio, nil)
+					stackChanSendMessage(ctx, client, messageType, msg)
+				}
+			} else {
+				msg = createMessage(OffAudio, nil)
+				stackChanSendMessage(ctx, client, messageType, msg)
+			}
 			break
 		case Jpeg:
-			subscribers := client.CameraSubscriptionList
+			subscribers := client.GetCameraSubscriptionList()
 			if len(subscribers) > 0 {
 				var isAll = true
 				for _, subClient := range subscribers {
-					if subClient.Conn != nil {
+					if subClient.GetConn() != nil {
 						isAll = false
 					}
-					forwardMessage(ctx, subClient.Conn, messageType, msg, subClient.mu)
+					appSendMessage(ctx, subClient, messageType, msg)
 				}
 				if isAll {
 					msg = createMessage(OffCamera, nil)
-					forwardMessage(ctx, client.Conn, messageType, msg, client.mu)
+					stackChanSendMessage(ctx, client, messageType, msg)
 				}
 			} else {
 				msg = createMessage(OffCamera, nil)
-				forwardMessage(ctx, client.Conn, messageType, msg, client.mu)
+				stackChanSendMessage(ctx, client, messageType, msg)
 			}
 			break
 		case GetAvatarPosture:
-			appClients := getAppClients(client.Mac)
+			appClients := getAppClients(client.GetMac())
 			for _, appClient := range appClients {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
+				appSendMessage(ctx, appClient, messageType, msg)
+			}
+			break
+		case AimedTakePhoto:
+			appClient := client.GetAimedTakePhotoAppClient()
+			if appClient != nil {
+				appSendMessage(ctx, appClient, messageType, msg)
 			}
 			break
 		default:
 			logger.Infof(ctx, "Unknown binary msgType: %d", msgType)
-			appClients := getAppClients(client.Mac)
+			appClients := getAppClients(client.GetMac())
 			if appClients != nil {
 				for _, appClient := range appClients {
-					forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
+					appSendMessage(ctx, appClient, messageType, msg)
 				}
 			}
 		}
 	} else if *messageType == websocket.TextMessage {
-		appClients := getAppClients(client.Mac)
+		appClients := getAppClients(client.GetMac())
 		if appClients != nil {
 			for _, appClient := range appClients {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
+				appSendMessage(ctx, appClient, messageType, msg)
 			}
 		}
 	} else if *messageType == websocket.PingMessage {
@@ -507,8 +479,8 @@ func readStackChanMessage(ctx context.Context, client *StackChanClient, messageT
 	}
 }
 
-// readAppClientMessage handles messages from the App side
-func readAppClientMessage(ctx context.Context, client *AppClient, messageType *int, msg *[]byte) {
+// Handle WebSocket messages from App clients
+func readAppClientMessage(ctx context.Context, client *model.AppClient, messageType *int, msg *[]byte) {
 	if *messageType == websocket.BinaryMessage {
 		msgType, _, payload, ok := parseBinaryMessage(ctx, msg)
 		if !ok {
@@ -519,7 +491,7 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			break
 		case GetDeviceName:
 			// Query device name
-			name, err := service.GetDeviceName(ctx, client.Mac)
+			name, err := service.GetDeviceName(ctx, client.GetMac())
 			if err != nil {
 				logger.Errorf(ctx, err.Error())
 				return
@@ -530,22 +502,20 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			}
 			newMsg := createStringMessage(GetDeviceName, name)
 			logger.Infof(ctx, "Device name found, returning: "+name)
-			forwardMessage(ctx, client.Conn, messageType, newMsg, client.mu)
+			appSendMessage(ctx, client, messageType, newMsg)
 			break
 		case UpdateDeviceName:
-			stackChanClient := getStackChanClient(client.Mac)
+			stackChanClient := getStackChanClient(client.GetMac())
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 			}
-			appClients := getAppClients(client.Mac)
+			appClients := getAppClients(client.GetMac())
 			for _, appClient := range appClients {
-				forwardMessage(ctx, appClient.Conn, messageType, msg, appClient.mu)
+				appSendMessage(ctx, appClient, messageType, msg)
 			}
 			break
 		case Opus:
-			break
-		case Jpeg:
-			if len(payload) < 12 {
+			if payload == nil || len(payload) < 12 {
 				logger.Warningf(ctx, "Payload too short, cannot parse MAC address: %v", payload)
 				return
 			}
@@ -555,13 +525,27 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			newMsg := createMessage(msgType, data)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				if stackChanClient.phoneScreen {
-					forwardMessage(ctx, stackChanClient.Conn, messageType, newMsg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, newMsg)
+			}
+			break
+		case Jpeg:
+			if payload == nil || len(payload) < 12 {
+				logger.Warningf(ctx, "Payload too short, cannot parse MAC address: %v", payload)
+				return
+			}
+			macAddrBytes := payload[:12]
+			data := payload[12:]
+			macAddr := string(macAddrBytes)
+			newMsg := createMessage(msgType, data)
+			stackChanClient := getStackChanClient(macAddr)
+			if stackChanClient != nil {
+				if stackChanClient.GetPhoneScreen() {
+					stackChanSendMessage(ctx, stackChanClient, messageType, newMsg)
 				}
 			}
 			break
 		case ControlAvatar, ControlMotion:
-			if len(payload) < 12 {
+			if payload == nil || len(payload) < 12 {
 				logger.Warningf(ctx, "Payload too short, cannot parse MAC address: %v", payload)
 				return
 			}
@@ -571,13 +555,13 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			newMsg := createMessage(msgType, data)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, newMsg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, newMsg)
 			} else {
 				logger.Infof(ctx, "StackChan is currently offline")
 			}
 			break
 		case TextMessage:
-			if len(payload) < 12 {
+			if payload == nil || len(payload) < 12 {
 				logger.Warningf(ctx, "Payload too short, cannot parse MAC address: %v", payload)
 				return
 			}
@@ -586,18 +570,18 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			newMsg := createMessage(msgType, data)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, newMsg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, newMsg)
 			}
 			appClients := getAppClients(macAddr)
 			if appClients != nil {
 				for _, appClient := range appClients {
-					forwardMessage(ctx, appClient.Conn, messageType, newMsg, appClient.mu)
+					appSendMessage(ctx, appClient, messageType, newMsg)
 				}
 			}
 			break
 		case RequestCall:
 			// Request call
-			if len(payload) < 12 {
+			if payload == nil || len(payload) < 12 {
 				logger.Warningf(ctx, "Payload too short, cannot parse MAC address: %v", payload)
 				return
 			}
@@ -605,76 +589,80 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			data := payload[12:]
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				stackChanClient.mu.Lock()
-				if stackChanClient.CallAppClient == nil || stackChanClient.CallAppClient == client {
-					stackChanClient.CallAppClient = client
-					stackChanClient.mu.Unlock()
+				if stackChanClient.GetCallAppClient() == nil || stackChanClient.GetCallAppClient() == client {
+					stackChanClient.SetCallAppClient(client)
 					newMsg := createMessage(msgType, data)
-					forwardMessage(ctx, stackChanClient.Conn, messageType, newMsg, stackChanClient.mu)
+					stackChanSendMessage(ctx, stackChanClient, messageType, newMsg)
 				} else {
-					stackChanClient.mu.Unlock()
 					// Notify App that the other side is already in a call
 					newMsg := createStringMessage(inCall, "The other party is currently in a call")
-					forwardMessage(ctx, client.Conn, messageType, newMsg, client.mu)
+					appSendMessage(ctx, client, messageType, newMsg)
 				}
 			}
 			break
 		case HangupCall:
 			stackChanClientPool.Range(func(_, value any) bool {
-				stackChanClient := value.(*StackChanClient)
-				if stackChanClient.CallAppClient == client {
+				stackChanClient := value.(*model.StackChanClient)
+				if stackChanClient.GetCallAppClient() == client {
 					// Found corresponding call
-					stackChanClient.mu.Lock()
-					stackChanClient.CallAppClient = nil
-					forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+					stackChanClient.SetCallAppClient(nil)
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 
-					newList := stackChanClient.CameraSubscriptionList[:0]
-					for _, sub := range stackChanClient.CameraSubscriptionList {
+					newList := stackChanClient.GetCameraSubscriptionList()[:0]
+					for _, sub := range stackChanClient.GetCameraSubscriptionList() {
 						if sub != client {
 							newList = append(newList, sub)
 						}
 					}
-					stackChanClient.CameraSubscriptionList = newList
-					stackChanClient.mu.Unlock()
-					if len(stackChanClient.CameraSubscriptionList) == 0 {
+					stackChanClient.SetCameraSubscriptionList(newList)
+					if len(stackChanClient.GetCameraSubscriptionList()) == 0 {
 						offMsg := createMessage(OffCamera, nil)
 						offType := websocket.BinaryMessage
-						forwardMessage(ctx, stackChanClient.Conn, &offType, offMsg, stackChanClient.mu)
+						stackChanSendMessage(ctx, stackChanClient, &offType, offMsg)
 					}
+
+					newAudio := stackChanClient.GetAudioSubscriptionList()[:0]
+					for _, sub := range stackChanClient.GetAudioSubscriptionList() {
+						if sub != client {
+							newAudio = append(newAudio, sub)
+						}
+					}
+					stackChanClient.SetAudioSubscriptionList(newAudio)
+					if len(stackChanClient.GetAudioSubscriptionList()) == 0 {
+						offMsg := createMessage(OffAudio, nil)
+						offType := websocket.BinaryMessage
+						stackChanSendMessage(ctx, stackChanClient, &offType, offMsg)
+					}
+
 					return false
 				}
 				return true
 			})
 			break
-		case OnCamera:
+		case OnAudio:
 			macAddr := string(payload)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				stackChanClient.mu.Lock()
 				alreadySubscribed := false
-				for _, sub := range stackChanClient.CameraSubscriptionList {
+				for _, sub := range stackChanClient.GetAudioSubscriptionList() {
 					if sub == client {
 						alreadySubscribed = true
 						break
 					}
 				}
+				stackChanClient.SetAudioSubscriptionList(append(stackChanClient.GetAudioSubscriptionList(), client))
 				if !alreadySubscribed {
-					stackChanClient.CameraSubscriptionList = append(stackChanClient.CameraSubscriptionList, client)
-					stackChanClient.mu.Unlock()
-					forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
-				} else {
-					stackChanClient.mu.Unlock()
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 				}
 			}
 			break
-		case OffCamera:
+		case OffAudio:
 			macAddr := string(payload)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				stackChanClient.mu.Lock()
 				existed := false
-				newList := stackChanClient.CameraSubscriptionList[:0]
-				for _, subClient := range stackChanClient.CameraSubscriptionList {
+				newList := stackChanClient.GetAudioSubscriptionList()[:0]
+				for _, subClient := range stackChanClient.GetAudioSubscriptionList() {
 					if subClient == client {
 						existed = true
 					} else {
@@ -682,10 +670,42 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 					}
 				}
 				shouldNotify := existed && len(newList) == 0
-				stackChanClient.CameraSubscriptionList = newList
-				stackChanClient.mu.Unlock()
+				stackChanClient.SetAudioSubscriptionList(newList)
 				if shouldNotify {
-					forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
+				}
+			}
+			break
+		case OnCamera:
+			macAddr := string(payload)
+			stackChanClient := getStackChanClient(macAddr)
+			if stackChanClient != nil {
+				for _, sub := range stackChanClient.GetCameraSubscriptionList() {
+					if sub == client {
+						return
+					}
+				}
+				stackChanClient.AppendCameraSubscriptionList(client)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
+			}
+			break
+		case OffCamera:
+			macAddr := string(payload)
+			stackChanClient := getStackChanClient(macAddr)
+			if stackChanClient != nil {
+				existed := false
+				newList := stackChanClient.GetCameraSubscriptionList()[:0]
+				for _, subClient := range stackChanClient.GetCameraSubscriptionList() {
+					if subClient == client {
+						existed = true
+					} else {
+						newList = append(newList, subClient)
+					}
+				}
+				shouldNotify := existed && len(newList) == 0
+				stackChanClient.SetCameraSubscriptionList(newList)
+				if shouldNotify {
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 				}
 			}
 			break
@@ -694,13 +714,9 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			macAddr := string(payload)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				stackChanClient.mu.Lock()
-				if stackChanClient.phoneScreen == false {
-					stackChanClient.phoneScreen = true
-					stackChanClient.mu.Unlock()
-					forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
-				} else {
-					stackChanClient.mu.Unlock()
+				if stackChanClient.GetPhoneScreen() == false {
+					stackChanClient.SetPhoneScreen(true)
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 				}
 			}
 			break
@@ -709,63 +725,92 @@ func readAppClientMessage(ctx context.Context, client *AppClient, messageType *i
 			macAddr := string(payload)
 			stackChanClient := getStackChanClient(macAddr)
 			if stackChanClient != nil {
-				stackChanClient.mu.Lock()
-				if stackChanClient.phoneScreen == true {
-					stackChanClient.phoneScreen = false
-					stackChanClient.mu.Unlock()
-					forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
-				} else {
-					stackChanClient.mu.Unlock()
+				if stackChanClient.GetPhoneScreen() == true {
+					stackChanClient.SetPhoneScreen(false)
+					stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 				}
 			}
 			break
 		case Dance:
 			// Dance message
-			stackChanClient := getStackChanClient(client.Mac)
+			stackChanClient := getStackChanClient(client.GetMac())
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 			}
 			break
 		case GetAvatarPosture:
-			stackChanClient := getStackChanClient(client.Mac)
+			stackChanClient := getStackChanClient(client.GetMac())
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 			}
+		case AimedTakePhoto:
+			stackChanClient := getStackChanClient(client.GetMac())
+			if stackChanClient != nil {
+				stackChanClient.SetAimedTakePhotoAppClient(client)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
+			}
+			break
 		default:
 			logger.Infof(ctx, "Unknown binary msgType: %d", msgType)
-			stackChanClient := getStackChanClient(client.Mac)
+			stackChanClient := getStackChanClient(client.GetMac())
 			if stackChanClient != nil {
-				forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+				stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 			}
 		}
 	} else if *messageType == websocket.TextMessage {
 		// Directly forward other message types
-		stackChanClient := getStackChanClient(client.Mac)
+		stackChanClient := getStackChanClient(client.GetMac())
 		if stackChanClient != nil {
-			forwardMessage(ctx, stackChanClient.Conn, messageType, msg, stackChanClient.mu)
+			stackChanSendMessage(ctx, stackChanClient, messageType, msg)
 		}
 	} else if *messageType == websocket.PingMessage {
 		logger.Info(ctx, "Received ping message from App side")
 	}
 }
 
-// forwardMessage forwards a message to the specified connection, with mutex for concurrency safety
-func forwardMessage(ctx context.Context, conn *websocket.Conn, messageType *int, msg *[]byte, mu *sync.RWMutex) {
-	if conn == nil {
-		logger.Infof(ctx, "StackChan is currently offline")
-		return
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	err := conn.WriteMessage(*messageType, *msg)
-	if err != nil {
-		//logger.Info(ctx, "Message forwarding failed: %v", err)
-	} else {
-		//logger.Info(ctx, "Message sent successfully")
+// Send WebSocket messages to App clients
+func appSendMessage(ctx context.Context, client *model.AppClient, messageType *int, msg *[]byte) {
+	select {
+	case client.SendChan() <- &model.WsSendMsg{
+		MsgType: *messageType,
+		Data:    *msg,
+	}:
+	default:
+		logger.Infof(ctx, "App client send message is full")
 	}
 }
 
-// createMessage encapsulates a binary message according to custom protocol (type + length + data)
+// Send WebSocket messages to StackChan devices
+func stackChanSendMessage(ctx context.Context, client *model.StackChanClient, messageType *int, msg *[]byte) {
+	select {
+	case client.SendChan() <- &model.WsSendMsg{
+		MsgType: *messageType,
+		Data:    *msg,
+	}:
+	default:
+		logger.Infof(ctx, "StackChan client send message is full")
+	}
+}
+
+// SendAppMessage Send WebSocket messages to App clients
+func SendAppMessage(ctx context.Context, mac string, messageType *int, msg *[]byte, supportOfflineMode *bool) {
+	clients := getAppClients(mac)
+	if clients != nil {
+		for _, client := range clients {
+			appSendMessage(ctx, client, messageType, msg)
+		}
+	}
+}
+
+// SendStackChanMessage Send WebSocket messages to StackChan devices
+func SendStackChanMessage(ctx context.Context, mac string, messageType *int, msg *[]byte, supportOfflineMode *bool) {
+	stackChanClient := getStackChanClient(mac)
+	if stackChanClient != nil {
+		stackChanSendMessage(ctx, stackChanClient, messageType, msg)
+	}
+}
+
+// Encapsulate binary messages for custom protocol (type + data length + data)
 func createMessage(msgType byte, data []byte) *[]byte {
 	var dataLen int
 	if data != nil {
@@ -782,49 +827,7 @@ func createMessage(msgType byte, data []byte) *[]byte {
 	return &msg
 }
 
-// createStringMessage creates a binary message with a string payload
+// Encapsulate binary messages for custom protocol (type + data length + string data)
 func createStringMessage(msgType byte, data string) *[]byte {
 	return createMessage(msgType, []byte(data))
-}
-
-// GetRandomStackChanDevice get Random StackChan Device list
-func GetRandomStackChanDevice(userMac string, maxLength int) (list []string) {
-	if maxLength <= 0 {
-		return []string{}
-	}
-	var macs []string
-
-	stackChanClientPool.Range(func(key, value interface{}) bool {
-		mac := key.(string)
-		client := value.(*StackChanClient)
-
-		if mac == userMac {
-			return true
-		}
-
-		client.mu.RLock()
-		online := client.Conn != nil
-		client.mu.RUnlock()
-
-		if online {
-			macs = append(macs, mac)
-		}
-
-		return true
-	})
-
-	if len(macs) == 0 {
-		return []string{}
-	}
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(macs), func(i, j int) {
-		macs[i], macs[j] = macs[j], macs[i]
-	})
-
-	if len(macs) > maxLength {
-		macs = macs[:maxLength]
-	}
-
-	return macs
 }
