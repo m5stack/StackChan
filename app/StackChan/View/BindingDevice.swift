@@ -227,9 +227,13 @@ struct ScanningEquipment : View {
             }
         }
         .task {
+            // Upstream ships this block empty. Without triggering the BLE scan
+            // here, the post-QR openBlufi() callback never fires because
+            // BlufiUtil.shared.startScan() is gated behind getPermission().
+            getPermission()
         }
     }
-    
+
     func updataName() {
         
     }
