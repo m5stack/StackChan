@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 // ==========================================================================
 // Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
 // ==========================================================================
@@ -22,10 +27,10 @@ type DevicePostCommentDao struct {
 // DevicePostCommentColumns defines and stores column names for the table device_post_comment.
 type DevicePostCommentColumns struct {
 	Id        string //
-	PostId    string // 帖子ID
-	Mac       string // 评论设备MAC
-	Content   string // 评论内容
-	CreatedAt string // 评论时间
+	PostId    string // Post ID
+	Mac       string // Comment device MAC
+	Content   string //
+	CreatedAt string // Comment time
 }
 
 // devicePostCommentColumns holds the columns for the table device_post_comment.

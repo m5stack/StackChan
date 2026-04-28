@@ -12,11 +12,19 @@ import (
 	"stackChan/internal/model"
 
 	"stackChan/api/post/v1"
+
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 )
 
 func (c *ControllerV1) DeletePostComment(ctx context.Context, req *v1.DeletePostCommentReq) (res *v1.DeletePostCommentRes, err error) {
+	mac := g.RequestFromCtx(ctx).GetCtxVar(model.Mac).String()
+	if mac == "" {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter)
+	}
 	var postComment model.PostComment
-	err = dao.DevicePostComment.Ctx(ctx).Where("id=?", req.Id).Scan(&postComment)
+	err = dao.DevicePostComment.Ctx(ctx).Where("id=? AND post_id=? AND mac=?", req.CommentId, req.PostId, mac).Scan(&postComment)
 
 	if err != nil {
 		return nil, err
@@ -26,13 +34,13 @@ func (c *ControllerV1) DeletePostComment(ctx context.Context, req *v1.DeletePost
 		return nil, errors.New("post not found")
 	}
 
-	if postComment.Mac != req.Mac {
+	if postComment.Mac != mac {
 		return nil, errors.New("no authority to delete")
 	}
 
 	_, err = dao.DevicePostComment.
 		Ctx(ctx).
-		Where("id = ? AND mac = ?", req.Id, req.Mac).
+		Where("id=? AND post_id=?", req.CommentId, req.PostId).
 		Delete()
 	if err != nil {
 		return nil, err

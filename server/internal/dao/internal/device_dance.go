@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 // ==========================================================================
 // Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
 // ==========================================================================
@@ -21,22 +26,24 @@ type DeviceDanceDao struct {
 
 // DeviceDanceColumns defines and stores column names for the table device_dance.
 type DeviceDanceColumns struct {
-	Id         string //
-	Mac        string // 设备MAC地址
-	DanceIndex string // 舞蹈编号，初始为1~3，可扩展
-	DanceData  string // MotionData
-	CreatedAt  string //
-	UpdatedAt  string //
+	Id        string //
+	Mac       string // Device MAC address
+	DanceName string // Dance name
+	DanceData string // MotionData
+	MusicUrl  string // Dance background music URL
+	CreatedAt string //
+	UpdatedAt string //
 }
 
 // deviceDanceColumns holds the columns for the table device_dance.
 var deviceDanceColumns = DeviceDanceColumns{
-	Id:         "id",
-	Mac:        "mac",
-	DanceIndex: "dance_index",
-	DanceData:  "dance_data",
-	CreatedAt:  "created_at",
-	UpdatedAt:  "updated_at",
+	Id:        "id",
+	Mac:       "mac",
+	DanceName: "dance_name",
+	DanceData: "dance_data",
+	MusicUrl:  "music_url",
+	CreatedAt: "created_at",
+	UpdatedAt: "updated_at",
 }
 
 // NewDeviceDanceDao creates and returns a new DAO object for table data access.
