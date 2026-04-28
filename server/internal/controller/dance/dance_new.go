@@ -17,3 +17,9 @@ type ControllerV1 struct{}
 func NewV1() dance.IDanceV1 {
 	return &ControllerV1{}
 }
+
+type ControllerV2 struct{}
+
+func NewV2() dance.IDanceV2 {
+	return &ControllerV2{}
+}
