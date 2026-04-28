@@ -261,7 +261,7 @@ class _SettingsState extends State<Settings> {
                 ),
               ),
 
-              //====================== userinfo区域 ======================
+              //====================== userinfo ======================
               // CupertinoListSection.insetGrouped(
               //   children: [_buildUserProfileTile()],
               // ),
@@ -272,12 +272,12 @@ class _SettingsState extends State<Settings> {
               //   ),
               // ),
 
-              //====================== 常规set ======================
+              //====================== set ======================
               CupertinoListSection.insetGrouped(
                 children: [_buildChangeNameTile()],
               ),
 
-              //====================== AI代理set ======================
+              //====================== AIset ======================
               CupertinoListSection.insetGrouped(
                 children: [
                   _buildAgentConfigTile(),
@@ -653,7 +653,7 @@ class _SettingsState extends State<Settings> {
             maxLines: 1,
             autofocus: true,
             inputFormatters: [
-              //addinputlimit,提升体验
+              //addinputlimit,
               LengthLimitingTextInputFormatter(15),
             ],
             onChanged: (value) => newName = value,

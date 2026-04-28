@@ -1,8 +1,13 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 //
 //  ViewFactory.swift
 //  Runner
 //
-//  Created by 袁智鸿 on 2026/1/30.
+// Created by on 2026/1/30.
 //
 
 import Flutter

@@ -93,7 +93,7 @@ class LastDevice {
   String? alias;
   int? agent_id;
 
-  //Constructorfunction(allfieldasoptionalparameter,符合Nullsafe)
+  //Constructorfunction(allfieldasoptionalparameter,Nullsafe)
   LastDevice({
     this.id,
     this.user_id,
@@ -106,7 +106,7 @@ class LastDevice {
     this.agent_id,
   });
 
-  //from JSON Deserialize(factory Factorymethod,标准写法)
+  //from JSON Deserialize(factory Factorymethod,)
   factory LastDevice.fromJson(Map<String, dynamic> json) {
     return LastDevice(
       id: json['id'] as int?,
@@ -124,7 +124,7 @@ class LastDevice {
   //Serializeas JSON(return Map<String, dynamic>,Candirectfor jsonEncode)
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    //one by onemapfield,nullWillautoSerializeas null(符合 JSON standard)
+    //one by onemapfield,nullWillautoSerializeas null( JSON standard)
     data['id'] = id;
     data['user_id'] = user_id;
     data['mac_address'] = mac_address;

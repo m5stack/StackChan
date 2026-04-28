@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 import 'package:flutter/cupertino.dart';
 
-///圆形
+//translated comment
 class GlassEffectCircle extends StatelessWidget {
   const GlassEffectCircle({super.key, this.padding, this.child});
 

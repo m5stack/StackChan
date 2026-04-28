@@ -62,13 +62,11 @@ class WebSocketUtil {
     _urlString = urlString;
 
     if (AppState.shared.deviceMac.isEmpty) {
-      debugPrint(' WebSocket ConnectFailed:DeviceMACAddressIs null/empty');
-      return;
+            return;
     }
 
     //Printconnectstartlog
-    debugPrint('🔌 StartConnect WebSocket: $urlString');
-
+    
     try {
       final encryptedToken = RsaUtil.encrypt(
         getAuthorization(AppState.shared.deviceMac),
@@ -79,10 +77,7 @@ class WebSocketUtil {
       //connectsuccesslog(ContainstimeandURL)
       _isConnected = true;
       final connectTime = DateTime.now().toString().split('.').first;
-      debugPrint(' WebSocket ConnectSuccess [$connectTime]');
-      debugPrint('   ConnectAddress: $urlString');
-      debugPrint('   ConnectState: ${_socket?.readyState} (OPEN)');
-
+                  
       _subscription = _socket!.listen(
         _handleMessage,
         onError: _handleError,
@@ -97,10 +92,7 @@ class WebSocketUtil {
       _isConnected = false;
       //connectfaillog(ContainsSpecificerrorinfo)
       final errorTime = DateTime.now().toString().split('.').first;
-      debugPrint(' WebSocket ConnectFailed [$errorTime]');
-      debugPrint('   ConnectAddress: $urlString');
-      debugPrint('   Error原Because: $e');
-      _scheduleReconnect();
+                        _scheduleReconnect();
     }
   }
 
@@ -116,8 +108,7 @@ class WebSocketUtil {
 
   void _handleError(Object error) {
     //errorlog(DistinguishconnecterrorandRunning / Runtimewhenerror)
-    debugPrint(' WebSocket Running / RuntimeWhenError: $error');
-    _isConnected = false;
+        _isConnected = false;
     _scheduleReconnect();
   }
 
@@ -125,10 +116,7 @@ class WebSocketUtil {
     //connectcloselog(ContainscloseoriginalBecause)
     _isConnected = false;
     final closeTime = DateTime.now().toString().split('.').first;
-    debugPrint(' WebSocket ConnectAlready关闭 [$closeTime]');
-    debugPrint('   关闭Address: $_urlString');
-    debugPrint('   关闭State: ${_socket?.closeCode} - ${_socket?.closeReason}');
-    _scheduleReconnect();
+                _scheduleReconnect();
   }
 
   bool replyPong(dynamic message) {
@@ -154,32 +142,27 @@ class WebSocketUtil {
    * ======================= */
   void sendString(String message) {
     if (_socket == null) {
-      debugPrint(' 发送StringMessageFailed:WebSocket Disconnected');
-      return;
+            return;
     }
 
-    debugPrint('📤 发送StringMessage: $message');
-    try {
+        try {
       _socket!.add(message);
     } catch (e) {
-      debugPrint(' 发送StringMessageFailed: $e');
-      _isConnected = false;
+            _isConnected = false;
       _scheduleReconnect();
     }
   }
 
   void send(Uint8List data) {
     if (_socket == null) {
-      debugPrint(' 发送2BaseMessageFailed:WebSocket Disconnected');
-      return;
+            return;
     }
 
     //debugPrint('📤 send2Basemessage: length=${data.length} Byte');
     try {
       _socket!.add(data);
     } catch (e) {
-      debugPrint(' 发送2BaseMessageFailed: $e');
-      _isConnected = false;
+            _isConnected = false;
       _scheduleReconnect();
     }
   }
@@ -192,8 +175,7 @@ class WebSocketUtil {
 
     //reconnectlog(avoidFrequentlyRepeatPrint)
     if (!_isConnected) {
-      debugPrint('🔄 准备重连 WebSocket: $_urlString (1Second(s)BackRetry)');
-    }
+          }
 
     await Future.delayed(const Duration(seconds: 1));
     await connect(_urlString);
@@ -207,8 +189,7 @@ class WebSocketUtil {
     _socket?.close(WebSocketStatus.goingAway, '主动断开连接');
     _isConnected = false;
     _socket = null;
-    debugPrint('🔌 WebSocket AlreadyProactiveDisconnectConnect');
-  }
+      }
 
   /* =======================
    * Observer

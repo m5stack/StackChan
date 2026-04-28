@@ -25,7 +25,7 @@ class _ConversationMessagePageState extends State<ConversationMessagePage> {
   RxBool isLoading = RxBool(false); //loadstate
   RxBool hasMore = RxBool(true); //whetherhasmoredata
 
-  final DateFormat timeFormat = DateFormat("yyyy-MM-dd HH:mm"); //time格式化
+  final DateFormat timeFormat = DateFormat("yyyy-MM-dd HH:mm"); //time
 
   RxList<ConversationMessageData> messageList = RxList([]);
 
@@ -164,7 +164,7 @@ class _ConversationMessagePageState extends State<ConversationMessagePage> {
             )
           : !hasMore.value
           ? Padding(
-              padding: EdgeInsets.symmetric(vertical: 12), //fix：补充EdgeInsets
+              padding: EdgeInsets.symmetric(vertical: 12), //fix：EdgeInsets
               child: Center(
                 child: Text(
                   "No more messages",
@@ -175,7 +175,7 @@ class _ConversationMessagePageState extends State<ConversationMessagePage> {
                 ),
               ),
             )
-          : const SizedBox.shrink(), //hasmoredatawhen不show任何component（autoload）
+          : const SizedBox.shrink(), //hasmoredatawhenshowcomponent（autoload）
     );
   }
 

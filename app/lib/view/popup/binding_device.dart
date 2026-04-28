@@ -262,9 +262,7 @@ class _ScanningEquipmentState extends State<ScanningEquipment> {
         CupertinoSheetRoute.popSheet(context);
       }
     } on FormatException catch (e) {
-      debugPrint('JSONParseFailed: ${e.message}');
-    } on Exception catch (e) {
-      debugPrint('HandleMACAddressWhen出错: $e');
-    }
+          } on Exception catch (e) {
+          }
   }
 }

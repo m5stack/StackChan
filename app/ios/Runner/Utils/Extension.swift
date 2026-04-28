@@ -164,21 +164,16 @@ extension UIImage {
 extension String {
     func jsonPrint() {
         guard let data = self.data(using: .utf8) else {
-            print(self)
-            return
+                        return
         }
         do {
             let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
             let prettyData = try JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted, .sortedKeys])
             if let prettyString = String(data: prettyData, encoding: .utf8) {
-                print("✅ JSON formatted output:\n\(prettyString)")
-            } else {
-                print(self)
-            }
+                            } else {
+                            }
         } catch {
-            print("❌ Invalid JSON format: \(error.localizedDescription)")
-            print(self)
-        }
+                                }
     }
     
     func leftPadding(toLength: Int, withPad character: Character) -> String {
@@ -253,8 +248,7 @@ extension Encodable {
             let data = try encoder.encode(self)
             return String(data: data, encoding: .utf8) ?? "{}"
         } catch {
-            print("❌ JSON serialization failed: \(error)")
-            return "{}"
+                        return "{}"
         }
     }
     
@@ -263,8 +257,7 @@ extension Encodable {
         do {
             return try encoder.encode(self)
         } catch {
-            print("❌ Failed to convert JSON to Data: \(error.localizedDescription)")
-            return nil
+                        return nil
         }
     }
 }

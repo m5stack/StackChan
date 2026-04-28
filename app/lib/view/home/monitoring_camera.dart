@@ -76,7 +76,7 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
       }
     });
 
-    //re打开Camera + audioStream(keyfix:exitAgain进must重发)
+    //reCamera + audioStream(keyfix:exitAgainmust)
     if (AppState.shared.deviceMac.isNotEmpty) {
       AppState.shared.sendWebSocketMessage(
         .onCamera,
@@ -98,7 +98,7 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
     // };
   }
 
-  //cleanAsset / Resource源
+  //cleanAsset / Resource
   void _cleanResources() {
     WebSocketUtil.shared.removeObserver(tag);
     if (AppState.shared.deviceMac.isNotEmpty) {

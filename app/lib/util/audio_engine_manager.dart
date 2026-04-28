@@ -53,15 +53,13 @@ class AudioEngineManager {
       );
 
       _isInitialized = true;
-      debugPrint(" Audio引擎InitializeSuccess");
-
-      //listenoriginal生Recorddata
+      
+      //listenoriginalRecorddata
       // NativeBridge.shared.recordChannel.receiveBroadcastStream().listen((data) {
       //   if (data is Uint8List) _processPcm(data);
       // });
     } catch (e) {
-      debugPrint(" InitializeFailed: $e");
-      rethrow;
+            rethrow;
     }
   }
 
@@ -90,8 +88,7 @@ class AudioEngineManager {
         }
       }
     } catch (e) {
-      debugPrint(" EncodeFailed: $e");
-    }
+          }
   }
 
   //decibelcalculate
@@ -116,8 +113,7 @@ class AudioEngineManager {
       }
       NativeBridge.shared.sendAudioStream(byteData);
     } catch (e) {
-      debugPrint(" PlayFailed: $e");
-    }
+          }
   }
 
   Future<void> stopPlayOpus() async {
@@ -131,20 +127,17 @@ class AudioEngineManager {
     //requestMicrophonepermission
     final perm = await Permission.microphone.request();
     if (!perm.isGranted) {
-      debugPrint("MicrophonePermissionNot授权");
-      return false;
+            return false;
     }
 
-    debugPrint("🎙️ RecordStart (实WhenOpusEncode Int16)");
-    NativeBridge.shared.sendMessage(.startRecording);
+        NativeBridge.shared.sendMessage(.startRecording);
     return true;
   }
 
   //====================== stopRecord ======================
   Future<void> stopRecording() async {
     NativeBridge.shared.sendMessage(.stopRecording);
-    debugPrint("🛑 RecordStop");
-  }
+      }
 
   Future<void> dispose() async {
     if (_isInitialized) {
@@ -152,6 +145,5 @@ class AudioEngineManager {
       simpleOpusDecoder.destroy();
       _isInitialized = false;
     }
-    debugPrint("♻️ Asset / Resource源ReleaseComplete / Done");
-  }
+      }
 }

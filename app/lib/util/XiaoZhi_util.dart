@@ -115,13 +115,11 @@ class XiaoZhiUtil {
                     handler.resolve(newResponse);
                     return;
                   } catch (e) {
-                    debugPrint('RetryRequestFailed: $e');
-                  }
+                                      }
                 }
               }
             } catch (e) {
-              debugPrint('ParseResponseFailed: $e');
-            }
+                          }
           }
 
           handler.next(response);
@@ -244,8 +242,7 @@ class XiaoZhiUtil {
       }
       return [];
     } catch (e) {
-      debugPrint('查询DeviceException:$e');
-      return [];
+            return [];
     }
   }
 
@@ -306,8 +303,7 @@ class XiaoZhiUtil {
       }
       return [];
     } catch (e) {
-      debugPrint('查询DeviceException:$e');
-      return [];
+            return [];
     }
   }
 
@@ -468,7 +464,7 @@ class XiaoZhiUtil {
   ///Returns: Authorization info (includes serial number), null on failure
   Future<GenerateLicense?> generateLicense(String macAddress) async {
     try {
-      //  Get generateLicenseToken 生成License
+      // Get generateLicenseToken License
       final generateResponse = await Http.instance.get(
         Urls.xiaozhiGenerateLicenseToken,
       );
@@ -482,9 +478,6 @@ class XiaoZhiUtil {
           generateLicenseModel.data == null) {
         return null;
       }
-
-      print("拿到generateToken");
-      print(generateLicenseModel.data);
 
       final Map<String, dynamic> queryParams = {
         ValueConstant.token: generateLicenseModel.data,
@@ -505,8 +498,7 @@ class XiaoZhiUtil {
       }
       return null;
     } catch (e) {
-      debugPrint('生成LicenseException:$e');
-      return null;
+            return null;
     }
   }
 
@@ -538,8 +530,7 @@ class XiaoZhiUtil {
       XiaozhiResponse xiaozhiResponse = XiaozhiResponse.fromJsonT(
         response.data,
       );
-      debugPrint(xiaozhiResponse.message);
-      if (xiaozhiResponse.message == "该设备已经添加过，请不要重复添加") {
+            if (xiaozhiResponse.message == "该设备已经添加过，请不要重复添加") {
         return true;
       }
     }

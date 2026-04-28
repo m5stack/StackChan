@@ -1,8 +1,13 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 //
 //  StackChanRobot.swift
 //  Runner
 //
-//  Created by 袁智鸿 on 2026/1/30.
+// Created by on 2026/1/30.
 //
 import SceneKit
 
@@ -104,8 +109,7 @@ class StackChanRobot: NSObject, FlutterPlatformView, FlutterStreamHandler {
     
     private func setupInitialScene() {
         guard let scene = SCNScene(named: "StackChanModel.scn") else {
-            print("Failed to load StackChanModel.scn")
-            return
+                        return
         }
         scene.rootNode.eulerAngles = SCNVector3Zero
         scene.rootNode.eulerAngles.x = -Float.pi / 2

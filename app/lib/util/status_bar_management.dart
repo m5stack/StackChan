@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 import 'package:flutter/services.dart';
 
 ///createtime：2024/1/8
-///Author:袁智鸿
+///Author:
 ///Description:status barManagertoolClass
 
 class StatusBarManagement {
@@ -16,7 +16,7 @@ class StatusBarManagement {
     return _statusBarManagement ?? StatusBarManagement();
   }
 
-  ///set沉浸式status barfontandicon
+  ///setstatus barfontandicon
   void setStatusBarImmerse(Brightness statusBarBrightness) {
     SystemUiOverlayStyle style = SystemUiOverlayStyle(
       statusBarColor: const Color(0x00000000),
@@ -121,7 +121,7 @@ class StatusBarManagement {
     );
   }
 
-  ///set沉浸式status barandnavigation barfontandicon
+  ///setstatus barandnavigation barfontandicon
   void setStatusBarAndNavigationBarImmerseDark(
     Brightness statusBarBrightness,
     Brightness navigationBrightness,

@@ -115,14 +115,13 @@ class XiaoZhiEditAgentModel extends GetxController {
           fillEditData(agent!);
         }
       } else {
-        ///没hasactivateagent,Needactivateagent
+        ///hasactivateagent,Needactivateagent
         //2. generatelicense
         final generateLicense = await XiaoZhiUtil.shared.generateLicense(
           AppState.shared.deviceMac,
         );
         if (generateLicense == null || generateLicense.serialNumber == null) {
-          debugPrint("❌ Failed to generate device license.");
-          AppState.shared.showToast("Failed to generate device license.");
+                    AppState.shared.showToast("Failed to generate device license.");
           return;
         }
 
@@ -138,8 +137,7 @@ class XiaoZhiEditAgentModel extends GetxController {
           mac,
         );
         if (!activateResult) {
-          debugPrint(" Device云Side / EndActivateFailed");
-          AppState.shared.showToast("Device cloud activation failed.");
+                    AppState.shared.showToast("Device cloud activation failed.");
           return;
         }
 
@@ -454,7 +452,7 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                       ),
                       SizedBox(height: 15),
 
-                      //基础info
+                      //info
                       CupertinoListSection.insetGrouped(
                         header: Row(
                           mainAxisSize: .min,
@@ -555,7 +553,7 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         children: [
                           //voice tone
                           ttsVoiceWidget(),
-                          //语速
+                          //translated comment
                           Obx(
                             () => buildSelectItem(
                               title: "Speed :",
@@ -576,7 +574,7 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                               selectedValue: getSpeedText(model.ttsSpeed.value),
                             ),
                           ),
-                          //音调
+                          //translated comment
                           Obx(
                             () => buildSelectItem(
                               title: "Pitch :",
@@ -597,7 +595,7 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                               selectedValue: model.ttsPitch.value.toString(),
                             ),
                           ),
-                          //ASR语速
+                          //ASR
                           Obx(
                             () => buildSelectItem(
                               title: "ASR Speed :",
@@ -621,7 +619,7 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         ],
                       ),
 
-                      //人设with记忆
+                      //with
                       CupertinoListSection.insetGrouped(
                         header: Text("Personality"),
                         children: [

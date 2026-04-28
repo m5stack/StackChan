@@ -17,7 +17,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 class MusicInfo {
-  int duration; //单位：秒
+  int duration; //translated comment
   String filePath;
   String? title;
   String? artist;
@@ -103,8 +103,7 @@ class MusicInfo {
         }
       } catch (e) {
         //onlyPrintdeletefaillog,NotinterruptMainStreamProcess / Thread
-        debugPrint("DeleteWhenWhenPCMFileFailed: $e");
-      }
+              }
     }
   }
 
@@ -199,7 +198,7 @@ class MusicUtil {
   //Singletonmode
   MusicUtil._internal() {
     _initAnalyzer();
-    _setupPlayerListener(); //提beforeinitlistener，avoid遗漏
+    _setupPlayerListener(); //beforeinitlistener，avoid
   }
 
   static final MusicUtil shared = MusicUtil._internal();
@@ -223,10 +222,8 @@ class MusicUtil {
   Future<void> _initAnalyzer() async {
     try {
       await MusicFeatureAnalyzer.initialize();
-      debugPrint("MusicFeatureAnalyzer InitializeSuccess");
-    } catch (e) {
-      debugPrint("MusicFeatureAnalyzer InitializeFailed: $e");
-    }
+          } catch (e) {
+          }
   }
 
   ///configplayerlistener(System1Managerstate)
@@ -235,12 +232,10 @@ class MusicUtil {
 
     //playerstatelisten(Containsplaystateandhandlestate)
     _audioPlayer.playerStateStream.listen((PlayerState state) {
-      debugPrint("PlayerState变化: Play=${state.playing}, HandleState=${state.processingState}");
-
+      
       //Playback completion check (handle completed status)
       if (state.processingState == ProcessingState.completed) {
-        debugPrint("MusicPlayComplete / Done,LoopState: ${_audioPlayer.loopMode}");
-        _currentPosition = 0.0; //resetprogress
+                _currentPosition = 0.0; //resetprogress
 
         //SingleloopThenreplay,elseexecutecompletecallback
         if (_audioPlayer.loopMode == LoopMode.one &&
@@ -263,8 +258,7 @@ class MusicUtil {
     _audioPlayer.durationStream.listen((Duration? duration) {
       if (duration != null) {
         _musicDuration = duration.inMilliseconds / 1000.0;
-        debugPrint("MusicDurationUpdate: $_musicDuration Second(s)");
-      }
+              }
     });
 
     //playprogresslisten
@@ -279,8 +273,7 @@ class MusicUtil {
     //errorlisten
     _audioPlayer.errorStream.listen((PlayerException? e) {
       if (e != null) {
-        debugPrint("PlayerError: 代码=${e.code}, Message=${e.message}");
-      }
+              }
     });
   }
 
@@ -300,27 +293,23 @@ class MusicUtil {
       await _audioPlayer.setAudioSource(audioSource);
       await _audioPlayer.play();
 
-      debugPrint("MusicByteDataPlaySuccess,VolumeAlreadySettingsIs1.0");
-    } on PlayerException catch (e) {
-      debugPrint("PlayMusicByteDataFailed: 代码=${e.code}, Message=${e.message}");
-      throw Exception("播放失败: ${e.message}");
+          } on PlayerException catch (e) {
+            throw Exception("播放失败: ${e.message}");
     } catch (e) {
-      debugPrint("PlayMusicByteDataFailed: $e");
-      throw Exception("播放失败: $e");
+            throw Exception("播放失败: $e");
     }
   }
 
   ///playSinglemusic(playcompleteafterexecutecallback)
   Future<void> playMusicOnce(MusicInfo musicInfo, Function() completion) async {
     _playbackCompletion = completion;
-    await playMusic(musicInfo, isLoop: false); //单次play强制closeloop
+    await playMusic(musicInfo, isLoop: false); //playcloseloop
   }
 
   ///PlayOnlineMusic1Time(s),RepeatCallThenStopFrontFrom beginningPlay
   Future<void> playUrlMusicOnce(String? url, {Function()? completion}) async {
     if (url == null) {
-      debugPrint("PlayFailed:URLIs null/empty");
-      return;
+            return;
     }
     try {
       // First / PreviouslyStopFrontPlay
@@ -336,21 +325,17 @@ class MusicUtil {
       await _audioPlayer.setUrl(url);
       await _audioPlayer.play();
 
-      debugPrint("OnlineMusicPlaySuccess:$url");
-    } on PlayerException catch (e) {
-      debugPrint("PlayOnlineMusicFailed: 代码=${e.code}, Message=${e.message}");
-      throw Exception("播放失败: ${e.message}");
+          } on PlayerException catch (e) {
+            throw Exception("播放失败: ${e.message}");
     } catch (e) {
-      debugPrint("PlayOnlineMusicFailed: $e");
-      throw Exception("播放失败: $e");
+            throw Exception("播放失败: $e");
     }
   }
 
   ///coreplaymethod（supportloop）
   Future<void> playMusic(MusicInfo? musicInfo, {bool isLoop = false}) async {
     if (musicInfo == null) {
-      debugPrint("PlayFailed:MusicInfoIs null/empty");
-      return;
+            return;
     }
 
     //Recordcurrentplaymusicinfo
@@ -363,80 +348,67 @@ class MusicUtil {
       final data = await musicInfo.loadData();
       final contentType = musicInfo.mimeType;
       await playMusicData(data, contentType: contentType);
-      debugPrint("PlayMusicSuccess:${musicInfo.title ?? musicInfo.filePath}");
-    } on PlayerException catch (e) {
-      debugPrint("PlayMusicFailed: 代码=${e.code}, Message=${e.message}");
-      throw Exception("播放失败: ${e.message}");
+          } on PlayerException catch (e) {
+            throw Exception("播放失败: ${e.message}");
     } catch (e) {
-      debugPrint("PlayMusicFailed: $e");
-      throw Exception("播放失败: $e");
+            throw Exception("播放失败: $e");
     }
   }
 
   ///stopplay
   Future<void> stopMusic() async {
     await _audioPlayer.stop();
-    await _audioPlayer.seek(Duration.zero); //resetprogressto开头
+    await _audioPlayer.seek(Duration.zero); //resetprogressto
 
     _currentPosition = 0.0;
     _playbackCompletion = null;
     _currentMusicInfo = null;
-    debugPrint("MusicAlreadyStopPlay");
-  }
+      }
 
   ///pauseplay
   Future<void> pauseMusic() async {
     if (_audioPlayer.playing) {
       await _audioPlayer.pause();
-      debugPrint("MusicAlreadyPause");
-    }
+          }
   }
 
   ///resumeplay
   Future<void> resumeMusic() async {
     if (!_audioPlayer.playing && _currentMusicInfo != null) {
       await _audioPlayer.play();
-      debugPrint("MusicAlreadyResumePlay");
-    }
+          }
   }
 
   ///setloopplaystate
   void setMusicLoop(bool isLoop) {
     final loopMode = isLoop ? LoopMode.one : LoopMode.off;
     _audioPlayer.setLoopMode(loopMode);
-    debugPrint("LoopPlayStateAlreadySettingsIs: $isLoop (LoopMode: $loopMode)");
-  }
+      }
 
   ///jumpplayprogress
   Future<void> seekTo(double seconds) async {
     if (seconds < 0 || seconds > _musicDuration) {
-      debugPrint("ProgressJumpFailed:No效ProgressValue $seconds,TotalDuration $_musicDuration");
-      return;
+            return;
     }
     await _audioPlayer.seek(Duration(seconds: seconds.toInt()));
     _currentPosition = seconds;
-    debugPrint("ProgressAlreadyJump到: $seconds Second(s)");
-  }
+      }
 
   ///Set volume (0.0 ~ 1.0)
   Future<void> setVolume(double volume) async {
     if (volume < 0.0 || volume > 1.0) {
-      debugPrint("VolumeSettingsFailed:No效Value $volume,Range需In 0.0 ~ 1.0 Between");
-      return;
+            return;
     }
     await _audioPlayer.setVolume(volume);
-    debugPrint("VolumeAlreadySettingsIs: $volume");
-  }
+      }
 
   ///setplayspeed
   Future<void> setPlaybackSpeed(double speed) async {
     if (speed <= 0) {
-      debugPrint("Play速度SettingsFailed:No效Value $speed,需Greater than 0");
-      return;
+            return;
     }
     await _audioPlayer.setSpeed(speed);
-    debugPrint("Play速度AlreadySettingsIs: $speed");
-  }
+      }
 
   ///Getcurrentplayprogress(Second(s))
   double getCurrentPosition() => _currentPosition;
@@ -456,20 +428,17 @@ class MusicUtil {
     await _audioPlayer.dispose();
     _currentMusicInfo = null;
     _playbackCompletion = null;
-    debugPrint("MusicUtil Asset / Resource源AlreadyRelease");
-  }
+      }
 
   ///improveaftermusicinfoparse(With / CarryVerboselog+cacheverify)
   Future<MusicInfo?> getMusicInfoAsync(String urlString) async {
     const tag = "MusicUtil/getMusicInfoAsync";
     try {
-      debugPrint("$tag StartHandleMusicURL: $urlString");
-
+      
       //1. Parse URL
       final uri = Uri.parse(urlString);
       if (!uri.isAbsolute) {
-        debugPrint("$tag URLIs not绝ForPath,ParseFailed");
-        return null;
+                return null;
       }
 
       //2. Generate cache file info
@@ -481,8 +450,7 @@ class MusicUtil {
             '.m4a',
             '.flac',
           ].contains(extension.toLowerCase())) {
-        debugPrint("$tag Not支持File格式: $extension");
-        return null;
+                return null;
       }
       final fileName = '${uri.hashCode.toRadixString(16)}$extension';
       //useDocumentDirectoryAnd / WhileNotisWhenwhenDirectory,avoidSystemautocleancachefile
@@ -499,11 +467,9 @@ class MusicUtil {
         final stat = await file.stat();
         final fileSizeKB = stat.size / 1024;
         if (fileSizeKB < 10) {
-          debugPrint("$tag CacheFile过小($fileSizeKB KB),DeleteAndAgainDownload");
-          await file.delete();
+                    await file.delete();
         } else {
-          debugPrint("$tag UseCacheFile: $filePath");
-          return await _extractMetadataFromFile(filePath, uri);
+                    return await _extractMetadataFromFile(filePath, uri);
         }
       }
 
@@ -512,15 +478,13 @@ class MusicUtil {
       final stat = await file.stat();
       final fileSizeKB = stat.size / 1024;
       if (fileSizeKB < 10) {
-        debugPrint("$tag DownloadFile过小($fileSizeKB KB),No效File");
-        return null;
+                return null;
       }
 
       //5. Extract metadata
       return await _extractMetadataFromFile(filePath, uri);
     } catch (e, stackTrace) {
-      debugPrint("$tag ExecuteFailed:ExceptionType=${e.runtimeType},Message=$e,堆Stack=$stackTrace");
-      return null;
+            return null;
     }
   }
 
@@ -537,10 +501,8 @@ class MusicUtil {
       }
 
       await response.pipe(file.openWrite());
-      debugPrint("$tag FileDownloadComplete / Done:${file.path}");
-    } catch (e) {
-      debugPrint("$tag DownloadFailed:$e");
-      rethrow;
+          } catch (e) {
+            rethrow;
     } finally {
       httpClient.close();
     }
@@ -552,15 +514,11 @@ class MusicUtil {
     try {
       final song = await MusicFeatureAnalyzer.metadata(filePath);
       if (song == null) {
-        debugPrint("$tag No法ExtractMetadata:MusicFeatureAnalyzerReturnnull");
-        return null;
+                return null;
       }
 
-      final durationSec = song.duration ~/ 1000; //convertas秒
-      debugPrint(
-        "$tag 提取元数据成功：时长=$durationSec秒，标题=${song.title}，艺术家=${song.artist}",
-      );
-
+      final durationSec = song.duration ~/ 1000; //convertas
+      
       return MusicInfo(
         durationSec,
         filePath,
@@ -570,8 +528,7 @@ class MusicUtil {
         artwork: song.albumArt,
       );
     } catch (e, stackTrace) {
-      debugPrint("$tag ExtractMetadataFailed:Exception=$e,堆Stack=$stackTrace");
-      return null;
+            return null;
     }
   }
 
@@ -595,14 +552,11 @@ class MusicUtil {
             if (fileAge > maxAge) {
               await file.delete();
               deletedCount++;
-              debugPrint("$tag DeleteExpiredCache:${file.path},ExistsDuration=${fileAge.inDays}天");
-            }
+                          }
           }
         }
       }
-      debugPrint("$tag CacheCleanupComplete / Done,共Delete$deletedCount个File");
-    } catch (e) {
-      debugPrint("$tag CacheCleanupFailed:$e");
-    }
+          } catch (e) {
+          }
   }
 }

@@ -19,10 +19,10 @@ class StackChanArView extends StatefulWidget {
     this.onCallback,
   });
 
-  final int decorate; //脸上玩具还ismodel
-  final bool captureScreen; //output画面
-  final Function(Uint8List)? onFrameCallback; //画面outputcallback
-  final Function(DanceData)? onCallback; //检测datacallback
+  final int decorate; //ismodel
+  final bool captureScreen; //output
+  final Function(Uint8List)? onFrameCallback; //outputcallback
+  final Function(DanceData)? onCallback; //datacallback
 
   @override
   State<StatefulWidget> createState() => _StackChanArViewState();

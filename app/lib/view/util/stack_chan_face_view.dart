@@ -22,9 +22,9 @@ class StackChanFaceView extends StatefulWidget {
     this.onCallback,
   });
 
-  final bool captureScreen; //output画面
-  final Function(Uint8List)? onFrameCallback; //画面outputcallback
-  final Function(DanceData)? onCallback; //检测datacallback
+  final bool captureScreen; //output
+  final Function(Uint8List)? onFrameCallback; //outputcallback
+  final Function(DanceData)? onCallback; //datacallback
 
   @override
   State<StatefulWidget> createState() => _StackChanFaceViewState();
@@ -88,16 +88,16 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
         });
   }
 
-  ///检测faceand导出画Surface / Side
+  ///faceandSurface / Side
   void processCameraImage(CameraImage image, int sensorOrientation) {
-    ///检测face
+    ///face
     MlKitUtil.shared.testing(image, sensorOrientation, (faces) {
       if (faces.isNotEmpty) {
         dataConversionTesting(faces.first);
       }
     });
     if (widget.captureScreen) {
-      //willimagecompressConcurrencyBack去
+      //willimagecompressConcurrencyBack
       final now = DateTime.now();
       if (now.difference(lastProcessTime).inMilliseconds >= 100) {
         if (isProcessing) return;
@@ -168,7 +168,7 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
     }
   }
 
-  ///compressAndsend出去
+  ///compressAndsend
   Future<void> handleAsyncCompression(
     CameraImage image,
     int sensorOrientation,

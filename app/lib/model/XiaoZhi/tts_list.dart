@@ -7,7 +7,7 @@ class TTsList {
   //languagelist
   List<String> languages;
 
-  //coreModify:anylanguage -> corresponding语音list,supportalllanguagetype
+  //coreModify:anylanguage -> correspondinglist,supportalllanguagetype
   Map<String, List<TTsVoice>>? ttsVoices;
 
   //Constructorfunction(NullsafedefaultValue)
@@ -20,7 +20,7 @@ class TTsList {
         ? List<String>.from(json['languages'].map((x) => x.toString()))
         : <String>[];
 
-    //parsedynamiclanguage语音 Map(core:autoadaptalllanguage key)
+    //parsedynamiclanguage Map(core:autoadaptalllanguage key)
     Map<String, List<TTsVoice>>? voiceMap;
     if (json['tts_voices'] != null) {
       voiceMap = {};

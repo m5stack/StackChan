@@ -222,8 +222,7 @@ class AppState extends GetxController {
           }
         }
       } else if (message is String) {
-        debugPrint("Received a regular message: $message");
-      }
+              }
     });
   }
 
@@ -442,12 +441,10 @@ class AppState extends GetxController {
 
       currentLocation.value = position;
       isLocationAvailable.value = true;
-      debugPrint("GetPositionSuccess: 纬度${position.latitude}, 经度${position.longitude}");
-    } catch (e) {
+          } catch (e) {
       showToast("Failed to obtain location: ${e.toString()}");
       isLocationAvailable.value = false;
-      debugPrint("GetPositionError: $e");
-    }
+          }
   }
 
   ///Continuously listen for location changes
@@ -463,8 +460,7 @@ class AppState extends GetxController {
         isLocationAvailable.value = true;
       },
       onError: (e) {
-        debugPrint("PositionUpdateError: $e");
-        isLocationAvailable.value = false;
+                isLocationAvailable.value = false;
       },
     );
   }

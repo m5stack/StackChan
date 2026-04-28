@@ -28,11 +28,11 @@ enum MsgType {
   offAudio(0x19),
   aimedTakePhoto(0x1A);
 
-  final int value; //custom值，andiOSrawValuefullyfor齐
+  final int value; //custom，andiOSrawValuefullyfor
 
   const MsgType(this.value);
 
-  //修CurrentlySerializelogic:用valueAnd / WhileNon-index
+  //CurrentlySerializelogic:valueAnd / WhileNon-index
   String toJson() => value.toString();
 
   static MsgType fromJson(String json) {

@@ -74,12 +74,10 @@ class NativeBridge {
       if (method != Method.unknown && _handlers.containsKey(method)) {
         return await _handlers[method]!(call);
       } else {
-        debugPrint('Unregistered method: ${call.method}');
-        return null;
+                return null;
       }
     } catch (e) {
-      debugPrint('Error handling method call: $e');
-      return null;
+            return null;
     }
   }
 
@@ -88,8 +86,7 @@ class NativeBridge {
     try {
       return await _channel.invokeMethod(method.name, arguments);
     } catch (e) {
-      debugPrint('Error sending message to native: $e');
-      return null;
+            return null;
     }
   }
 
@@ -98,8 +95,7 @@ class NativeBridge {
     try {
       await _audioPlayChannel.send(pcmData);
     } catch (e) {
-      debugPrint("Audio stream send failed: $e");
-    }
+          }
   }
 }
 

@@ -71,7 +71,7 @@ class _MotionState extends State<Motion> {
     if (AppState.shared.deviceMac.isNotEmpty) {
       String jsonString = AppState.shared.deviceMac + avatarData.toString();
       AppState.shared.sendWebSocketMessage(
-        .controlAvatar, //假设枚举名as WebSocketMessageType
+        .controlAvatar, //as WebSocketMessageType
         data: jsonString.toUint8List(),
       );
     }

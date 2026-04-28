@@ -10,7 +10,7 @@ class Pagination {
   bool? hasMore;
   int? page;
   int? limit;
-  int? totaPages; //注意：这里field名可能is拼写error，应该is totalPages
+  int? totaPages; //：fieldiserror，is totalPages
 
   //Constructorfunction
   Pagination({
@@ -33,7 +33,7 @@ class Pagination {
       page: json['page'] as int?,
       limit: json['limit'] as int?,
       totaPages:
-          json['totaPages'] as int? ?? json['totalPages'] as int?, //兼容两种field名
+          json['totaPages'] as int? ?? json['totalPages'] as int?, //field
     );
   }
 

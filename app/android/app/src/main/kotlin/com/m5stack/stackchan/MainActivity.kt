@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 package com.m5stack.stackchan
 
 import android.Manifest
@@ -40,7 +45,7 @@ class MainActivity : FlutterActivity() {
 
         val messenger = flutterEngine.dartExecutor.binaryMessenger
 
-        // 注册通道
+        // translated comment
         channel = MethodChannel(
             messenger,
             "com.m5stack.stackchan/native"
@@ -105,7 +110,7 @@ class MainActivity : FlutterActivity() {
         audioTrack?.write(data, 0, data.size)
     }
 
-    // ====================== 修复核心 1 ======================
+    // ====================== 1 ======================
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun startRecording() {
         if (isRecording.get()) return
@@ -124,7 +129,7 @@ class MainActivity : FlutterActivity() {
                     val readSize = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (readSize > 0) {
                         val data = buffer.copyOf(readSize)
-                        // 切到主线程发送 → 修复崩溃
+                        // translated comment
                         runOnUiThread {
                             eventSink?.success(data)
                         }
@@ -139,7 +144,7 @@ class MainActivity : FlutterActivity() {
         audioRecord?.stop()
     }
 
-    // ====================== 修复核心 2 ======================
+    // ====================== 2 ======================
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun methodCallHandler(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -147,7 +152,7 @@ class MainActivity : FlutterActivity() {
                 if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
                     audioTrack?.pause()
                 }
-                result.success(null) // 必须回调
+                result.success(null) // translated comment
             }
 
             "startRecording" -> {
@@ -160,7 +165,7 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
             }
 
-            else -> result.notImplemented() // 缺失方法处理
+            else -> result.notImplemented() // translated comment
         }
     }
 

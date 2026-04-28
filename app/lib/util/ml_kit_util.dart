@@ -34,8 +34,7 @@ class MlKitUtil {
       final faces = await _faceDetector.processImage(inputImage);
       onFacesDetected(faces);
     } catch (e) {
-      debugPrint("Face detection error: $e");
-    } finally {
+          } finally {
       _isProcessing = false;
     }
   }

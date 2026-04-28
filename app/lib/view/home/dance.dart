@@ -33,16 +33,16 @@ class Dance extends StatefulWidget {
 }
 
 class DanceModel extends GetxController {
-  RxInt selectedDance = RxInt(0); //currentSelectedDance帧index
+  RxInt selectedDance = RxInt(0); //currentSelectedDanceindex
   Rx<DanceList> danceInfo = Rx(DanceList()); //danceData
-  RxInt dancePlayIndex = RxInt(-1); //正inplay帧index（forhighlight）
-  RxBool isRun = RxBool(false); //whether正inwholeplay
-  RxBool isLoop = RxBool(false); //new增：loopplaymode开关
+  RxInt dancePlayIndex = RxInt(-1); //inplayindex（forhighlight）
+  RxBool isRun = RxBool(false); //whetherinwholeplay
+  RxBool isLoop = RxBool(false); //new：loopplaymode
 
   //playControl related
-  Timer? playTimer; //wholeplaytimer（网络mode）
+  Timer? playTimer; //wholeplaytimer（mode）
   List<Future<void>?> bluetoothPlayTasks = []; //Bluetoothplaytasklist
-  RxBool isPlayingSingle = RxBool(false); //whether正inplay单帧
+  RxBool isPlayingSingle = RxBool(false); //whetherinplay
 }
 
 class _DanceState extends State<Dance> {
@@ -60,7 +60,7 @@ class _DanceState extends State<Dance> {
     model.isRun.value = false;
     model.isLoop.value = false; //disposewhenresetloopstate
     model.onClose();
-    stopDance(); //disposewhen强制stopplay
+    stopDance(); //disposewhenstopplay
     super.dispose();
   }
 
@@ -125,7 +125,7 @@ class _DanceState extends State<Dance> {
 
     //updateplaystate
     model.isPlayingSingle.value = true;
-    model.dancePlayIndex.value = selectedIndex; //highlightcurrentplay帧
+    model.dancePlayIndex.value = selectedIndex; //highlightcurrentplay
 
     ///Single frameplaycorelogic
     Future<void> playSingleFrame() async {
@@ -148,8 +148,7 @@ class _DanceState extends State<Dance> {
           );
         }
       } catch (e) {
-        debugPrint("Single framePlayFailed: $e");
-        Get.snackbar("错误", "播放失败: $e", snackPosition: SnackPosition.BOTTOM);
+                Get.snackbar("错误", "播放失败: $e", snackPosition: SnackPosition.BOTTOM);
       } finally {
         //playcompleteafterresetstate
         model.isPlayingSingle.value = false;
@@ -184,7 +183,7 @@ class _DanceState extends State<Dance> {
 
     //wrapwholeplaylogic(forloopCall)
     void playFullDance() {
-      if (!model.isRun.value) return; //已stop则exit
+      if (!model.isRun.value) return; //stopexit
 
       if (AppState.shared.deviceControlMode == 0) {
         //NetworkControlmode:1One-timesendalldancedata
@@ -266,8 +265,7 @@ class _DanceState extends State<Dance> {
                 Duration(milliseconds: currentData.durationMs + 70),
               );
             } catch (e) {
-              debugPrint("BluetoothPlayFrame $i Failed: $e");
-              break;
+                            break;
             }
           }
 

@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 import Flutter
 import NetworkExtension
 import CoreLocation
@@ -70,8 +75,7 @@ class SceneDelegate: FlutterSceneDelegate,CLLocationManagerDelegate {
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        print(manager.authorizationStatus)
-        if manager.authorizationStatus == .authorizedWhenInUse ||
+                if manager.authorizationStatus == .authorizedWhenInUse ||
             manager.authorizationStatus == .authorizedAlways {
             fetchWifiInfo()
         }

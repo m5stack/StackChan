@@ -68,10 +68,8 @@ class _DeviceWifiConfigState extends State<DeviceWifiConfig> {
     try {
       await AppState.asyncPrefs.setString(WifiCacheKeys.wifiName, name);
       await AppState.asyncPrefs.setString(WifiCacheKeys.wifiPassword, password);
-      debugPrint("WiFi info cached: $name");
-    } catch (e) {
-      debugPrint("Failed to save WiFi cache: $e");
-      AppState.shared.showToast("Failed to save WiFi information");
+          } catch (e) {
+            AppState.shared.showToast("Failed to save WiFi information");
     }
   }
 
@@ -91,13 +89,11 @@ class _DeviceWifiConfigState extends State<DeviceWifiConfig> {
           _nameTextEditingController.text = cachedName;
           _passwordTextEditingController.text = cachedPassword;
         });
-        debugPrint("Using cached WiFi info: $cachedName");
-        return true;
+                return true;
       }
       return false;
     } catch (e) {
-      debugPrint("Failed to load WiFi cache: $e");
-      return false;
+            return false;
     }
   }
 
@@ -105,8 +101,7 @@ class _DeviceWifiConfigState extends State<DeviceWifiConfig> {
   Future<void> _initializeWifiInfo() async {
     final hasCache = await _loadCachedWifiInfo();
     if (!hasCache) {
-      debugPrint("No WiFi cache found, fetching from system");
-      await _fetchSystemWifiName();
+            await _fetchSystemWifiName();
     }
   }
 
@@ -118,8 +113,7 @@ class _DeviceWifiConfigState extends State<DeviceWifiConfig> {
       if (status.isGranted) {
         await _fetchAndroidWifiName();
       } else {
-        debugPrint("Location permission denied, cannot fetch WiFi name");
-      }
+              }
     } else if (Platform.isIOS) {
       // iOS: Request permission and immediately fetch via native bridge
       // (no need to wait for permission result on iOS)
@@ -141,12 +135,10 @@ class _DeviceWifiConfigState extends State<DeviceWifiConfig> {
             _wifiName = cleanWifiName;
             _nameTextEditingController.text = cleanWifiName;
           });
-          debugPrint("Fetched Android WiFi name: $cleanWifiName");
-        }
+                  }
       }
     } on PlatformException catch (e) {
-      debugPrint("Failed to fetch Android WiFi name: $e");
-    }
+          }
   }
 
   @override

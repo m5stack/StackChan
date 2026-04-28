@@ -127,17 +127,14 @@ class BlueUtil {
 
       //Execute enable Bluetooth command regardless of success to fix some plugin bugs
       if (allGranted) {
-        debugPrint(" BluetoothPermissionAllGetSuccess");
-        _registerBluetoothStateListener();
+                _registerBluetoothStateListener();
         await _tryTurnOnBluetooth();
       } else {
-        debugPrint(" Part/AllBluetoothPermission被Reject,No法打开Bluetooth");
-        _registerBluetoothStateListener();
+                _registerBluetoothStateListener();
         await _tryTurnOnBluetooth();
       }
     } catch (e) {
-      debugPrint(" Permission申请Exception:$e");
-      _registerBluetoothStateListener();
+            _registerBluetoothStateListener();
       await _tryTurnOnBluetooth();
     }
   }
@@ -154,15 +151,12 @@ class BlueUtil {
   Future<void> _tryTurnOnBluetooth() async {
     try {
       final currentState = FlutterBluePlus.adapterStateNow;
-      debugPrint("🔵 CurrentBluetoothState: $currentState");
-
+      
       if (currentState == BluetoothAdapterState.off) {
-        debugPrint("🔵 BluetoothAlready关闭,In progressAutoRequest打开...");
-        await FlutterBluePlus.turnOn();
+                await FlutterBluePlus.turnOn();
       } else if (currentState == BluetoothAdapterState.on) {
         //[fixkey]Androidfirstpermissionsuccess+BluetoothAlreadyenable → proactivetriggerscan
-        debugPrint(" BluetoothAlready开启,ProactiveTrigger首Time(s)Scan");
-        blueSwitch = true;
+                blueSwitch = true;
         if (automaticScanning) {
           startScan();
         }
@@ -171,28 +165,22 @@ class BlueUtil {
         }
       }
     } catch (e) {
-      debugPrint(" Auto打开BluetoothFailed:$e");
-    }
+          }
   }
 
   //MARK: - Bluetooth status update (auto scan, auto reconnect)
   void _centralManagerDidUpdateState(BluetoothAdapterState state) {
     switch (state) {
       case BluetoothAdapterState.unknown:
-        debugPrint("Bluetooth state unknown");
-        break;
+                break;
       case BluetoothAdapterState.unavailable:
-        debugPrint("This device does not support Bluetooth");
-        break;
+                break;
       case BluetoothAdapterState.unauthorized:
-        debugPrint("No permission to use Bluetooth, please check settings");
-        break;
+                break;
       case BluetoothAdapterState.turningOn:
-        debugPrint("Bluetooth is resetting");
-        break;
+                break;
       case BluetoothAdapterState.on:
-        debugPrint(" BluetoothAlready打开,AutoStartScan");
-        blueSwitch = true;
+                blueSwitch = true;
         //Bluetoothenable autostartscan
         if (automaticScanning) {
           startScan();
@@ -203,11 +191,9 @@ class BlueUtil {
         }
         break;
       case BluetoothAdapterState.turningOff:
-        debugPrint("Bluetooth is turning off");
-        break;
+                break;
       case BluetoothAdapterState.off:
-        debugPrint("🔌 BluetoothAlready关闭");
-        blueSwitch = false;
+                blueSwitch = false;
         //closeafterautoTryreOpen
         _tryTurnOnBluetooth();
         break;
@@ -217,15 +203,13 @@ class BlueUtil {
   //MARK: - Scan related (auto execute)
   void startScan() {
     if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
-      debugPrint("Bluetooth is not ready when scanning");
-      //stateNotMeet / Satisfy,autoOpenBluetooth
+            //stateNotMeet / Satisfy,autoOpenBluetooth
       _tryTurnOnBluetooth();
       return;
     }
 
     discoveredDevices.clear();
-    debugPrint("🔍 StartAutoScan附近BLEDevice");
-
+    
     FlutterBluePlus.startScan(
       withServices: [Guid(targetServiceUUID), Guid(danceTargetServiceUUID)],
       continuousUpdates: true,
@@ -239,8 +223,7 @@ class BlueUtil {
         }
       },
       onError: (e) {
-        debugPrint("Scan error: $e");
-      },
+              },
     );
 
     _startCleanupTimer();
@@ -349,10 +332,7 @@ class BlueUtil {
         );
 
         if (isBound && currentPeripheral == null) {
-          debugPrint(
-            "✅ 发现已绑定设备: ${deviceInfo.device.platformName}, MAC: $deviceMac, 自动连接",
-          );
-          currentPeripheral = deviceInfo.device;
+                    currentPeripheral = deviceInfo.device;
           //[Fix]First / Previouslymarkconnectin,connectsuccessafterAgainpopup
           await connect(deviceInfo.device);
           if (AppState.shared.popupState) {
@@ -398,10 +378,7 @@ class BlueUtil {
       }
       final String targetMac = AppState.shared.deviceMac.toUpperCase();
       if (deviceMac.toUpperCase() == targetMac) {
-        debugPrint(
-          "✅ 匹配到目标设备: ${deviceInfo.device.platformName}, MAC: $deviceMac",
-        );
-        currentPeripheral = deviceInfo.device;
+                currentPeripheral = deviceInfo.device;
         connect(deviceInfo.device);
         break;
       }
@@ -425,16 +402,14 @@ class BlueUtil {
   }
 
   void stopScan() {
-    debugPrint("⏹️ StopScan");
-    FlutterBluePlus.stopScan();
+        FlutterBluePlus.stopScan();
     _scanSubscription?.cancel();
     _cleanupTimer?.cancel();
   }
 
   //MARK: - Connection related
   Future<void> connect(BluetoothDevice peripheral) async {
-    debugPrint("🔗 StartConnectDevice: ${peripheral.platformName}");
-    try {
+        try {
       _connectionStateSubscription?.cancel();
       _connectionStateSubscription = peripheral.connectionState.listen((state) {
         _handleConnectionState(peripheral, state);
@@ -449,8 +424,7 @@ class BlueUtil {
       String errorMsg = e is FlutterBluePlusException
           ? "${e.description} (code: ${e.code})"
           : e.toString();
-      debugPrint(" ConnectFailed: $errorMsg");
-      connectionStateChanged?.call(peripheral, false);
+            connectionStateChanged?.call(peripheral, false);
     }
   }
 
@@ -460,17 +434,13 @@ class BlueUtil {
   ) {
     switch (state) {
       case BluetoothConnectionState.connected:
-        debugPrint(" ConnectSuccess: ${peripheral.platformName}");
-        currentPeripheral = peripheral;
+                currentPeripheral = peripheral;
         _peripheralDidConnect(peripheral);
         connectionStateChanged?.call(peripheral, true);
         break;
       case BluetoothConnectionState.disconnected:
         final disconnectReason = peripheral.disconnectReason;
-        debugPrint(
-          "🔌 设备断开: ${peripheral.platformName}, ${disconnectReason?.description ?? "no error"}",
-        );
-        currentPeripheral = null;
+                currentPeripheral = null;
         _resetCharacteristics();
         connectionStateChanged?.call(peripheral, false);
 
@@ -480,8 +450,7 @@ class BlueUtil {
             final mac = _getDeviceId(deviceInfo);
             if (mac != null) {
               cachedDeviceMacs.remove(mac.toUpperCase());
-              debugPrint("🔌 AlreadyWillDisconnectDevice从CacheInRemove: $mac");
-            }
+                          }
             break;
           }
         }
@@ -502,20 +471,14 @@ class BlueUtil {
   Future<void> _discoverServices(BluetoothDevice peripheral) async {
     try {
       if (peripheral.isDisconnected) {
-        debugPrint(" DeviceDisconnected,No法DiscoverService");
-        return;
+                return;
       }
-      debugPrint("=====================================");
-      debugPrint(" StartDiscoverService [Device: ${peripheral.platformName}]");
-      debugPrint("=====================================");
-
+                  
       //CallSystemmethoddiscoverservice
       final services = await peripheral.discoverServices(timeout: 35);
 
-      debugPrint(" DiscoverServiceSuccess,TotalCount / Number量: ${services.length}");
-      for (var s in services) {
-        debugPrint("🟢 ServiceUUID: ${s.uuid}");
-      }
+            for (var s in services) {
+              }
 
       //iteratediscoverfeature
       for (var service in services) {
@@ -523,13 +486,7 @@ class BlueUtil {
       }
     } catch (e, stack) {
       //Add stack print trace
-      debugPrint("=====================================");
-      debugPrint(" DiscoverService[彻底Failed]");
-      debugPrint(" ErrorType: ${e.runtimeType}");
-      debugPrint(" ErrorInfo: $e");
-      debugPrint(" Error堆Stack: $stack");
-      debugPrint("=====================================");
-    }
+                                        }
   }
 
   Future<void> _discoverCharacteristics(
@@ -538,17 +495,14 @@ class BlueUtil {
   ) async {
     try {
       final characteristics = service.characteristics;
-      debugPrint("🔍 DiscoverService[${service.uuid}]DownCharacteristicCount / Number量: ${characteristics.length}");
-
+      
       for (var characteristic in characteristics) {
-        debugPrint("🔍 DiscoverCharacteristic: ${characteristic.uuid}");
-        characteristicCallback?.call(peripheral, characteristic);
+                characteristicCallback?.call(peripheral, characteristic);
         await _setupCharacteristicListener(peripheral, characteristic);
         _saveCharacteristicReference(characteristic);
       }
     } catch (e) {
-      debugPrint(" Discover特征Failed: $e");
-    }
+          }
   }
 
   Future<void> _setupCharacteristicListener(
@@ -560,8 +514,7 @@ class BlueUtil {
     const List<String> needNotifyUuids = [wifiSetCharacteristicUUID];
 
     if (!needNotifyUuids.map((e) => e.toLowerCase()).contains(uuid)) {
-      debugPrint("ℹ️ Characteristic[$uuid] Not in白名单,SkipListener");
-      return;
+            return;
     }
 
     //onlyhasinwhitelistInsidefeatureValue,Only thenexecuteDownSurface / Sidelistenlogic
@@ -570,19 +523,15 @@ class BlueUtil {
       try {
         bool notifySuccess = await characteristic.setNotifyValue(true);
         if (notifySuccess) {
-          debugPrint(" Characteristic[$uuid] Listener开启Success");
-        } else {
-          debugPrint(" Characteristic[$uuid] Listener开启Failed");
-        }
+                  } else {
+                  }
       } catch (e) {
-        debugPrint(" Characteristic[$uuid] ListenerSettingsException: $e");
-      }
+              }
     }
     //listendatareceive
     characteristic.lastValueStream.listen((value) {
       if (value.isEmpty) return;
-      debugPrint("📥 Characteristic[$uuid] 收到Data: ${utf8.decode(value)}");
-      if (uuid == wifiSetCharacteristicUUID.toLowerCase()) {
+            if (uuid == wifiSetCharacteristicUUID.toLowerCase()) {
         wifiSetCharacteristicCall?.call(value);
       }
     });
@@ -618,16 +567,14 @@ class BlueUtil {
   Future<void> disconnectCurrentPeripheral() async {
     final peripheral = currentPeripheral;
     if (peripheral == null) {
-      debugPrint(" NoConnectedDevice");
-      return;
+            return;
     }
 
     try {
       await peripheral.disconnect(timeout: 35, queue: true, androidDelay: 2000);
       _resetCharacteristics();
     } catch (e) {
-      debugPrint("DisconnectFailed: $e");
-    }
+          }
   }
 
   void _resetCharacteristics() {
@@ -702,42 +649,35 @@ class BlueUtil {
     String type,
   ) async {
     if (characteristic == null) {
-      debugPrint(" 发送Failed:BluetoothDisconnected,No法发送: 发送Within容Is: $data");
-      return false;
+            return false;
     }
 
     final dataToSend = utf8.encode(data);
     if (dataToSend.isEmpty) {
-      debugPrint(" 发送Failed:DataIs null/empty");
-      return false;
+            return false;
     }
 
     try {
-      debugPrint("📤 In progress发送Data:$data");
-
+      
       await characteristic.write(
         dataToSend,
         withoutResponse: false,
         allowLongWrite: true,
       );
 
-      debugPrint(" 发送Success!Type:$type");
-      return true;
+            return true;
     } catch (e) {
-      debugPrint(" 发送Failed!Error:$e");
-
+      
       //Send failed = connection broken → can reconnect here
       if (e.toString().contains("Timed out")) {
-        debugPrint("🔌 Bluetooth发送Timeout,DeviceDisconnected");
-        //cantriggerreconnectlogic
+                //cantriggerreconnectlogic
       }
       return false;
     }
   }
 
   Future<void> reconnect() async {
-    debugPrint("🔄 Try重连...");
-    if (currentPeripheral != null && currentPeripheral!.isDisconnected) {
+        if (currentPeripheral != null && currentPeripheral!.isDisconnected) {
       _resetCharacteristics();
       await connect(currentPeripheral!);
       onReconnectSuccess?.call(currentPeripheral!);

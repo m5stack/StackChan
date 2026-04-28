@@ -4,7 +4,7 @@ SPDX-License-Identifier: MIT
 */
 
 class GenerateLicense {
-  //field采用Dart小驼峰namingstandard,parsewhenmapAPIreturnDown划线naming
+  //fieldDartnamingstandard,parsewhenmapAPIreturnDownnaming
   String? productName;
   String? boardName;
   String? serialNumber;
@@ -27,18 +27,18 @@ class GenerateLicense {
   //core:fromJsonFactorymethod,parseJSONdatatoobject
   factory GenerateLicense.fromJson(Map<String, dynamic> json) {
     return GenerateLicense(
-      //mapAPIreturnDown划线fieldtoDart小驼峰field
+      //mapAPIreturnDownfieldtoDartfield
       productName: json['product_name'] as String?,
       boardName: json['board_name'] as String?,
       serialNumber: json['serial_number'] as String?,
       licenseKey: json['license_key'] as String?,
       licenseAlgorithm: json['license_algorithm'] as String?,
       createdAt: json['created_at'] as String?,
-      firmware: json['firmware'], //dynamictypedirect赋值
+      firmware: json['firmware'], //dynamictypedirect
     );
   }
 
-  //optional:addtoJsonmethod(For easylaterSerialize,如Local存储)
+  //optional:addtoJsonmethod(For easylaterSerialize,Local)
   Map<String, dynamic> toJson() {
     return {
       'product_name': productName,

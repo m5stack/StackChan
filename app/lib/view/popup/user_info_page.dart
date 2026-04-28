@@ -23,7 +23,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
     }
   }
 
-  //time戳to日期
+  //timeto
   String _formatTimestamp(int? timestamp) {
     if (timestamp == null) return "Unknown";
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
@@ -69,7 +69,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
           final userInfo = AppState.shared.userInfo.value!;
           return ListView(
             children: [
-              //====================== center文字圆Avatar ======================
+              //====================== centerAvatar ======================
               Center(
                 child: Container(
                   width: 100,
@@ -153,7 +153,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
     );
   }
 
-  //info行component
+  //infocomponent
   Widget _buildInfoItem(String title, String value) {
     return CupertinoListTile(
       title: Text(title, style: TextStyle(fontWeight: FontWeight.w500)),

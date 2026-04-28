@@ -1,8 +1,13 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 //
 //  Dance.swift
 //  StackChan
 //
-//  Created by 袁智鸿 on 2026/1/16.
+// Created by on 2026/1/16.
 //
 
 import Foundation
@@ -40,12 +45,10 @@ struct DanceData : Codable,Identifiable {
     
     static func from(jsonString: String) -> DanceData? {
         guard !jsonString.isEmpty else {
-            print("JSON string is empty")
-            return nil
+                        return nil
         }
         guard let jsonData = jsonString.data(using: .utf8) else {
-            print("Failed to convert string to UTF-8 data")
-            return nil
+                        return nil
         }
         
         do {

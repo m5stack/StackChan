@@ -49,7 +49,7 @@ class _AppToastState extends State<AppToast> {
 
   ///Update Toast text and show
   void _updateToast(String text) {
-    //First / Previouslycancel旧timer,avoidRepeat计when
+    //First / Previouslycanceltimer,avoidRepeatwhen
     _hideTimer?.cancel();
     setState(() {
       _toastText = text;

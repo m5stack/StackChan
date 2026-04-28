@@ -5,12 +5,12 @@ SPDX-License-Identifier: MIT
 
 class McpEndpoints {
   int? id;
-  int? developerId; //修正namingstandard：snake_case 转 camelCase
+  int? developerId; //namingstandard：snake_case camelCase
   String? name;
   String? description;
   int? enabled;
-  String? createdAt; //修正namingstandard：snake_case 转 camelCase
-  String? updatedAt; //修正namingstandard：snake_case 转 camelCase
+  String? createdAt; //namingstandard：snake_case camelCase
+  String? updatedAt; //namingstandard：snake_case camelCase
 
   //defaultConstructorfunction
   McpEndpoints({
@@ -44,21 +44,21 @@ class McpEndpoints {
     if (jsonList.isEmpty) return [];
 
     return jsonList
-        .where((item) => item is Map<String, dynamic>) //filter非 Map type元素
+        .where((item) => item is Map<String, dynamic>) //filter Map type
         .map((item) => McpEndpoints.fromJson(item as Map<String, dynamic>))
         .toList();
   }
 
-  ///convertas JSON object(forNetworkrequest/存储)
+  ///convertas JSON object(forNetworkrequest/)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'developer_id': developerId, //转回 snake_case adaptafter端
+      'developer_id': developerId, // snake_case adaptafter
       'name': name,
       'description': description,
       'enabled': enabled,
-      'created_at': createdAt, //转回 snake_case adaptafter端
-      'updated_at': updatedAt, //转回 snake_case adaptafter端
+      'created_at': createdAt, // snake_case adaptafter
+      'updated_at': updatedAt, // snake_case adaptafter
     };
   }
 }

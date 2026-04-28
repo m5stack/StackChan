@@ -90,7 +90,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
   Future<void> setup() async {
     threeJs.scene = three.Scene();
 
-    //1. 光照set (Maintain / KeepNot变)
+    //1. set (Maintain / KeepNot)
     final hemiLight = three.HemisphereLight(0xffffff, 0x444444, 1);
     hemiLight.position.setValues(0, 100, 0);
     threeJs.scene.add(hemiLight);
@@ -99,7 +99,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     dirLight.position.setValues(50, 50, 70);
     threeJs.scene.add(dirLight);
 
-    //2. 摄像机set
+    //2. set
     threeJs.camera = three.PerspectiveCamera(
       60,
       widget.width / widget.height,
@@ -162,7 +162,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint();
 
-    //background:黑色With / Carry 70% transparency (0xB3 = 179/255)
+    //background:With / Carry 70% transparency (0xB3 = 179/255)
     paint.color = const ui.Color(0xB3000000);
     canvas.drawRect(ui.Rect.fromLTWH(0, 0, canvasWidth, canvasHeight), paint);
 
@@ -197,7 +197,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
       canvas.rotate(rotationDegrees * pi / 180);
       canvas.translate(-centerX, -centerY);
 
-      //createcrop区域模拟eye睁开度
+      //createcropeye
       final clipRect = ui.Rect.fromLTRB(
         eyeRect.left,
         eyeRect.bottom - visibleHeight,
@@ -206,14 +206,14 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
       );
       canvas.clipRect(clipRect);
 
-      //draw白色椭圆eye
+      //draweye
       paint.color = const ui.Color(0xFFFFFFFF);
       canvas.drawOval(eyeRect, paint);
 
       canvas.restore();
     }
 
-    //calculateeye基础position
+    //calculateeyeposition
     final eyeY = (canvasHeight * 0.4) - (eyeSize / 2);
     final leftEyePoint = ui.Offset((canvasWidth / 4) - (eyeSize / 2), eyeY);
     final rightEyePoint = ui.Offset(
@@ -270,7 +270,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
     if (byteData != null) {
-      //convertas three_js 识别 Uint8Array
+      //convertas three_js Uint8Array
       final uint8List = byteData.buffer.asUint8List();
       final nativeArray = three.Uint8Array.fromList(uint8List);
 
@@ -281,10 +281,10 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
         height: canvasHeight.toInt(),
       );
 
-      //marktexture及其源Needupdate
+      //marktextureNeedupdate
       expressionTexture.needsUpdate = true;
 
-      //ifuse MeshBasicMaterial,Ensure它也Willrereadtexture
+      //ifuse MeshBasicMaterial,EnsureWillrereadtexture
       if (expressionPlaneMesh.material is three.Material) {
         (expressionPlaneMesh.material as three.Material).needsUpdate = true;
       }

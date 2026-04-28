@@ -281,7 +281,7 @@ class _DanceListPageState extends State<DanceListPage> {
     final textColor = CupertinoColors.label.resolveFrom(context);
     final subTextColor = CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    //最after1个addbutton - optimizestyle
+    //after1addbutton - optimizestyle
     if (index == model.list.length) {
       return Container(
         height: itemHeight,
@@ -307,7 +307,7 @@ class _DanceListPageState extends State<DanceListPage> {
               builder: (context) {
                 return RecordDance(
                   onResult: (danceList, musicUrl, musicName) async {
-                    //Wait 2 Second(s),然afterexecute
+                    //Wait 2 Second(s),afterexecute
                     showEditDanceName(danceList, musicUrl, musicName);
 
                     // if (musicName != null &&
@@ -393,14 +393,14 @@ class _DanceListPageState extends State<DanceListPage> {
       );
     } else {
       DanceList dance = model.list[index];
-      //useSlidableImplementLeft滑menu
+      //useSlidableImplementLeftmenu
 
       return Slidable(
         key: Key('dance_${dance.id}'),
-        //Left滑config
+        //Leftconfig
         endActionPane: ActionPane(
           extentRatio: 0.6,
-          motion: const ScrollMotion(), //滑动动效
+          motion: const ScrollMotion(), //translated comment
           dismissible: DismissiblePane(
             onDismissed: () => deleteDance(dance.id),
           ),
@@ -431,12 +431,12 @@ class _DanceListPageState extends State<DanceListPage> {
             ),
           ],
         ),
-        //listItemMain体 - optimizestyle
+        //listItemMain - optimizestyle
         child: Obx(
           () => Container(
             height: itemHeight,
             decoration: BoxDecoration(
-              //渐变background + Shadow
+              //background + Shadow
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -623,7 +623,7 @@ class _DanceListPageState extends State<DanceListPage> {
     isPlaying = true;
     MusicUtil.shared.stopMusic();
 
-    //checkmusicinfoandfilewhetherhas效
+    //checkmusicinfoandfilewhetherhas
     var musicInfo = currentDance.musicInfo;
     if (musicInfo == null || !(await File(musicInfo.filePath).exists())) {
       if (currentDance.musicUrl != null && currentDance.musicUrl!.isNotEmpty) {
@@ -662,7 +662,7 @@ class _DanceListPageState extends State<DanceListPage> {
         if (isPlaying && model.runId.value == currentPlayId) {
           if (currentLoopMode) {
             isPlaying = false;
-            startPlay(); //async调用，无需等待
+            startPlay(); //async，
           } else {
             stopPlay();
           }
@@ -707,7 +707,7 @@ class _DanceListPageState extends State<DanceListPage> {
     if (isPlaying && model.runId.value == currentPlayId) {
       if (currentLoopMode) {
         isPlaying = false;
-        startPlay(); //async调用，无需等待
+        startPlay(); //async，
       } else {
         stopPlay();
       }

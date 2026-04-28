@@ -104,11 +104,7 @@ class _RecordDanceState extends State<RecordDance> {
       durationMs: 100,
     );
     recordedDanceFrames.add(danceFrame);
-    debugPrint(
-      "Recorded frame ${recordedDanceFrames.length}: "
-      "Yaw=${danceFrame.yawServo.angle}, Pitch=${danceFrame.pitchServo.angle}, Duration=100ms",
-    );
-  }
+      }
 
   Widget buildBandFrequencyChart(List<double> frequencies, double progress) {
     if (frequencies.isEmpty) {

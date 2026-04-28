@@ -43,7 +43,7 @@ class _PanoPageState extends State<PanoPage> {
         childAspectRatio: 1,
       );
 
-  //舵机运动轨迹data
+  //data
   List<MotionData> motionList = [
     //1
     MotionData(
@@ -252,13 +252,12 @@ class _PanoPageState extends State<PanoPage> {
         data: AppState.shared.deviceMac.toUint8List(),
       );
       AppState.shared.showToast("The shooting was unsuccessful.：${e.toString()}");
-      debugPrint("拍照Exception:$e");
-    } finally {
+          } finally {
       isTakingPhotos.value = false;
       recordSwitch = false;
     }
 
-    ///打开deviceSide / EndCamera
+    ///deviceSide / EndCamera
     AppState.shared.sendWebSocketMessage(
       .onCamera,
       data: AppState.shared.deviceMac.toUint8List(),
@@ -271,7 +270,7 @@ class _PanoPageState extends State<PanoPage> {
         data: jsonString.toUint8List(),
       );
 
-      ///Wait500ms,然after  recordSwitch = true, 接着Again等 500ms, 接着executeNext
+      ///Wait500ms,after recordSwitch = true, Again 500ms, executeNext
     }
 
     ///closedeviceSide / EndCamera
@@ -317,8 +316,7 @@ class _PanoPageState extends State<PanoPage> {
       result.dispose();
     } catch (e) {
       AppState.shared.showToast("Error: ${e.toString()}");
-      debugPrint("Stitch error: $e");
-    } finally {
+          } finally {
       for (var mat in mats) {
         mat.dispose();
       }

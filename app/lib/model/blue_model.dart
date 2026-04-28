@@ -29,7 +29,7 @@ class BlueEncryptionDecryption {
 
   //fromJson Constructorfunction:from JSON mapcreateinstance
   BlueEncryptionDecryption.fromJson(Map<String, dynamic> json) {
-    //safe地from JSON in取Value,avoidtypeerror
+    //safefrom JSON inValue,avoidtypeerror
     cmd = json['cmd'] as String?;
     data = json['data'] as String?;
   }
@@ -46,7 +46,7 @@ class BlueEncryptionDecryption {
     return json;
   }
 
-  //toString method:友好Stringoutput
+  //toString method:Stringoutput
   @override
   String toString() {
     return '{\n'
@@ -55,7 +55,7 @@ class BlueEncryptionDecryption {
         '}';
   }
 
-  //optional:enhance版 toString(格式化output,适合Debug)
+  //optional:enhance toString(output,Debug)
   String toStringFormatted() {
     return 'BlueEncryptionDecryption {\n'
         '  cmd: "${cmd ?? 'null'}"\n'

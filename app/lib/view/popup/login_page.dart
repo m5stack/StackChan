@@ -138,11 +138,11 @@ class _LoginPageState extends State<LoginPage> {
       );
       return;
     } else {
-      //定义defaulthint
+      //defaulthint
       String errorMessage = "Login failed";
 
       if (text != null && text.isNotEmpty) {
-        //match [[error:xxx]] 格式,Extractin间errorcontent
+        //match [[error:xxx]] ,Extractinerrorcontent
         final regExp = RegExp(r'\[\[error:(.*?)\]\]');
         final match = regExp.firstMatch(text);
 
@@ -150,11 +150,11 @@ class _LoginPageState extends State<LoginPage> {
           //Extracttocustomerrorcontent
           errorMessage = match.group(1)!.trim();
         } else {
-          //普通texterror,directuse
+          //texterror,directuse
           errorMessage = text.trim();
         }
       }
-      //展示 Toast
+      // Toast
       AppState.shared.showToast(errorMessage);
     }
   }
@@ -455,7 +455,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       if (responseData.isSuccess()) {
         AppState.shared.showToast("Registration successful!");
         if (mounted) {
-          Navigator.pop(context); //returnlogin页
+          Navigator.pop(context); //returnlogin
         }
       } else {
         showLoginErrMessage(responseData.message);
@@ -466,11 +466,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   void showLoginErrMessage(String? text) {
-    //定义defaulthint
+    //defaulthint
     String errorMessage = "Register failed";
 
     if (text != null && text.isNotEmpty) {
-      //match [[error:xxx]] 格式,Extractin间errorcontent
+      //match [[error:xxx]] ,Extractinerrorcontent
       final regExp = RegExp(r'\[\[error:(.*?)\]\]');
       final match = regExp.firstMatch(text);
 
@@ -478,11 +478,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
         //Extracttocustomerrorcontent
         errorMessage = match.group(1)!.trim();
       } else {
-        //普通texterror,directuse
+        //texterror,directuse
         errorMessage = text.trim();
       }
     }
-    //展示 Toast
+    // Toast
     AppState.shared.showToast(errorMessage);
   }
 

@@ -29,7 +29,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> init() async {
-    //Main页initwhensetasWiFimode
+    //MaininitwhensetasWiFimode
     BlueUtil.shared.blueMode = 1;
 
     AppState.shared.webSocketMessageMonitoring();
@@ -37,7 +37,7 @@ class _HomeState extends State<Home> {
       AppState.shared.connectWebSocket();
     }
 
-    //setBluetoothdevicescancallback,updateMain页devicelist
+    //setBluetoothdevicescancallback,updateMaindevicelist
     BlueUtil.shared.blufDevicesMonitoring = (List<BlueDeviceInfo> devices) {
       AppState.shared.blueDeviceList.value = devices;
     };

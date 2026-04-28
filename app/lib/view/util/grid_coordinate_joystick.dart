@@ -57,14 +57,14 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
     }
   }
 
-  //in _GridCoordinateJoystickState ClassinModify以Downmethod
+  //in _GridCoordinateJoystickState ClassinModifyDownmethod
 
   void _updatePoint(Offset localPosition, Size size) {
-    //Get padding Value便捷方式
+    //Get padding Value
     final padding =
         widget.padding?.resolve(Directionality.of(context)) ?? EdgeInsets.zero;
 
-    //calculate实际Can操控区域(Inside缩after矩形)
+    //calculateCan(Insideafter)
     double clickableWidth = size.width - padding.left - padding.right;
     double clickableHeight = size.height - padding.top - padding.bottom;
 
@@ -78,13 +78,13 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
       size.height - padding.bottom,
     );
 
-    //坐标convertlogic:现in (clampedX - padding.left) rangeis 0 to clickableWidth
+    //convertlogic:in (clampedX - padding.left) rangeis 0 to clickableWidth
     double normalizedX =
         ((clampedX - padding.left) / clickableWidth) *
             (widget.maxX - widget.minX) +
         widget.minX;
 
-    //Y axis同理
+    //Y axis
     double normalizedY =
         widget.maxY -
         ((clampedY - padding.top) / clickableHeight) *
@@ -108,7 +108,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
             widget.padding?.resolve(Directionality.of(context)) ??
             EdgeInsets.zero;
 
-        //corecalculatelogic:willcurrent点mapBackscreen像素position
+        //corecalculatelogic:willcurrentmapBackscreenposition
         double clickableWidth = size.width - padding.left - padding.right;
         double clickableHeight = size.height - padding.top - padding.bottom;
 
@@ -117,7 +117,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
         double yPercent =
             (_currentPoint.dy - widget.minY) / (widget.maxY - widget.minY);
 
-        //加Up padding.left/top 作as起始offset
+        //Up padding.left/top asoffset
         double xPos = padding.left + (xPercent * clickableWidth);
         double yPos =
             padding.top + (clickableHeight - (yPercent * clickableHeight));
@@ -140,7 +140,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
             onPointerCancel: (_) => setState(() => _isDragging = false),
             behavior: HitTestBehavior.opaque,
             child: Stack(
-              clipBehavior: Clip.none, //允许button阴影or元素超出父容器边界
+              clipBehavior: Clip.none, //buttonor
               children: [
                 if (widget.showMarking)
                   Positioned.fill(
@@ -151,7 +151,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
                         maxX: widget.maxX,
                         minY: widget.minY,
                         maxY: widget.maxY,
-                        //这里canaccording toNeedPassed padding For / To Painter draw装饰线
+                        //canaccording toNeedPassed padding For / To Painter draw
                         padding: padding,
                         gridCountX: (clickableWidth / widget.targetGridSize)
                             .floor(),
@@ -162,7 +162,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
                     ),
                   ),
                 Positioned(
-                  //buttoncanin padding 区域甚至Outsideshow,depends on xPos/yPos
+                  //buttoncanin padding Outsideshow,depends on xPos/yPos
                   left: xPos - widget.buttonSize / 2,
                   top: yPos - widget.buttonSize / 2,
                   child: _buildJoystickButton(context),
@@ -241,7 +241,7 @@ class JoystickPainter extends CustomPainter {
       ..color = CupertinoColors.systemGrey
       ..style = PaintingStyle.stroke;
 
-    //1. drawbackground网格and刻度
+    //1. drawbackgroundand
     for (int i = 0; i <= gridCountX; i++) {
       double x = i * gridSpacingX;
       double opacity = (i == 0 || i == gridCountX)
@@ -252,7 +252,7 @@ class JoystickPainter extends CustomPainter {
 
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
 
-      //draw X axis文字
+      //draw X axis
       double xValue = i * (maxX - minX) / gridCountX + minX;
       _drawText(
         canvas,
@@ -272,12 +272,12 @@ class JoystickPainter extends CustomPainter {
 
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
 
-      //draw Y axis文字
+      //draw Y axis
       double yValue = maxY - i * (maxY - minY) / gridCountY;
       _drawText(canvas, yValue.toInt().toString(), Offset(10, y - 5), size);
     }
 
-    //2. drawactivateMainaxis线
+    //2. drawactivateMainaxis
     final activePaint = Paint()
       ..color = accentColor.withValues(alpha: 0.8)
       ..strokeWidth = 2

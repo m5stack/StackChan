@@ -15,7 +15,7 @@ import '../../model/XiaoZhi/agent_template.dart';
 import '../../model/XiaoZhi/device.dart';
 import '../../util/XiaoZhi_util.dart';
 
-//System1UIConstant - 提升Can维护性
+//System1UIConstant - Can
 const double kCardRadius = 16.0;
 const double kDefaultPadding = 16.0;
 const double kDefaultSpacing = 16.0;
@@ -34,7 +34,7 @@ class AgentConfigurationModel extends GetxController {
   RxList<AgentTemplate> agentTemplatesList = RxList([]);
   Rxn<Agent> currentBindAgent = Rxn(null);
 
-  //分页search相关
+  //search
   int agentListPage = 1;
   RxBool isLoading = false.obs;
   RxBool isDialogLoading = false.obs;
@@ -46,8 +46,7 @@ class AgentConfigurationModel extends GetxController {
     try {
       await Future.wait([loadDevice(), loadAgentTemplates()]);
     } catch (e) {
-      debugPrint("Failed to initialize data: $e");
-    } finally {
+          } finally {
       isLoading.value = false;
     }
   }
@@ -117,15 +116,14 @@ class AgentConfigurationModel extends GetxController {
       AppState.shared.showToast("Successfully switched AI Agent");
       return true;
     } catch (e) {
-      debugPrint("Failed to switch bound AI Agent: $e");
-      AppState.shared.showToast(e.toString().replaceAll("Exception: ", ""));
+            AppState.shared.showToast(e.toString().replaceAll("Exception: ", ""));
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  //loadagent模板
+  //loadagent
   Future<void> loadAgentTemplates() async {
     final templates = await XiaoZhiUtil.shared.agentTemplatesList(
       agentListPage,
@@ -134,7 +132,7 @@ class AgentConfigurationModel extends GetxController {
     agentTemplatesList.assignAll(templates);
   }
 
-  //Replace字符Descriptionin占位符
+  //ReplaceDescriptionin
   String replacePlaceholdersInCharacter(Agent agent) {
     if (agent.character == null || agent.character!.isEmpty) {
       return "";
@@ -199,7 +197,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
 
   @override
   Widget build(BuildContext context) {
-    //GetCupertinodynamicTheme色
+    //GetCupertinodynamicTheme
     final CupertinoThemeData cupertinoTheme = CupertinoTheme.of(context);
     final Color surfaceColor = CupertinoColors.systemGroupedBackground
         .resolveFrom(context);
@@ -235,10 +233,10 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
             color: primaryColor,
           ),
         ),
-        border: const Border(bottom: BorderSide.none), //remove底部边框更现代
+        border: const Border(bottom: BorderSide.none), //remove
       ),
       child: Obx(() {
-        //全局Initialloadstate
+        //Initialloadstate
         if (model.isLoading.value) {
           return const Center(
             child: CupertinoActivityIndicator(radius: 16), //increaseloadindicator
@@ -256,21 +254,21 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
             vertical: 24,
           ),
           children: [
-            //currentbindagent卡片
+            //currentbindagent
             _buildCurrentBindCard(
               cupertinoTheme,
               primaryColor,
               secondaryTextColor,
             ),
             const SizedBox(height: 32),
-            //increase间距提升呼吸感
+            //increase
             //listtitle
             // const Text(
             //   "AI Agent Templates",
             //   style: TextStyle(
             //     fontSize: 20,
             //     fontWeight: FontWeight.w600,
-            //letterSpacing: -0.5, // 轻微Zoom out字间距更精致
+            //letterSpacing: -0.5, // Zoom out
             //   ),
             // ),
             // const SizedBox(height: 16),
@@ -289,7 +287,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //currentbindagent卡片 - optimize视觉质感
+  //currentbindagent - optimize
   Widget _buildCurrentBindCard(
     CupertinoThemeData theme,
     Color primaryColor,
@@ -308,7 +306,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                CupertinoIcons.person_badge_plus, //use填充icon更现代
+                CupertinoIcons.person_badge_plus, //useicon
                 size: 56,
                 color: secondaryTextColor.withValues(alpha: 0.7),
               ),
@@ -326,7 +324,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
                 "Select an Agent template below to bind, or create a custom AI Agent by tapping the edit button in the upper right corner.",
                 style: TextStyle(
                   fontSize: 15,
-                  height: 1.5, //行高提升可读性
+                  height: 1.5, //translated comment
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -430,7 +428,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //Nodevicehintcomponent - optimize视觉表现
+  //Nodevicehintcomponent - optimize
   Widget _buildNoDeviceWidget(Color secondaryTextColor, Color primaryColor) {
     return Center(
       child: Padding(
@@ -479,7 +477,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //通用infoItemcomponent - optimize排版
+  //infoItemcomponent - optimize
   Widget _buildInfoItem(String title, String value, Color secondaryTextColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),

@@ -113,17 +113,17 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
   Future<void> setup() async {
     threeJs.scene = three.Scene();
 
-    //环境光
+    //translated comment
     final hemiLight = three.HemisphereLight(0xffffff, 0x444444, 1);
     hemiLight.position.setValues(0, 100, 0);
     threeJs.scene.add(hemiLight);
 
-    //定向光
+    //translated comment
     final dirLight = three.DirectionalLight(0xffffff, 1);
     dirLight.position.setValues(50, 50, 70);
     threeJs.scene.add(dirLight);
 
-    //镜头and光线set
+    //andset
     threeJs.camera = three.PerspectiveCamera(
       60,
       widget.width / widget.height,
@@ -149,7 +149,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     applyDanceData();
   }
 
-  //set视Angle
+  //setAngle
   void setupCamera() {
     if (widget.topLook) {
       threeJs.camera.position.setValues(0, -100, 70);
@@ -162,14 +162,14 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
   three.Object3D yawAxis = three.Object3D();
   three.Object3D pitchAxis = three.Object3D();
 
-  three.Mesh? expressionPlaneMesh; //faceshow平面
+  three.Mesh? expressionPlaneMesh; //faceshow
   three.CanvasTexture? expressionTexture; //facecanvastexture
-  final double canvasWidth = 210; //canvas宽（correspondingiOS 42*5）
-  final double canvasHeight = 160; //canvas高（correspondingiOS 32*5）
-  final String expressionPlaneName = "expressionPlane"; //平面节点name（for齐iOS）
+  final double canvasWidth = 210; //canvas（correspondingiOS 42*5）
+  final double canvasHeight = 160; //canvas（correspondingiOS 32*5）
+  final String expressionPlaneName = "expressionPlane"; //name（foriOS）
   Function(double)? currentRotationEvent;
 
-  //重组层级关系
+  //translated comment
   void setupRobotHierarchy() {
     final model = threeJs.scene.children.firstWhere(
       (element) => element.type == "Group",
@@ -180,7 +180,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
 
     if (foundation == null || centralComponent == null || head == null) return;
 
-    //========== LeftRightto(yaw axis)logic(originalhaslogicCankeep,补充注释) ==========
+    //========== LeftRightto(yaw axis)logic(originalhaslogicCankeep,) ==========
     final centralWorldPos = centralComponent.worldPosition();
     centralWorldPos.y -= 20;
     yawAxis.setWorldPosition(centralWorldPos);
@@ -191,7 +191,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     centralComponent.setWorldTransform(centralWorldTransform);
     centralComponent.setWorldPosition(centralWorldPosition);
 
-    //========== UpDown点(pitch axis)logic(corefixPart) ==========
+    //========== UpDown(pitch axis)logic(corefixPart) ==========
     final headWorldPosition = head.worldPosition();
     final headWorldTransform = head.worldTransform();
     final pitchAxisWorldPosition = pitchAxis.worldPosition();
@@ -296,14 +296,14 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint();
 
-    //水平fliphandle(绕Yaxisflip)
+    //fliphandle(Yaxisflip)
     if (widget.mirrorFace) {
       canvas.save();
       canvas.translate(canvasWidth, 0);
       canvas.scale(-1, 1);
     }
 
-    //background:黑色With / Carry 70% transparency (0xB3 = 179/255)
+    //background:With / Carry 70% transparency (0xB3 = 179/255)
     paint.color = const ui.Color(0xB3000000);
     canvas.drawRect(ui.Rect.fromLTWH(0, 0, canvasWidth, canvasHeight), paint);
 
@@ -338,7 +338,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       canvas.rotate(rotationDegrees * pi / 180);
       canvas.translate(-centerX, -centerY);
 
-      //createcrop区域模拟eye睁开度
+      //createcropeye
       final clipRect = ui.Rect.fromLTRB(
         eyeRect.left,
         eyeRect.bottom - visibleHeight,
@@ -347,14 +347,14 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       );
       canvas.clipRect(clipRect);
 
-      //draw白色椭圆eye
+      //draweye
       paint.color = const ui.Color(0xFFFFFFFF);
       canvas.drawOval(eyeRect, paint);
 
       canvas.restore();
     }
 
-    //calculateeye基础position
+    //calculateeyeposition
     final eyeY = (canvasHeight * 0.4) - (eyeSize / 2);
     final leftEyePoint = ui.Offset((canvasWidth / 4) - (eyeSize / 2), eyeY);
     final rightEyePoint = ui.Offset(
@@ -416,7 +416,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
     if (byteData != null) {
-      //convertas three_js 识别 Uint8Array
+      //convertas three_js Uint8Array
       final uint8List = byteData.buffer.asUint8List();
       final nativeArray = three.Uint8Array.fromList(uint8List);
 
@@ -427,10 +427,10 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
         height: canvasHeight.toInt(),
       );
 
-      //marktexture及其源Needupdate
+      //marktextureNeedupdate
       expressionTexture!.needsUpdate = true;
 
-      //ifuse MeshBasicMaterial,Ensure它也Willrereadtexture
+      //ifuse MeshBasicMaterial,EnsureWillrereadtexture
       if (expressionPlaneMesh!.material is three.Material) {
         (expressionPlaneMesh!.material as three.Material).needsUpdate = true;
       }

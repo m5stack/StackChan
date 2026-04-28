@@ -19,7 +19,7 @@ extension HexExtension on Uint8List {
   }
 }
 
-// 定义NeedReplaceKeyValueFor
+// NeedReplaceKeyValueFor
 final projectStringReplacement = {
   "小智": "Xiaozhi",
   "Qwen3 实时": "Qwen3 235B (Fast)",
@@ -32,20 +32,20 @@ final projectStringReplacement = {
 };
 
 extension StringTool on String? {
-  /// Regex批量ReplaceString
-  /// 按照 projectStringReplacement 定义规ThenReplaceAllMatchContent
+  /// RegexReplaceString
+  /// projectStringReplacement ThenReplaceAllMatchContent
   String? regularExpressionSubstitution() {
     // 1. NullValueDirectlyReturns null
     if (this == null) {
       return null;
     }
 
-    // 2. 拿到Non-NullString
+    // 2. Non-NullString
     String result = this!;
 
-    // 3. IterateReplaceDictionary,逐个ReplaceAllMatchItem
+    // 3. IterateReplaceDictionary,ReplaceAllMatchItem
     for (final entry in projectStringReplacement.entries) {
-      // Escape特殊字符,AvoidRegex报错(比如括号,点号等)
+      // Escape,AvoidRegex(,)
       final pattern = RegExp.escape(entry.key);
       // GlobalReplaceAllMatchContent
       result = result.replaceAll(RegExp(pattern), entry.value);
@@ -233,7 +233,6 @@ Future<Uint8List?> _compressImage(_CompressParams params) async {
 
     return compressedData;
   } catch (e) {
-    debugPrint('图片压缩Failed:$e');
-    return null;
+        return null;
   }
 }

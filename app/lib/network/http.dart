@@ -15,20 +15,18 @@ import '../util/value_constant.dart';
 void logPrint(Object? object) {
   if (object == null) return;
   String log = object.toString();
-  const int chunkSize = 800; //每次打印800字符（低于系统limit）
-  //ifcontent较短,directPrint
+  const int chunkSize = 800; //800（limit）
+  //ifcontent,directPrint
   if (log.length <= chunkSize) {
-    debugPrint(log);
-    return;
+        return;
   }
 
-  //长content分段Print
+  //contentPrint
   for (int i = 0; i < log.length; i += chunkSize) {
     int end = i + chunkSize;
     if (end > log.length) end = log.length;
-    //usedebugPrint(比print更稳定,support更长content)
-    debugPrint(log.substring(i, end));
-  }
+    //usedebugPrint(print,supportcontent)
+      }
 }
 
 class Http {

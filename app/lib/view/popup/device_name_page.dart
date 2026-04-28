@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-//====================== devicename页(completed) ======================
+//====================== devicename(completed) ======================
 import 'package:flutter/cupertino.dart';
 import 'package:stack_chan/view/popup/XiaoZhi_welcome_page.dart';
 

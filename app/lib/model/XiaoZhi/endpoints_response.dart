@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-///根responsemodel
+///responsemodel
 class EndpointsResponse {
   final List<Endpoint> endpoints;
 

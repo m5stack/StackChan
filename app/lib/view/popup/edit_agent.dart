@@ -16,7 +16,7 @@ import '../../model/XiaoZhi/common_mcp_tool.dart';
 import '../../util/XiaoZhi_util.dart';
 import 'agent_configuration.dart';
 
-//Editor者Create agent
+//EditorCreate agent
 class EditAgent extends StatefulWidget {
   const EditAgent({super.key, this.agent});
 
@@ -41,7 +41,7 @@ class EditAgentModel extends GetxController {
 
   final Rxn<ModelData> selectedModel = Rxn();
   final Rxn<TTsVoice> selectedTtsVoice = Rxn();
-  final RxString selectedLanguage = "".obs; //初始空，dynamic赋值
+  final RxString selectedLanguage = "".obs; //，dynamic
   final RxString ttsSpeed = "normal".obs;
   final RxInt ttsPitch = 0.obs;
   final RxString asrSpeed = "normal".obs;
@@ -70,7 +70,7 @@ class EditAgentModel extends GetxController {
     ever(selectedLanguage, (lang) => _updateTtsVoiceList(lang));
 
     await loadCommonMcpTools();
-    await loadTtsList(); //先loadTTS → autogeneratelanguagelist
+    await loadTtsList(); //loadTTS → autogeneratelanguagelist
     await loadModelList();
 
     if (agent != null) {
@@ -128,7 +128,7 @@ class EditAgentModel extends GetxController {
     characterController.text = agent.character ?? "";
     memoryController.text = agent.memory ?? "";
 
-    //Editmode:languagemustexist于dynamiclistin
+    //Editmode:languagemustexistdynamiclistin
     if (languageList.contains(agent.language)) {
       selectedLanguage.value = agent.language!;
     } else if (languageList.isNotEmpty) {
@@ -278,8 +278,8 @@ class _EditAgentState extends State<EditAgent> {
           () => Text(
             model.isEdit.value
                 ? (agentConfigurationModel.currentBindAgent.value?.agent_name ??
-                      "Edit Agent") //修正拼写error
-                : "Create AI Agent", //统一术语
+                      "Edit Agent") //error
+                : "Create AI Agent", //translated comment
           ),
         ),
         leading: CupertinoNavigationBarBackButton(),
@@ -311,24 +311,24 @@ class _EditAgentState extends State<EditAgent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    //1. 基础info
+                    //1. info
                     _buildSectionTitle("Basic Information"),
                     // _buildInputItem(
                     //   title: "Agent Name",
                     //   controller: model.agentNameController,
                     //   placeholder:
-                    //"Please enter the name of the AI Agent.", // System1术语
+                    //"Please enter the name of the AI Agent.", // System1
                     // ),
                     _buildInputItem(
-                      title: "Assistant Name", //简化更自然
+                      title: "Assistant Name", //translated comment
                       controller: model.assistantNameController,
                       placeholder:
                           "Please enter the assistant's name (e.g. StackChan).",
                     ),
                     //2. modelconfig
-                    _buildSectionTitle("Model Configuration"), //大小写standard
+                    _buildSectionTitle("Model Configuration"), //standard
                     _buildSelectItem(
-                      title: "LLM Model", //专业术语（Large Language Model）
+                      title: "LLM Model", //（Large Language Model）
                       value: model.selectedModel.value?.name ?? "Please select",
                       onTap: showModelPicker,
                     ),
@@ -337,55 +337,55 @@ class _EditAgentState extends State<EditAgent> {
                       value: getLanguagesTitle(model.selectedLanguage.value),
                       onTap: showLanguagePicker,
                     ),
-                    //3. 语音config
-                    _buildSectionTitle("Voice Configuration"), //大小写standard
+                    //3. config
+                    _buildSectionTitle("Voice Configuration"), //standard
                     _buildSelectItem(
-                      title: "Voice Tone", //替换Timbre，更贴合语音场景
+                      title: "Voice Tone", //Timbre，
                       value:
                           model.selectedTtsVoice.value?.voiceName ??
                           "Please select",
                       onTap: showTtsPicker,
                     ),
                     _buildSelectItem(
-                      title: "TTS Speech Speed", //明确isTTS语速
+                      title: "TTS Speech Speed", //isTTS
                       value: model.ttsSpeed.value,
                       onTap: showSpeedPicker,
                     ),
                     _buildSelectItem(
-                      title: "TTS Pitch", //明确isTTS音调
+                      title: "TTS Pitch", //isTTS
                       value: model.ttsPitch.value.toString(),
                       onTap: showPitchPicker,
                     ),
                     _buildSelectItem(
-                      title: "ASR Speed", //专业术语（Automatic Speech Recognition）
+                      title: "ASR Speed", //（Automatic Speech Recognition）
                       value: model.asrSpeed.value,
                       onTap: showAsrSpeedPicker,
                     ),
                     //4. characterconfig
-                    _buildSectionTitle("Character Configuration"), //大小写standard
+                    _buildSectionTitle("Character Configuration"), //standard
                     _buildInputItem(
                       title: "Character Description",
                       controller: model.characterController,
                       placeholder:
                           "Please provide the character description (max 2000 characters).",
-                      //更精准(words→characters)
+                      //(words→characters)
                       maxLines: 4,
                     ),
                     _buildInputItem(
-                      title: "Short-term Memory Content", //更清晰
+                      title: "Short-term Memory Content", //translated comment
                       controller: model.memoryController,
                       placeholder:
                           "Please enter the short-term memory content.",
                       maxLines: 3,
                     ),
                     _buildSelectItem(
-                      title: "Memory Type", //大小写standard
+                      title: "Memory Type", //standard
                       value: model.memoryType.value == "SHORT_TERM"
-                          ? "Short-term Memory" //大小写standard
-                          : "Disabled", //替换Shut down，更符合UI习惯
+                          ? "Short-term Memory" //standard
+                          : "Disabled", //Shut down，UI
                       onTap: showMemoryTypePicker,
                     ),
-                    //5. MCPtoolconfig(注释Part也optimize)
+                    //5. MCPtoolconfig(Partoptimize)
                     // _buildSectionTitle("MCP Tools (Optional)"),
                     // model.commonMcpTools.isEmpty
                     //     ? const Center(child: Text("No available MCP tools"))
@@ -510,7 +510,7 @@ class _EditAgentState extends State<EditAgent> {
     required String title,
     required List<String> items,
     required Function(int) onSelected,
-    int initialIndex = 0, //new增：初始selectedindex
+    int initialIndex = 0, //new：selectedindex
   }) {
     //initselectedItemascurrentValue(fixdefaultselectederror)
     selectedItem = initialIndex;
@@ -558,7 +558,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //区域title
+  //title
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -569,7 +569,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //input表单Item
+  //inputItem
   Widget _buildInputItem({
     required String title,
     required TextEditingController controller,
@@ -603,7 +603,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //select表单Item
+  //selectItem
   Widget _buildSelectItem({
     required String title,
     required String value,

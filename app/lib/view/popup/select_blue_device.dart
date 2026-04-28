@@ -34,10 +34,10 @@ class SelectBlueDevice extends StatefulWidget {
 }
 
 class _SelectBlueDeviceState extends State<SelectBlueDevice> {
-  //connecttimeouttimer(preventNo限Wait)
+  //connecttimeouttimer(preventNoWait)
   Timer? _connectTimer;
 
-  //verifytimeouttimer(preventdeviceNoresponsewhen1直to圈)
+  //verifytimeouttimer(preventdeviceNoresponsewhen1to)
   Timer? _verifyTimer;
 
   //timeouttime:30Second(s)
@@ -116,11 +116,9 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
             await device
                 .requestMtu(512)
                 .then((mtu) {
-                  debugPrint(" MTUSettingsSuccess: $mtu");
-                })
+                                  })
                 .catchError((e) {
-                  debugPrint(" MTUSettingsFailed: $e");
-                  if (mounted) {
+                                    if (mounted) {
                     AppState.shared.showToast(
                       "Failed to set MTU. Device may not work properly.",
                     );
@@ -130,11 +128,9 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
           //enablefeatureValuenotify
           try {
             await characteristic.setNotifyValue(true);
-            debugPrint(" 开启DeviceNotificationSuccess");
-            startVerificationEquipment(characteristic);
+                        startVerificationEquipment(characteristic);
           } catch (e) {
-            debugPrint(" 开启DeviceNotificationFailed: $e");
-            _resetConnectState();
+                        _resetConnectState();
             if (mounted) {
               AppState.shared.showToast(
                 "Failed to enable device notification.",
@@ -144,20 +140,17 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
           return;
         }
       }
-      debugPrint(" Not找到WiFiConfigurationCharacteristic");
-      if (mounted) {
+            if (mounted) {
         AppState.shared.showToast("Device configuration feature not found.");
       }
     };
     BlueUtil.shared.wifiSetCharacteristicCall = (data) async {
       try {
         String json = utf8.decode(data);
-        debugPrint("📥 收到DeviceNotification: $json");
-        final model = BlueNotifyStateModel.fromJson(json);
+                final model = BlueNotifyStateModel.fromJson(json);
 
         if (model == null) {
-          debugPrint(" DeviceDataParseFailed");
-          if (mounted) {
+                    if (mounted) {
             AppState.shared.showToast("Failed to parse device data.");
           }
           return;
@@ -166,11 +159,10 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         if (model.cmd != null &&
             model.cmd == "notifyState" &&
             model.data?.type == 4) {
-          //拿to身份Encryptinfo
+          //toEncryptinfo
           String? data = model.data?.state;
           if (data == null) {
-            debugPrint(" DeviceNotReturnEncryptInfo");
-            if (mounted) {
+                        if (mounted) {
               AppState.shared.showToast(
                 "Device did not return encryption data.",
               );
@@ -180,10 +172,9 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
 
           //RSADecrypt
           final result = RsaUtil.decryptStackChanBlue(data);
-          //newIncrease / Add:Decryptfail/lengthNot足
+          //newIncrease / Add:Decryptfail/lengthNot
           if (result.isEmpty || result.length < 12) {
-            debugPrint(" DeviceInfoDecryptFailed");
-            if (mounted) {
+                        if (mounted) {
               AppState.shared.showToast(
                 "Device verification decryption failed.",
               );
@@ -207,8 +198,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
           activateDevice(macAddress);
         }
       } catch (e) {
-        debugPrint(" HandleDeviceNotificationFailed: $e");
-        if (mounted) {
+                if (mounted) {
           AppState.shared.showToast("Failed to process device data.");
         }
       }
@@ -220,7 +210,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
     return mac
         .toUpperCase()
         .replaceAllMapped(RegExp(r'(.{2})'), (match) => '${match.group(1)}:')
-        .substring(0, 17); //remove最after一个冒号
+        .substring(0, 17); //removeafter
   }
 
   bool isValidMac(String mac) {
@@ -235,7 +225,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       bool isConfiguration = await queryConfiguration(macAddress);
       if (!isConfiguration) {
         _resetConnectState();
-        //activatefail(Alreadyhashint,No需Repeat)
+        //activatefail(Alreadyhashint,NoRepeat)
         return;
       }
 
@@ -243,7 +233,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         AppState.shared.showToast("The AI Agent has been configured.");
       }
 
-      //binddevice关系
+      //binddevice
       bool result = await AppState.shared.bindDevice(macAddress);
       if (result) {
         _resetConnectState();
@@ -257,21 +247,19 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       } else {
         _resetConnectState();
         //newIncrease / Add:binddevicefail
-        debugPrint(" DeviceBindFailed");
-        if (mounted) {
+                if (mounted) {
           AppState.shared.showToast("Device binding failed. Please try again.");
         }
       }
     } catch (e) {
       _resetConnectState();
-      debugPrint(" DeviceActivateStreamProcess / ThreadException: $e");
-      if (mounted) {
+            if (mounted) {
         AppState.shared.showToast("Device activation exception.");
       }
     }
   }
 
-  //querydeviceconfig(全StreamProcess / Threaderrorhint)
+  //querydeviceconfig(StreamProcess / Threaderrorhint)
   Future<bool> queryConfiguration(String macAddress) async {
     try {
       //1. querydevicewhetheractivated (laterNotAgainquery directactivate)
@@ -288,8 +276,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         macAddress,
       );
       if (generateLicense == null || generateLicense.serialNumber == null) {
-        debugPrint(" 生成DeviceLicenseFailed");
-        if (mounted) {
+                if (mounted) {
           AppState.shared.showToast("Failed to generate device license.");
         }
         return false;
@@ -307,14 +294,13 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         mac,
       );
       if (!activateResult) {
-        debugPrint(" Device云Side / EndActivateFailed");
-        if (mounted) {
+                if (mounted) {
           AppState.shared.showToast("Device cloud activation failed.");
         }
         return false;
       }
 
-      ///deviceMayexist 但Notactivate,Needverify
+      ///deviceMayexist Notactivate,Needverify
       final checkDevice = await XiaoZhiUtil.shared.serialNumberGetDevice(
         serialNumber,
       );
@@ -323,12 +309,10 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         return false;
       } else {
         AppState.shared.showToast("Device activation successful");
-        debugPrint("DeviceActivateSuccess,DeviceId: ${checkDevice.device_id}");
-        return true;
+                return true;
       }
     } catch (e) {
-      debugPrint(" 查询DeviceConfigurationException: $e");
-      if (mounted) {
+            if (mounted) {
         AppState.shared.showToast("Failed to query device configuration.");
       }
       return false;
@@ -406,8 +390,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
                                 Duration(seconds: _connectTimeout),
                                 () {
                                   _resetConnectState();
-                                  debugPrint(" DeviceConnectTimeout");
-                                  if (mounted) {
+                                                                    if (mounted) {
                                     AppState.shared.showToast(
                                       "Device connection timed out. Please try again.",
                                     );
@@ -427,8 +410,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
                                 );
                               } catch (e) {
                                 _resetConnectState();
-                                debugPrint(" BluetoothConnectFailed: $e");
-                                if (mounted) {
+                                                                if (mounted) {
                                   AppState.shared.showToast(
                                     "Bluetooth connection failed: ${e.toString()}",
                                   );
@@ -470,7 +452,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
     );
   }
 
-  //startverifydevice(send握手data)
+  //startverifydevice(senddata)
   void startVerificationEquipment(
     BluetoothCharacteristic characteristic,
   ) async {
@@ -482,14 +464,13 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       _verifyTimer?.cancel();
       _verifyTimer = Timer(Duration(seconds: _verifyTimeout), () {
         _resetConnectState();
-        debugPrint(" DeviceVerifyTimeout");
-        if (mounted) {
+                if (mounted) {
           AppState.shared.showToast(
             "Device verification timed out. Please try again.",
           );
         }
       });
-      //构建握手data
+      //data
       final dateTimeString = DateTime.now().millisecondsSinceEpoch.toString();
       final BlueEncryptionDecryption data = BlueEncryptionDecryption(
         cmd: "handshake",
@@ -500,8 +481,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       //senddata
       bool result = await BlueUtil.shared.sendWifiSetData(jsonString);
       if (result) {
-        debugPrint(" 发送DeviceVerify指令Success");
-      } else {
+              } else {
         _verifyTimer?.cancel();
         AppState.shared.showToast(
           "The equipment may have been disconnected. Please reconfigure it on the StackChan end.",
@@ -511,8 +491,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
     } catch (e) {
       _verifyTimer?.cancel();
       _resetConnectState();
-      debugPrint(" 发送DeviceVerify指令Failed: $e");
-      if (mounted) {
+            if (mounted) {
         AppState.shared.showToast(
           "Failed to send device verification command.",
         );
