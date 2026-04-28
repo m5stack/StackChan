@@ -63,8 +63,18 @@ class Http {
 
             return handler.next(options);
           },
-      onResponse: (Response response, ResponseInterceptorHandler handler) {
+      onResponse:
+          (Response response, ResponseInterceptorHandler handler) async {
+        if (response.statusCode == 401) {
+          await AppState.shared.logout();
+        }
         return handler.next(response);
+      },
+      onError: (DioException error, ErrorInterceptorHandler handler) async {
+        if (error.response?.statusCode == 401) {
+          await AppState.shared.logout();
+        }
+        return handler.next(error);
       },
     ),
   ];
