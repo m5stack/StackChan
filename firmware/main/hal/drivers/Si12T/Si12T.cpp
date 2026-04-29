@@ -291,6 +291,38 @@ esp_err_t si12t_read_touch_result(si12t_handle_t handle, uint8_t *touch_result)
     return si12t_i2c_read_reg(handle, SI12T_OUTPUT1_ADDR, touch_result);
 }
 
+esp_err_t si12t_enable_irq_level_active(si12t_handle_t handle)
+{
+    if (handle == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t ret = ESP_OK;
+    uint8_t verify = 0;
+
+    // CTRL1 = 0x22:
+    //   - Auto Mode
+    //   - FTC = 01 (fast tracking)
+    //   - INT condition: assert on Mid/High output (i.e. while touched)
+    //   - Response 4 (2+2): keeps INT asserted as long as the channel reports
+    //     a touch -> behaves as level-active for ext0 wake.
+    ret |= si12t_i2c_write_reg(handle, SI12T_CTRL1_ADDR, 0x22);
+
+    // CTRL2 = 0x03:
+    //   - bit0 = 1: keep sensing enabled
+    //   - bit1 = 1: scan all channels (low-power scan retained)
+    //   - bit2 = 0: do NOT enter Si12T internal sleep (we want the chip to
+    //               continue detecting touches while ESP32-S3 deep-sleeps)
+    //   - bit3 = 0: S/W reset disable
+    //   The combination keeps the IRQ line live across host deep sleep.
+    ret |= si12t_i2c_write_reg(handle, SI12T_CTRL2_ADDR, 0x03);
+
+    si12t_i2c_read_reg(handle, SI12T_CTRL1_ADDR, &verify);
+    si12t_i2c_read_reg(handle, SI12T_CTRL2_ADDR, &verify);
+
+    return ret;
+}
+
 void si12t_parse_touch_result(uint8_t touch_result)
 {
     int index = 0;

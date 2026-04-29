@@ -150,6 +150,23 @@ esp_err_t si12t_sleep_enable(si12t_handle_t handle);
 esp_err_t si12t_sleep_disable(si12t_handle_t handle);
 
 /**
+ * @brief Configure Si12T IRQ as level-active so the INT line is held while a
+ *        finger is touching one of the channels. This is required for ESP32-S3
+ *        ext0 wake from deep sleep, since ext0 latches the GPIO level.
+ *
+ *        Path: Si12T pin20 IRQ -> FPC1 pin7 -> CoreS3 CTP1 pin5 -> AW9523B P1_2
+ *              -> INTN -> ESP32-S3 GPIO21 (RTC IO).
+ *
+ *        Internally writes CTRL1 (interrupt mode/condition) and CTRL2 (sleep
+ *        mode keep-alive) so the INT pin remains asserted while touched and
+ *        the chip continues sensing while the host MCU sleeps.
+ *
+ * @param handle Si12T device handle
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t si12t_enable_irq_level_active(si12t_handle_t handle);
+
+/**
  * @brief 读取触摸结果
  *
  * @param handle 设备句柄

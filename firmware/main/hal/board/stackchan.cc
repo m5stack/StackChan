@@ -19,6 +19,7 @@
 // #include "esp32_camera.h"
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
+#include "../wake_manager.h"
 
 #define TAG "M5Stack-StackChan-Board"
 
@@ -161,6 +162,48 @@ public:
         WriteReg(0x03, 0b10000011);
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+
+    /**
+     * @brief Configure P1_2 as input with interrupt enabled.
+     *
+     * P1_2 is the AW9523B pin tied (via INTN) to ESP32-S3 GPIO21, which is
+     * the wake source we want for Si12T head touch.  We unmask P1_2 in the
+     * INT_PORT1 mask register so a low-level on P1_2 (active-low INT from
+     * Si12T) propagates to AW9523's INTN -> GPIO21.
+     *
+     * Touched registers:
+     *   0x05 CONFIG_P1   bit2 = 1 -> P1_2 is input (default already 1, kept)
+     *   0x07 INT_PORT1   bit2 = 0 -> interrupt for P1_2 enabled (0 = enable)
+     *   0x13 LEDMODE_P1  bit2 = 1 -> P1_2 is GPIO mode (not LED)
+     */
+    void EnableTouchIrqWakeSource()
+    {
+        ESP_LOGI(TAG, "AW9523: enable P1_2 touch IRQ wake source");
+
+        // Make sure P1_2 stays in GPIO mode (not LED).
+        // LEDMODE register: 1 = GPIO mode, 0 = LED mode.
+        WriteReg(0x13, 0b11111111);
+
+        // CONFIG_P1: 1 = input. Preserve other bits, force P1_2 = 1.
+        // Existing init writes 0b00001100 -> P1_2 already configured as input.
+        WriteReg(0x05, 0b00001100);
+
+        // INT_PORT1: 0 = interrupt enabled, 1 = masked.
+        // Enable interrupt on P1_2 only; mask the rest to avoid spurious wake.
+        WriteReg(0x07, 0b11111011);
+    }
+
+    /**
+     * @brief Read the AW9523 input port 1 to find which line caused the
+     *        interrupt. The chip auto-clears the latched INT on reading the
+     *        input registers (0x00/0x01).
+     *
+     * @return uint8_t Raw input value of port 1.
+     */
+    uint8_t ReadInputPort1()
+    {
+        return ReadReg(0x01);
+    }
 };
 
 class Ft6336 : public I2cDevice {
@@ -223,7 +266,16 @@ private:
             GetDisplay()->SetPowerSaveMode(false);
             GetBacklight()->RestoreBrightness();
         });
-        power_save_timer_->OnShutdownRequest([this]() { pmic_->PowerOff(); });
+        power_save_timer_->OnShutdownRequest([this]() {
+            // Try to deep-sleep first so a head touch can wake us back up.
+            // If something goes wrong inside enter_deep_sleep, fall back to
+            // a hard power-off via the PMIC.
+            ESP_LOGW(TAG, "PowerSaveTimer shutdown -> deep sleep on Si12T touch");
+            GetBacklight()->SetBrightness(0);
+            wake_manager_enter_deep_sleep();
+            // Unreachable, but kept as a safety net.
+            pmic_->PowerOff();
+        });
         power_save_timer_->SetEnabled(true);
     }
 
@@ -279,6 +331,16 @@ private:
         ESP_LOGI(TAG, "Init AW9523");
         aw9523_ = new Aw9523(i2c_bus_, 0x58);
         vTaskDelay(pdMS_TO_TICKS(50));
+
+        // Arm the Si12T head-touch IRQ as a wake source. P1_2 -> INTN ->
+        // GPIO21 (ext0 wake). This only configures the I/O expander; the
+        // actual deep-sleep entry happens via wake_manager later.
+        aw9523_->EnableTouchIrqWakeSource();
+
+        // Snapshot the wake reason now so subsequent input-register reads
+        // (which auto-clear the AW9523 latch) don't lose the info.
+        wake_reason_t reason = wake_manager_check_boot_reason();
+        ESP_LOGI(TAG, "Boot wake reason = %d", (int)reason);
     }
 
     void PollTouchpad()
