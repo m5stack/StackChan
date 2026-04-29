@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 // =================================================================================
 // Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
 // =================================================================================
@@ -13,8 +18,8 @@ import (
 type DevicePostComment struct {
 	g.Meta    `orm:"table:device_post_comment, do:true"`
 	Id        any         //
-	PostId    any         // 帖子ID
-	Mac       any         // 评论设备MAC
-	Content   any         // 评论内容
-	CreatedAt *gtime.Time // 评论时间
+	PostId    any         // Post ID
+	Mac       any         // Comment device MAC
+	Content   any         //
+	CreatedAt *gtime.Time // Comment time
 }

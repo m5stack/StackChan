@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 // ==========================================================================
 // Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
 // ==========================================================================
@@ -21,14 +26,18 @@ type DeviceDao struct {
 
 // DeviceColumns defines and stores column names for the table device.
 type DeviceColumns struct {
-	Mac  string //
-	Name string //
+	Mac      string //
+	Name     string //
+	Uid      string // Bound user UID
+	BindTime string // Device binding time
 }
 
 // deviceColumns holds the columns for the table device.
 var deviceColumns = DeviceColumns{
-	Mac:  "mac",
-	Name: "name",
+	Mac:      "mac",
+	Name:     "name",
+	Uid:      "uid",
+	BindTime: "bind_time",
 }
 
 // NewDeviceDao creates and returns a new DAO object for table data access.

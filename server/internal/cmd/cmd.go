@@ -7,23 +7,27 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"path/filepath"
+	"stackChan/internal/boot"
+	"stackChan/internal/controller/admin"
+	"stackChan/internal/controller/appstore"
 	"stackChan/internal/controller/dance"
 	"stackChan/internal/controller/device"
 	"stackChan/internal/controller/file"
 	"stackChan/internal/controller/friend"
+	"stackChan/internal/controller/pano"
 	"stackChan/internal/controller/post"
+	"stackChan/internal/controller/stackchandevice"
+	"stackChan/internal/controller/user"
+	"stackChan/internal/controller/xiaozhi"
+	"stackChan/internal/middleware"
 	"stackChan/internal/web_socket"
-	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
 	"github.com/gogf/gf/v2/os/gfile"
-	"github.com/gogf/gf/v2/os/gtimer"
 )
 
 var (
@@ -32,19 +36,15 @@ var (
 		Usage: "main",
 		Brief: "start http server",
 		Func: func(ctx context.Context, parser *gcmd.Parser) (err error) {
-			PrintIPAddr()
-
-			//Start a scheduled task to send ping messages
-			gtimer.SetInterval(ctx, time.Second*5, func(ctx context.Context) {
-				web_socket.StartPingTime(ctx)
-			})
-			//Start a timer to clean up long-lived connections that have been inactive for a long time on the app.
-			gtimer.SetInterval(ctx, time.Second*15, func(ctx context.Context) {
-				web_socket.CheckExpiredLinks(ctx)
-			})
-
 			s := g.Server()
+			s.SetClientMaxBodySize(100 * 1024 * 1024)
+
+			s.Use(middleware.CORS)
+
 			s.BindHandler("/stackChan/ws", web_socket.Handler)
+
+			// heartBeat
+			boot.InitCron()
 
 			///Configuration file access
 			s.Group("/file", func(group *ghttp.RouterGroup) {
@@ -65,28 +65,27 @@ var (
 				})
 			})
 
-			s.Group("/stackChan", func(group *ghttp.RouterGroup) {
-				group.Middleware(ghttp.MiddlewareHandlerResponse)
-				group.Bind(device.NewV1(), friend.NewV1(), dance.NewV1(), file.NewV1(), post.NewV1())
+			s.Group("/stackChan/v2", func(group *ghttp.RouterGroup) {
+				group.Middleware(middleware.V2TokenAuthMiddleware, ghttp.MiddlewareHandlerResponse)
+				group.Bind(user.NewV2(), dance.NewV2(), device.NewV2())
 			})
+
+			s.Group("/stackChan", func(group *ghttp.RouterGroup) {
+				group.Middleware(middleware.TokenAuthMiddleware, ghttp.MiddlewareHandlerResponse)
+				group.Bind(device.NewV1(), friend.NewV1(), dance.NewV1(), file.NewV1(), post.NewV1(), pano.NewV1(), appstore.NewV1(), xiaozhi.NewV1(), stackchandevice.NewV2())
+			})
+
+			s.Group("/admin/stackChan", func(group *ghttp.RouterGroup) {
+				group.Middleware(middleware.AdminTokenAuthMiddleware, ghttp.MiddlewareHandlerResponse)
+				group.Bind(admin.NewV1(), file.NewV1())
+			})
+
+			// Do not use SetServerRoot, globally only provide frontend entry via /web
+			//s.SetServerRoot("web/management")
+
+			s.SetPort(12800)
 			s.Run()
 			return nil
 		},
 	}
 )
-
-func PrintIPAddr() {
-	addrs, err := net.InterfaceAddrs()
-	if err == nil {
-		fmt.Println("Local IP addresses detected on this machine:")
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-				fmt.Println("  -", ipnet.IP.String())
-			}
-		}
-	} else {
-		fmt.Println("Could not detect local IP addresses:", err)
-	}
-	fmt.Println("Please update the StackChan and iOS client access addresses to use one of the above local IPs as needed.")
-
-}

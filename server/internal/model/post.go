@@ -8,13 +8,13 @@ package model
 import "github.com/gogf/gf/v2/os/gtime"
 
 type Post struct {
-	Id              int64          `json:"id"           orm:"id"            description:"帖子ID"`
-	Mac             string         `json:"mac"          orm:"mac"           description:"发帖设备MAC"`
-	Name            string         `json:"name"         orm:"name"          description:"发帖设备名称"`
-	ContentText     string         `json:"contentText"  orm:"content_text"  description:"文本内容"`
-	ContentImage    string         `json:"contentImage" orm:"content_image" description:"图片URL"`
-	CreatedAt       *gtime.Time    `json:"createdAt"    orm:"created_at"    description:"发帖时间"`
-	PostCommentList []*PostComment `json:"postCommentList" orm:"postCommentList" description:"评论"`
+	Id              int64          `json:"id"           orm:"id"            description:"Post ID"`
+	Mac             string         `json:"mac"          orm:"mac"           description:"Post device MAC"`
+	Name            string         `json:"name"         orm:"name"          description:"Post device name"`
+	ContentText     string         `json:"contentText"  orm:"content_text"  description:"Text content"`
+	ContentImage    string         `json:"contentImage" orm:"content_image" description:"Image URL"`
+	CreatedAt       *gtime.Time    `json:"createdAt"    orm:"created_at"    description:"Post time"`
+	PostCommentList []*PostComment `json:"postCommentList" orm:"postCommentList" description:"Comments"`
 }
 
 type PostComment struct {

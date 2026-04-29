@@ -26,7 +26,7 @@ func (c *ControllerV1) GetPostComment(ctx context.Context, req *v1.GetPostCommen
 
 	var list []*model.PostComment
 
-	db := dao.DevicePostComment.Ctx(ctx).As("dp").Where("mac = ? AND post_id = ?", req.Mac, req.PostId)
+	db := dao.DevicePostComment.Ctx(ctx).As("dp").Where("post_id = ?", req.PostId)
 
 	total, err := db.Count()
 	if err != nil {
