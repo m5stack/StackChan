@@ -325,6 +325,8 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
         if (idle_motion_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_motion_modifier_id_);
             idle_motion_modifier_id_ = -1;
+        }
+        if (idle_expression_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_expression_modifier_id_);
             idle_expression_modifier_id_ = -1;
         }
@@ -504,9 +506,15 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
     if (is_idle) {
         // Start idle motion
         ESP_LOGW(TAG, "Start idle motion");
-        if (idle_motion_modifier_id_ < 0) {
-            idle_motion_modifier_id_     = stackchan.addModifier(std::make_unique<IdleMotionModifier>());
+        if (idle_expression_modifier_id_ < 0) {
             idle_expression_modifier_id_ = stackchan.addModifier(std::make_unique<IdleExpressionModifier>());
+        }
+        auto cfg = GetHAL().getXiaozhiConfig();
+        if (cfg.idleMotionEnabled && idle_motion_modifier_id_ < 0) {
+            auto interval = idleMotionFrequencyToIntervals(cfg.idleMotionFrequency);
+            auto factor   = idleMotionIntensityToFactor(cfg.idleMotionIntensity);
+            idle_motion_modifier_id_ =
+                stackchan.addModifier(std::make_unique<IdleMotionModifier>(interval.min_ms, interval.max_ms, factor));
         }
 
         _is_xiaozhi_idle = true;
@@ -516,6 +524,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         if (idle_motion_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_motion_modifier_id_);
             idle_motion_modifier_id_ = -1;
+        }
+        if (idle_expression_modifier_id_ >= 0) {
             stackchan.removeModifier(idle_expression_modifier_id_);
             idle_expression_modifier_id_ = -1;
         }

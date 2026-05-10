@@ -27,6 +27,9 @@ struct Data_t {
 struct XiaozhiConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
     bool allowShutdownWhenCharging   = false;
+    bool idleMotionEnabled           = true;
+    uint8_t idleMotionFrequency      = 1;  // 0=Sparse, 1=Normal, 2=Frequent
+    uint8_t idleMotionIntensity      = 1;  // 0=Calm, 1=Normal, 2=Lively
 };
 
 void lock();

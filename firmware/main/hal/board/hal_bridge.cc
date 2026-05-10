@@ -23,6 +23,9 @@ static const char* _tag = "HAL_BRIDGE";
 static constexpr std::string_view _xiaozhi_config_nvs_ns                           = "xiaozhi";
 static constexpr std::string_view _xiaozhi_config_idle_shutdown_time_key           = "idle_shutdown";
 static constexpr std::string_view _xiaozhi_config_allow_shutdown_when_charging_key = "shutdown_charge";
+static constexpr std::string_view _xiaozhi_config_idle_motion_enabled_key          = "idle_motion";
+static constexpr std::string_view _xiaozhi_config_idle_motion_frequency_key        = "idle_freq";
+static constexpr std::string_view _xiaozhi_config_idle_motion_intensity_key        = "idle_intensity";
 
 namespace hal_bridge {
 
@@ -126,6 +129,12 @@ XiaozhiConfig_t get_xiaozhi_config()
                                                      static_cast<int>(config.idleShutdownTimeSeconds));
     config.allowShutdownWhenCharging =
         settings.GetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
+    config.idleMotionEnabled =
+        settings.GetBool(_xiaozhi_config_idle_motion_enabled_key.data(), config.idleMotionEnabled);
+    config.idleMotionFrequency = static_cast<uint8_t>(settings.GetInt(
+        _xiaozhi_config_idle_motion_frequency_key.data(), static_cast<int>(config.idleMotionFrequency)));
+    config.idleMotionIntensity = static_cast<uint8_t>(settings.GetInt(
+        _xiaozhi_config_idle_motion_intensity_key.data(), static_cast<int>(config.idleMotionIntensity)));
 
     return config;
 }
@@ -135,6 +144,9 @@ void set_xiaozhi_config(const XiaozhiConfig_t& config)
     Settings settings(_xiaozhi_config_nvs_ns.data(), true);
     settings.SetInt(_xiaozhi_config_idle_shutdown_time_key.data(), config.idleShutdownTimeSeconds);
     settings.SetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
+    settings.SetBool(_xiaozhi_config_idle_motion_enabled_key.data(), config.idleMotionEnabled);
+    settings.SetInt(_xiaozhi_config_idle_motion_frequency_key.data(), config.idleMotionFrequency);
+    settings.SetInt(_xiaozhi_config_idle_motion_intensity_key.data(), config.idleMotionIntensity);
 }
 
 void app_play_sound(const std::string_view& sound)

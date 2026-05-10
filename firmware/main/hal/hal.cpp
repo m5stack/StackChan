@@ -208,6 +208,9 @@ XiaozhiConfig_t Hal::getXiaozhiConfig()
     return XiaozhiConfig_t{
         .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
         .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
+        .idleMotionEnabled         = bridge_config.idleMotionEnabled,
+        .idleMotionFrequency       = bridge_config.idleMotionFrequency,
+        .idleMotionIntensity       = bridge_config.idleMotionIntensity,
     };
 }
 
@@ -216,6 +219,9 @@ void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
     hal_bridge::set_xiaozhi_config({
         .idleShutdownTimeSeconds   = config.idleShutdownTimeSeconds,
         .allowShutdownWhenCharging = config.allowShutdownWhenCharging,
+        .idleMotionEnabled         = config.idleMotionEnabled,
+        .idleMotionFrequency       = config.idleMotionFrequency,
+        .idleMotionIntensity       = config.idleMotionIntensity,
     });
 }
 

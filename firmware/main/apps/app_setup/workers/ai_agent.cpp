@@ -139,3 +139,178 @@ void XiaozhiPowerSavingWorker::update_idle_label()
     auto total_minutes = _config.idleShutdownTimeSeconds / 60;
     _label_idle_value->setText(fmt::format("{} min", total_minutes));
 }
+
+static const char* frequency_label(uint8_t preset)
+{
+    switch (preset) {
+        case 0:  return "Sparse";
+        case 2:  return "Frequent";
+        default: return "Normal";
+    }
+}
+
+static const char* intensity_label(uint8_t preset)
+{
+    switch (preset) {
+        case 0:  return "Calm";
+        case 2:  return "Lively";
+        default: return "Normal";
+    }
+}
+
+IdleBehaviorWorker::IdleBehaviorWorker()
+{
+    mclog::info("IdleBehaviorWorker start");
+
+    _config = GetHAL().getXiaozhiConfig();
+
+    _panel = std::make_unique<Container>(lv_screen_active());
+    _panel->setBgColor(lv_color_hex(0xEDF4FF));
+    _panel->align(LV_ALIGN_CENTER, 0, 0);
+    _panel->setBorderWidth(0);
+    _panel->setSize(320, 240);
+    _panel->setRadius(0);
+    _panel->setPadding(0, 50, 24, 18);
+    _panel->setScrollDir(LV_DIR_VER);
+    _panel->setScrollbarMode(LV_SCROLLBAR_MODE_ACTIVE);
+
+    _panel_enable = std::make_unique<Container>(_panel->get());
+    _panel_enable->setSize(296, 120);
+    _panel_enable->align(LV_ALIGN_TOP_MID, 0, 20);
+    _panel_enable->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_enable->setBorderWidth(0);
+    _panel_enable->setRadius(18);
+    _panel_enable->setPadding(0, 0, 0, 0);
+    _panel_enable->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_enable_title = std::make_unique<Label>(_panel_enable->get());
+    _label_enable_title->setText("Idle head motion:");
+    _label_enable_title->setTextFont(&lv_font_montserrat_16);
+    _label_enable_title->setTextColor(lv_color_hex(0x26206A));
+    _label_enable_title->setWidth(260);
+    _label_enable_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_enable_title->align(LV_ALIGN_TOP_MID, 0, 18);
+
+    _switch_enable = std::make_unique<Switch>(_panel_enable->get());
+    _switch_enable->setSize(64, 36);
+    _switch_enable->align(LV_ALIGN_TOP_MID, 0, 66);
+    _switch_enable->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _switch_enable->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    _switch_enable->setBgColor(lv_color_hex(0xFFFFFF), LV_PART_KNOB);
+    if (_config.idleMotionEnabled) {
+        _switch_enable->addState(LV_STATE_CHECKED);
+    }
+
+    _panel_frequency = std::make_unique<Container>(_panel->get());
+    _panel_frequency->setSize(296, 148);
+    _panel_frequency->align(LV_ALIGN_TOP_MID, 0, 160);
+    _panel_frequency->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_frequency->setBorderWidth(0);
+    _panel_frequency->setRadius(18);
+    _panel_frequency->setPadding(0, 0, 0, 0);
+    _panel_frequency->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_frequency_title = std::make_unique<Label>(_panel_frequency->get());
+    _label_frequency_title->setText("Frequency");
+    _label_frequency_title->setWidth(280);
+    _label_frequency_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_frequency_title->setTextFont(&lv_font_montserrat_16);
+    _label_frequency_title->setTextColor(lv_color_hex(0x26206A));
+    _label_frequency_title->align(LV_ALIGN_TOP_MID, 0, 18);
+
+    _label_frequency_value = std::make_unique<Label>(_panel_frequency->get());
+    _label_frequency_value->setTextFont(&lv_font_montserrat_24);
+    _label_frequency_value->setTextColor(lv_color_hex(0x26206A));
+    _label_frequency_value->align(LV_ALIGN_TOP_MID, 0, 64);
+
+    _slider_frequency = std::make_unique<Slider>(_panel_frequency->get());
+    _slider_frequency->align(LV_ALIGN_TOP_MID, 0, 106);
+    _slider_frequency->setRange(0, 2);
+    _slider_frequency->setSize(250, 18);
+    _slider_frequency->setBgColor(lv_color_hex(0x615B9E), LV_PART_KNOB);
+    _slider_frequency->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR);
+    _slider_frequency->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _slider_frequency->setBgOpa(255);
+    _slider_frequency->setValue(_config.idleMotionFrequency);
+    _slider_frequency->onValueChanged().connect([this](int32_t value) { _pending_frequency_index = value; });
+
+    _panel_intensity = std::make_unique<Container>(_panel->get());
+    _panel_intensity->setSize(296, 148);
+    _panel_intensity->align(LV_ALIGN_TOP_MID, 0, 328);
+    _panel_intensity->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_intensity->setBorderWidth(0);
+    _panel_intensity->setRadius(18);
+    _panel_intensity->setPadding(0, 0, 0, 0);
+    _panel_intensity->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_intensity_title = std::make_unique<Label>(_panel_intensity->get());
+    _label_intensity_title->setText("Intensity");
+    _label_intensity_title->setWidth(280);
+    _label_intensity_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_intensity_title->setTextFont(&lv_font_montserrat_16);
+    _label_intensity_title->setTextColor(lv_color_hex(0x26206A));
+    _label_intensity_title->align(LV_ALIGN_TOP_MID, 0, 18);
+
+    _label_intensity_value = std::make_unique<Label>(_panel_intensity->get());
+    _label_intensity_value->setTextFont(&lv_font_montserrat_24);
+    _label_intensity_value->setTextColor(lv_color_hex(0x26206A));
+    _label_intensity_value->align(LV_ALIGN_TOP_MID, 0, 64);
+
+    _slider_intensity = std::make_unique<Slider>(_panel_intensity->get());
+    _slider_intensity->align(LV_ALIGN_TOP_MID, 0, 106);
+    _slider_intensity->setRange(0, 2);
+    _slider_intensity->setSize(250, 18);
+    _slider_intensity->setBgColor(lv_color_hex(0x615B9E), LV_PART_KNOB);
+    _slider_intensity->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR);
+    _slider_intensity->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _slider_intensity->setBgOpa(255);
+    _slider_intensity->setValue(_config.idleMotionIntensity);
+    _slider_intensity->onValueChanged().connect([this](int32_t value) { _pending_intensity_index = value; });
+
+    _btn_confirm = std::make_unique<Button>(_panel->get());
+    apply_button_common_style(*_btn_confirm);
+    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 496);
+    _btn_confirm->setSize(290, 50);
+    _btn_confirm->label().setText("Confirm");
+    _btn_confirm->onClick().connect([this]() { _confirm_flag = true; });
+
+    update_frequency_label();
+    update_intensity_label();
+}
+
+void IdleBehaviorWorker::update()
+{
+    if (_pending_frequency_index != -1) {
+        _config.idleMotionFrequency = static_cast<uint8_t>(_pending_frequency_index);
+        _pending_frequency_index    = -1;
+        update_frequency_label();
+    }
+
+    if (_pending_intensity_index != -1) {
+        _config.idleMotionIntensity = static_cast<uint8_t>(_pending_intensity_index);
+        _pending_intensity_index    = -1;
+        update_intensity_label();
+    }
+
+    if (_confirm_flag) {
+        _confirm_flag             = false;
+        _config.idleMotionEnabled = _switch_enable->getValue();
+        GetHAL().setXiaozhiConfig(_config);
+        mclog::tagInfo(_tag,
+                       "idle motion config updated: enabled={}, frequency={}, intensity={}",
+                       _config.idleMotionEnabled,
+                       _config.idleMotionFrequency,
+                       _config.idleMotionIntensity);
+        _is_done = true;
+    }
+}
+
+void IdleBehaviorWorker::update_frequency_label()
+{
+    _label_frequency_value->setText(frequency_label(_config.idleMotionFrequency));
+}
+
+void IdleBehaviorWorker::update_intensity_label()
+{
+    _label_intensity_value->setText(intensity_label(_config.idleMotionIntensity));
+}

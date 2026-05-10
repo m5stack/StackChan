@@ -77,6 +77,12 @@ void AppSetup::onOpen()
                   _destroy_menu    = true;
                   _need_warm_reset = true;
                   _worker          = std::make_unique<XiaozhiPowerSavingWorker>();
+              }},
+             {"Idle Behavior",
+              [&]() {
+                  _destroy_menu    = true;
+                  _need_warm_reset = true;
+                  _worker          = std::make_unique<IdleBehaviorWorker>();
               }}},
         },
         {

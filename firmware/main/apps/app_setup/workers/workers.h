@@ -295,6 +295,43 @@ private:
  * @brief
  *
  */
+class IdleBehaviorWorker : public WorkerBase {
+public:
+    IdleBehaviorWorker();
+    void update() override;
+
+private:
+    void update_frequency_label();
+    void update_intensity_label();
+
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_enable;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_enable_title;
+    std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_enable;
+
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_frequency;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_frequency_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_frequency_value;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_frequency;
+
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_intensity;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_intensity_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_intensity_value;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_intensity;
+
+    std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
+
+    XiaozhiConfig_t _config;
+    int32_t _pending_frequency_index = -1;
+    int32_t _pending_intensity_index = -1;
+    bool _confirm_flag               = false;
+};
+
+/**
+ * @brief
+ *
+ */
 class TimezoneWorker : public WorkerBase {
 public:
     TimezoneWorker();
