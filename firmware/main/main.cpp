@@ -32,7 +32,9 @@ extern "C" void app_main(void)
     GetMooncake().installApp(std::make_unique<AppAvatar>());
     GetMooncake().installApp(std::make_unique<AppEspnowControl>());
     GetMooncake().installApp(std::make_unique<AppAppCenter>());
+#if CONFIG_USE_EZDATA
     GetMooncake().installApp(std::make_unique<AppEzdata>());
+#endif
     GetMooncake().installApp(std::make_unique<AppDance>());
     GetMooncake().installApp(std::make_unique<AppSetup>());
 
