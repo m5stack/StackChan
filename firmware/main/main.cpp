@@ -29,6 +29,7 @@ extern "C" void app_main(void)
     // Install apps
     GetMooncake().installApp(std::make_unique<AppLauncher>());
     GetMooncake().installApp(std::make_unique<AppAiAgent>());
+    GetMooncake().installApp(std::make_unique<AppAtlasAgent>());
     GetMooncake().installApp(std::make_unique<AppAvatar>());
     GetMooncake().installApp(std::make_unique<AppEspnowControl>());
     GetMooncake().installApp(std::make_unique<AppAppCenter>());

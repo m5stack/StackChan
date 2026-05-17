@@ -6,6 +6,7 @@
 #pragma once
 #include "app_launcher/app_launcher.h"
 #include "app_ai_agent/app_ai_agent.h"
+#include "app_atlas_agent/app_atlas_agent.h"
 #include "app_avatar/app_avatar.h"
 #include "app_setup/app_setup.h"
 #include "app_espnow_ctrl/app_espnow_ctrl.h"
