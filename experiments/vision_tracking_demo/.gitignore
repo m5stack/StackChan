@@ -1,0 +1,5 @@
+build/
+managed_components/
+captures/
+sdkconfig
+sdkconfig.old
