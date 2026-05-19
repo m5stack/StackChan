@@ -17,6 +17,16 @@ python3 ./fetch_repos.py
 idf.py build
 ```
 
+### Host-side tests
+
+Servo motion profiling helpers can be tested without ESP-IDF hardware:
+
+```bash
+cmake -S tests -B build-host-tests
+cmake --build build-host-tests
+ctest --test-dir build-host-tests --output-on-failure
+```
+
 ### Flash
 
 ```bash
