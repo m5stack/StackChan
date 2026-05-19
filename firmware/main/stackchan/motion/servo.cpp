@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "servo.h"
+#include "servo_math.h"
 #include <hal/hal.h>
 
 using namespace uitk;
@@ -118,37 +119,14 @@ void Servo::update_angle_anim_target(int angle)
 
 uitk::SpringOptions_t Servo::map_speed_to_spring_options(int speed)
 {
-    speed = uitk::clamp(speed, 0, 1000);
+    auto profile = calculateServoSpringProfile(speed);
 
-    // 1. 计算 Stiffness (刚度)
-    // 使用二次方映射: k = k_min + (speed/1000)^2 * k_range
-    // 当 speed=500 时，k 约为 10 + 0.25 * 640 = 170
-    float k_min           = 10.0f;
-    float k_max           = 650.0f;
-    float normalizedSpeed = speed / 1000.0f;
-    float stiffness       = k_min + (normalizedSpeed * normalizedSpeed) * (k_max - k_min);
-
-    // 2. 计算 Damping (阻尼)
-    // 为了保持临界阻尼(无过冲，最快稳定)，公式为 d = 2 * sqrt(m * k)
-    // 如果想要带一点点弹性感(bounce)，可以将系数从 2.0 降到 1.5~1.8
-    float mass    = 1.0f;
-    float damping = 2.0f * sqrtf(mass * stiffness);
-
-    // 3. 构造选项
     uitk::SpringOptions_t options = _default_spring_options;
-    options.stiffness             = stiffness;
-    options.damping               = damping;
-    options.mass                  = mass;
-
-    // 4. 动态调整静止阈值
-    // 高速时阈值大一点可以防止由于离散计算导致的微小抖动
-    if (speed > 800) {
-        options.restDelta = 0.5f;
-        options.restSpeed = 0.5f;
-    } else {
-        options.restDelta = 0.1f;
-        options.restSpeed = 0.1f;
-    }
+    options.stiffness = profile.stiffness;
+    options.damping = profile.damping;
+    options.mass = profile.mass;
+    options.restDelta = profile.restDelta;
+    options.restSpeed = profile.restSpeed;
 
     return options;
 }
