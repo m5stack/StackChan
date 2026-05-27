@@ -147,3 +147,41 @@ StackChan の中に「育成アプリ」を追加する。
 - `onRunning()` で重い処理をしない。
 - LVGL の UI 操作は `LvglLockGuard` の中で行う。
 - 保存処理を毎フレーム行わない。操作時、または数秒おきに限定する。
+
+## 実装メモ
+
+2026-05-27 時点で、最初のプロトタイプを追加した。
+
+追加ファイル:
+
+- `firmware/main/apps/app_raise/app_raise.h`
+- `firmware/main/apps/app_raise/app_raise.cpp`
+
+変更ファイル:
+
+- `firmware/main/apps/apps.h`
+- `firmware/main/main.cpp`
+
+実装済み:
+
+- Launcher に `RAISE` App を追加
+- `love` / `energy` / `hunger` の状態を追加
+- `Feed` / `Play` / `Pet` / `Rest` ボタンを追加
+- ボタン操作で状態を更新
+- 状態を `Settings` 経由で NVS に保存
+- 状態に応じて表情を変更
+- 起動中は 15 秒ごとに空腹・元気を少し変化
+
+未検証:
+
+- この作業環境には `python` / `py` がなく、`fetch_repos.py` を実行できなかった。
+- この作業環境には `idf.py` がなく、ESP-IDF ビルドを実行できなかった。
+
+実機確認時に必要な作業:
+
+```powershell
+cd firmware
+python .\fetch_repos.py
+idf.py build
+idf.py -p COMx flash monitor
+```
