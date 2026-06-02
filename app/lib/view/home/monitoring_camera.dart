@@ -33,6 +33,7 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
 
   Rx<Uint8List> cameraImage = Rx(Uint8List(0));
   RxBool onMic = RxBool(false);
+  RxBool isCameraOn = RxBool(false);
 
   @override
   void initState() {
@@ -76,18 +77,6 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
       }
     });
 
-    //reCamera + audioStream(keyfix:exitAgainmust)
-    if (AppState.shared.deviceMac.isNotEmpty) {
-      AppState.shared.sendWebSocketMessage(
-        .onCamera,
-        data: AppState.shared.deviceMac.toUint8List(),
-      );
-      // AppState.shared.sendWebSocketMessage(
-      //   .onAudio,
-      //   data: AppState.shared.deviceMac.toUint8List(),
-      // );
-    }
-
     //audiodatasend
     // AudioEngineManager.shared.onAudioData = (opusData) {
     //   final bytesBuilder = BytesBuilder();
@@ -106,11 +95,9 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
         .offCamera,
         data: AppState.shared.deviceMac.toUint8List(),
       );
-      // AppState.shared.sendWebSocketMessage(
-      //   .offAudio,
-      //   data: AppState.shared.deviceMac.toUint8List(),
-      // );
     }
+    isCameraOn.value = false;
+    cameraImage.value = Uint8List(0);
     // AudioEngineManager.shared.onAudioData = null;
     // AudioEngineManager.shared.stopPlayOpus();
     // AudioEngineManager.shared.stopRecording();
@@ -149,7 +136,46 @@ class _MonitoringCameraState extends State<MonitoringCamera> {
               SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxWidth / 4 * 3,
-                child: Obx(() => imageView(cameraImage.value)),
+                child: Obx(() {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      imageView(cameraImage.value),
+                      Positioned(
+                        top: 15,
+                        right: 15,
+                        child: CupertinoButton(
+                          padding: const EdgeInsets.all(12),
+                          color: CupertinoColors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(50),
+                          child: Icon(
+                            isCameraOn.value
+                                ? CupertinoIcons.video_camera_solid
+                                : CupertinoIcons.video_camera,
+                            color: CupertinoColors.white,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            if (isCameraOn.value) {
+                              AppState.shared.sendWebSocketMessage(
+                                .offCamera,
+                                data: AppState.shared.deviceMac.toUint8List(),
+                              );
+                              cameraImage.value = Uint8List(0);
+                              isCameraOn.value = false;
+                            } else {
+                              AppState.shared.sendWebSocketMessage(
+                                .onCamera,
+                                data: AppState.shared.deviceMac.toUint8List(),
+                              );
+                              isCameraOn.value = true;
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }),
               ),
               const Spacer(),
               Padding(
