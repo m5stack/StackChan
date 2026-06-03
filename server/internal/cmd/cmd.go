@@ -21,7 +21,6 @@ import (
 	"stackChan/internal/controller/stackchandevice"
 	"stackChan/internal/controller/user"
 	"stackChan/internal/controller/xiaozhi"
-	devicecontrol "stackChan/internal/device_control"
 	"stackChan/internal/middleware"
 	"stackChan/internal/web_socket"
 
@@ -68,8 +67,6 @@ var (
 
 			s.Group("/stackChan/v2", func(group *ghttp.RouterGroup) {
 				group.Middleware(middleware.V2TokenAuthMiddleware, ghttp.MiddlewareHandlerResponse)
-				group.GET("/device/control/status", devicecontrol.StatusHandler)
-				group.GET("/device/control/ws", devicecontrol.ProxyHandler)
 				group.Bind(user.NewV2(), dance.NewV2(), device.NewV2())
 			})
 

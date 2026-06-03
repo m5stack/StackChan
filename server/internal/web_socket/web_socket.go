@@ -12,7 +12,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	devicecontrol "stackChan/internal/device_control"
 	"stackChan/internal/model"
 	"stackChan/internal/service"
 	"stackChan/utility"
@@ -130,7 +129,6 @@ func Handler(r *ghttp.Request) {
 	}
 
 	if deviceType == "StackChan" {
-		devicecontrol.UpdatePresence(mac, clientRemoteAddr(r), true)
 		isHave := false
 		var client *model.StackChanClient
 
@@ -177,7 +175,6 @@ func Handler(r *ghttp.Request) {
 		logger.Info(ctx, "There is a StackChen connected to the service.", client.GetMac())
 		defer func() {
 			logger.Info(ctx, "There is a StackChan that has disconnected.", mac, deviceType)
-			devicecontrol.SetVoiceActive(mac, false)
 			if client.GetConn() != nil {
 				_ = client.GetConn().Close()
 				client.SetConn(nil)
@@ -267,16 +264,6 @@ func Handler(r *ghttp.Request) {
 			readAppClientMessage(ctx, client, &messageType, &msg)
 		}
 	}
-}
-
-func clientRemoteAddr(r *ghttp.Request) string {
-	if forwardedFor := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwardedFor != "" {
-		return strings.TrimSpace(strings.Split(forwardedFor, ",")[0])
-	}
-	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
-		return realIP
-	}
-	return r.Request.RemoteAddr
 }
 
 // Handle WebSocket connection requests from StackChan devices
@@ -506,7 +493,7 @@ func readAppClientMessage(ctx context.Context, client *model.AppClient, messageT
 			// Query device name
 			name, err := service.GetDeviceName(ctx, client.GetMac())
 			if err != nil {
-				logger.Errorf(ctx, "%s", err.Error())
+				logger.Errorf(ctx, err.Error())
 				return
 			}
 			if name == "" {
@@ -514,7 +501,7 @@ func readAppClientMessage(ctx context.Context, client *model.AppClient, messageT
 				return
 			}
 			newMsg := createStringMessage(GetDeviceName, name)
-			logger.Infof(ctx, "Device name found, returning: %s", name)
+			logger.Infof(ctx, "Device name found, returning: "+name)
 			appSendMessage(ctx, client, messageType, newMsg)
 			break
 		case UpdateDeviceName:

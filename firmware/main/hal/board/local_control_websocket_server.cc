@@ -7,8 +7,13 @@
 
 #include <cJSON.h>
 #include <esp_log.h>
+#include <esp_mac.h>
+#include <esp_random.h>
+#include <esp_timer.h>
+#include <mbedtls/md.h>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <new>
 #include <string>
 #include <utility>
@@ -22,6 +27,120 @@
 #endif
 
 static const char* TAG = "LocalControlWS";
+
+static constexpr int64_t AUTH_CHALLENGE_TTL_US = 30 * 1000 * 1000;
+
+static std::string BytesToHex(const uint8_t* bytes, size_t len)
+{
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(len * 2);
+    for (size_t i = 0; i < len; ++i) {
+        out.push_back(hex[(bytes[i] >> 4) & 0x0f]);
+        out.push_back(hex[bytes[i] & 0x0f]);
+    }
+    return out;
+}
+
+static std::string RandomHex(size_t byte_count)
+{
+    std::string out;
+    out.reserve(byte_count * 2);
+    for (size_t i = 0; i < byte_count; ++i) {
+        const uint8_t byte = static_cast<uint8_t>(esp_random() & 0xff);
+        static constexpr char hex[] = "0123456789abcdef";
+        out.push_back(hex[(byte >> 4) & 0x0f]);
+        out.push_back(hex[byte & 0x0f]);
+    }
+    return out;
+}
+
+static std::string GetDeviceId()
+{
+    uint8_t mac[6] = {};
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
+        return "stackchan-unknown";
+    }
+
+    char buffer[32] = {};
+    std::snprintf(buffer, sizeof(buffer), "stackchan-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3],
+                  mac[4], mac[5]);
+    return buffer;
+}
+
+static std::string BuildAuthProofMessage(const std::string& device_id, const std::string& challenge_id,
+                                         const std::string& nonce, const std::string& principal)
+{
+    return device_id + ":" + challenge_id + ":" + nonce + ":" + principal;
+}
+
+static std::string HmacSha256Hex(const std::string& key, const std::string& message)
+{
+    uint8_t digest[32] = {};
+    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if (md_info == nullptr) {
+        return "";
+    }
+
+    if (mbedtls_md_hmac(md_info, reinterpret_cast<const unsigned char*>(key.data()), key.size(),
+                        reinterpret_cast<const unsigned char*>(message.data()), message.size(), digest) != 0) {
+        return "";
+    }
+
+    return BytesToHex(digest, sizeof(digest));
+}
+
+static bool ConstantTimeEquals(const std::string& a, const std::string& b)
+{
+    if (a.size() != b.size()) {
+        return false;
+    }
+
+    uint8_t diff = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        diff |= static_cast<uint8_t>(a[i] ^ b[i]);
+    }
+    return diff == 0;
+}
+
+static bool IsValidPrincipal(const char* principal)
+{
+    if (principal == nullptr) {
+        return false;
+    }
+    return std::strcmp(principal, "dashboard") == 0 || std::strcmp(principal, "backend_control") == 0 ||
+           std::strcmp(principal, "mcp_bridge") == 0 || std::strcmp(principal, "voice_bridge") == 0;
+}
+
+static const char* GetJsonString(const cJSON* object, const char* key)
+{
+    const cJSON* item = cJSON_IsObject(object) ? cJSON_GetObjectItem(object, key) : nullptr;
+    return cJSON_IsString(item) ? item->valuestring : nullptr;
+}
+
+static const char* GetJsonRpcSessionToken(const cJSON* root, const cJSON* payload)
+{
+    const char* token = GetJsonString(root, "session_token");
+    if (token != nullptr) {
+        return token;
+    }
+
+    token = GetJsonString(payload, "session_token");
+    if (token != nullptr) {
+        return token;
+    }
+
+    return nullptr;
+}
+
+static bool IsLocalControlMethod(const char* method_name)
+{
+    if (method_name == nullptr) {
+        return false;
+    }
+    return std::strcmp(method_name, "settings/get") == 0 || std::strcmp(method_name, "settings/write_sd") == 0 ||
+           std::strcmp(method_name, "local_control/set_token") == 0;
+}
 
 static std::string PrintAndDelete(cJSON* json)
 {
@@ -143,6 +262,7 @@ bool LocalControlWebSocketServer::Start(int port)
     config.server_port      = port;
     config.ctrl_port        = 32769;
     config.max_open_sockets = 4;
+    config.lru_purge_enable = true;
 
     httpd_uri_t ws_uri = {
         .uri          = "/ws",
@@ -199,42 +319,6 @@ void LocalControlWebSocketServer::SetToken(std::string token)
     token_ = std::move(token);
 }
 
-bool LocalControlWebSocketServer::IsAuthorized(httpd_req_t* req) const
-{
-    const char* expected_token = token_.c_str();
-    if (expected_token == nullptr || expected_token[0] == '\0') {
-        ESP_LOGW(TAG, "control WebSocket token is empty; rejecting connection");
-        return false;
-    }
-
-    char query[128] = {};
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        char token[97] = {};
-        if (httpd_query_key_value(query, "token", token, sizeof(token)) == ESP_OK &&
-            std::strcmp(token, expected_token) == 0) {
-            return true;
-        }
-    }
-
-    const size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");
-    if (auth_len > 0 && auth_len < 128) {
-        char auth[128] = {};
-        if (httpd_req_get_hdr_value_str(req, "Authorization", auth, sizeof(auth)) == ESP_OK) {
-            if (std::strcmp(auth, expected_token) == 0) {
-                return true;
-            }
-
-            const char bearer_prefix[] = "Bearer ";
-            if (std::strncmp(auth, bearer_prefix, sizeof(bearer_prefix) - 1) == 0 &&
-                std::strcmp(auth + sizeof(bearer_prefix) - 1, expected_token) == 0) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 esp_err_t LocalControlWebSocketServer::WsHandler(httpd_req_t* req)
 {
     if (instance_ == nullptr) {
@@ -242,14 +326,8 @@ esp_err_t LocalControlWebSocketServer::WsHandler(httpd_req_t* req)
     }
 
     if (req->method == HTTP_GET) {
-        if (!instance_->IsAuthorized(req)) {
-            ESP_LOGW(TAG, "rejected unauthorized WebSocket connection");
-            httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-            return ESP_FAIL;
-        }
-
         instance_->AddClient(req);
-        ESP_LOGI(TAG, "WebSocket connection opened");
+        ESP_LOGI(TAG, "WebSocket connection opened; awaiting auth handshake");
         return ESP_OK;
     }
 
@@ -335,7 +413,28 @@ void LocalControlWebSocketServer::HandleMessage(httpd_req_t* req, const char* da
     }
 
     const int sock_fd = httpd_req_to_sockfd(req);
+    if (HandleAuthJsonRpc(req, payload, sock_fd)) {
+        cJSON_Delete(payload);
+        cJSON_Delete(root);
+        return;
+    }
+
+    if (!IsClientSessionAuthorized(sock_fd, root, payload)) {
+        SendText(req, JsonRpcError(payload, -32001, "unauthenticated local control session").c_str());
+        cJSON_Delete(payload);
+        cJSON_Delete(root);
+        return;
+    }
+
     if (HandleLocalJsonRpc(req, payload)) {
+        cJSON_Delete(payload);
+        cJSON_Delete(root);
+        return;
+    }
+
+    const auto client = clients_.find(sock_fd);
+    if (client == clients_.end() || !IsPrincipalAllowedMcp(client->second.principal)) {
+        SendText(req, JsonRpcError(payload, -32003, "principal is not allowed to use MCP bridge").c_str());
         cJSON_Delete(payload);
         cJSON_Delete(root);
         return;
@@ -348,6 +447,130 @@ void LocalControlWebSocketServer::HandleMessage(httpd_req_t* req, const char* da
     cJSON_Delete(root);
 }
 
+bool LocalControlWebSocketServer::HandleAuthJsonRpc(httpd_req_t* req, const cJSON* payload, int sock_fd)
+{
+    const cJSON* method = cJSON_GetObjectItem(payload, "method");
+    if (!cJSON_IsString(method)) {
+        return false;
+    }
+
+    const char* method_name = method->valuestring;
+    const cJSON* params     = cJSON_GetObjectItem(payload, "params");
+
+    if (std::strcmp(method_name, "local_control/auth_begin") == 0) {
+        auto client = clients_.find(sock_fd);
+        if (client == clients_.end()) {
+            SendText(req, JsonRpcError(payload, -32000, "unknown WebSocket client").c_str());
+            return true;
+        }
+
+        client->second.authenticated          = false;
+        client->second.principal              = "";
+        client->second.session_token          = "";
+        client->second.challenge_id           = RandomHex(16);
+        client->second.nonce                  = RandomHex(16);
+        client->second.challenge_expires_at_us = esp_timer_get_time() + AUTH_CHALLENGE_TTL_US;
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "algorithm", "hmac-sha256-v1");
+        cJSON_AddStringToObject(result, "device_id", GetDeviceId().c_str());
+        cJSON_AddStringToObject(result, "challenge_id", client->second.challenge_id.c_str());
+        cJSON_AddStringToObject(result, "nonce", client->second.nonce.c_str());
+        cJSON_AddNumberToObject(result, "expires_in_ms", AUTH_CHALLENGE_TTL_US / 1000);
+
+        cJSON* principals = cJSON_CreateArray();
+        cJSON_AddItemToArray(principals, cJSON_CreateString("dashboard"));
+        cJSON_AddItemToArray(principals, cJSON_CreateString("backend_control"));
+        cJSON_AddItemToArray(principals, cJSON_CreateString("mcp_bridge"));
+        cJSON_AddItemToArray(principals, cJSON_CreateString("voice_bridge"));
+        cJSON_AddItemToObject(result, "principals", principals);
+
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "local_control/auth_verify") == 0) {
+        auto client = clients_.find(sock_fd);
+        if (client == clients_.end()) {
+            SendText(req, JsonRpcError(payload, -32000, "unknown WebSocket client").c_str());
+            return true;
+        }
+
+        const char* challenge_id = GetJsonString(params, "challenge_id");
+        const char* principal    = GetJsonString(params, "principal");
+        const char* proof        = GetJsonString(params, "proof");
+        if (challenge_id == nullptr || principal == nullptr || proof == nullptr) {
+            SendText(req, JsonRpcError(payload, -32602, "challenge_id, principal, and proof strings are required").c_str());
+            return true;
+        }
+        if (!IsValidPrincipal(principal)) {
+            SendText(req, JsonRpcError(payload, -32602, "invalid principal").c_str());
+            return true;
+        }
+        if (client->second.challenge_id.empty() || std::strcmp(challenge_id, client->second.challenge_id.c_str()) != 0) {
+            SendText(req, JsonRpcError(payload, -32002, "unknown auth challenge").c_str());
+            return true;
+        }
+        if (client->second.challenge_expires_at_us <= esp_timer_get_time()) {
+            client->second.challenge_id = "";
+            client->second.nonce        = "";
+            SendText(req, JsonRpcError(payload, -32002, "expired auth challenge").c_str());
+            return true;
+        }
+
+        const std::string device_id = GetDeviceId();
+        const std::string message =
+            BuildAuthProofMessage(device_id, client->second.challenge_id, client->second.nonce, principal);
+        const std::string expected_proof = HmacSha256Hex(token_, message);
+        if (expected_proof.empty() || !ConstantTimeEquals(expected_proof, proof)) {
+            client->second.challenge_id = "";
+            client->second.nonce        = "";
+            ESP_LOGW(TAG, "rejected invalid auth proof for principal %s", principal);
+            SendText(req, JsonRpcError(payload, -32002, "invalid auth proof").c_str());
+            return true;
+        }
+
+        client->second.authenticated           = true;
+        client->second.principal               = principal;
+        client->second.session_token           = RandomHex(32);
+        client->second.challenge_id            = "";
+        client->second.nonce                   = "";
+        client->second.challenge_expires_at_us = 0;
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "session_token", client->second.session_token.c_str());
+        cJSON_AddStringToObject(result, "principal", client->second.principal.c_str());
+        cJSON_AddStringToObject(result, "device_id", device_id.c_str());
+        ESP_LOGI(TAG, "authenticated local control client %d as %s", sock_fd, client->second.principal.c_str());
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    return false;
+}
+
+bool LocalControlWebSocketServer::IsClientSessionAuthorized(int sock_fd, const cJSON* root, const cJSON* payload) const
+{
+    const auto client = clients_.find(sock_fd);
+    if (client == clients_.end() || !client->second.authenticated || client->second.session_token.empty()) {
+        return false;
+    }
+
+    const char* session_token = GetJsonRpcSessionToken(root, payload);
+    return session_token != nullptr && ConstantTimeEquals(client->second.session_token, session_token);
+}
+
+bool LocalControlWebSocketServer::IsPrincipalAllowedLocalMethod(const std::string& principal, const char* method_name) const
+{
+    (void)method_name;
+    return principal == "dashboard" || principal == "backend_control";
+}
+
+bool LocalControlWebSocketServer::IsPrincipalAllowedMcp(const std::string& principal) const
+{
+    return principal == "dashboard" || principal == "backend_control" || principal == "mcp_bridge";
+}
+
 bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJSON* payload)
 {
     const cJSON* method = cJSON_GetObjectItem(payload, "method");
@@ -357,6 +580,16 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
 
     const char* method_name = method->valuestring;
     const cJSON* params     = cJSON_GetObjectItem(payload, "params");
+    if (!IsLocalControlMethod(method_name)) {
+        return false;
+    }
+
+    const int sock_fd       = httpd_req_to_sockfd(req);
+    const auto client       = clients_.find(sock_fd);
+    if (client == clients_.end() || !IsPrincipalAllowedLocalMethod(client->second.principal, method_name)) {
+        SendText(req, JsonRpcError(payload, -32003, "principal is not allowed to call local method").c_str());
+        return true;
+    }
 
     if (std::strcmp(method_name, "settings/get") == 0) {
         SendText(req, JsonRpcResult(payload, BuildSettingsResult()).c_str());
@@ -425,7 +658,7 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
 void LocalControlWebSocketServer::AddClient(httpd_req_t* req)
 {
     const int sock_fd = httpd_req_to_sockfd(req);
-    clients_[sock_fd] = true;
+    clients_[sock_fd] = ClientState{};
     ESP_LOGI(TAG, "client connected: %d (total: %zu)", sock_fd, clients_.size());
 }
 

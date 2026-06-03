@@ -38,7 +38,8 @@ Short NVS-style keys are also accepted:
 }
 ```
 
-Runtime settings methods are available only on the local control WebSocket:
+Runtime settings methods are available only on an authenticated local control
+WebSocket session:
 
 - `settings/get`
 - `settings/write_sd`
