@@ -8,6 +8,7 @@
 #include "i2c_device.h"
 #include "axp2101.h"
 #include "settings.h"
+#include "stackchan_panel_io_spi_shared_dc.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -16,6 +17,10 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_ili9341.h>
 #include <esp_timer.h>
+#include <esp_vfs_fat.h>
+#include <sdmmc_cmd.h>
+#include <driver/sdspi_host.h>
+#include <dirent.h>
 #include <algorithm>
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
@@ -249,6 +254,29 @@ private:
     bool last_power_save_enabled_      = false;
     int64_t last_power_state_check_ms_ = 0;
 
+    void LogSdCardRootEntries()
+    {
+        // Boot-time SD access is safe before LCD init. Runtime /sdcard access
+        // must use GetHAL().withSdCard() so LCD and SD do not overlap on GPIO35.
+        DIR* dir = opendir(SDCARD_MOUNT_POINT);
+        if (dir == nullptr) {
+            ESP_LOGW(TAG, "Unable to open %s for listing", SDCARD_MOUNT_POINT);
+            return;
+        }
+
+        ESP_LOGI(TAG, "Listing %s", SDCARD_MOUNT_POINT);
+        struct dirent* entry = nullptr;
+        int entry_count      = 0;
+        while ((entry = readdir(dir)) != nullptr && entry_count < 8) {
+            ESP_LOGI(TAG, "  %s", entry->d_name);
+            entry_count++;
+        }
+        if (entry_count == 0) {
+            ESP_LOGI(TAG, "  <empty>");
+        }
+        closedir(dir);
+    }
+
     bool ShouldEnablePowerSave(bool has_external_power, bool is_discharging) const
     {
         return is_discharging || (has_external_power && xiaozhi_config_.allowShutdownWhenCharging);
@@ -282,6 +310,9 @@ private:
     void InitializePowerSaveTimer()
     {
         xiaozhi_config_ = hal_bridge::get_xiaozhi_config();
+        // Boot-time SD settings load is allowed here because the card is mounted
+        // before LCD init. Runtime /sdcard access must use GetHAL().withSdCard().
+        hal_bridge::apply_xiaozhi_config_sd_overrides(xiaozhi_config_);
 
         const int seconds_to_shutdown = xiaozhi_config_.idleShutdownTimeSeconds > 0
                                             ? static_cast<int>(xiaozhi_config_.idleShutdownTimeSeconds)
@@ -397,13 +428,13 @@ private:
     void InitializeSpi()
     {
         spi_bus_config_t buscfg = {};
-        buscfg.mosi_io_num      = GPIO_NUM_37;
-        buscfg.miso_io_num      = GPIO_NUM_NC;
-        buscfg.sclk_io_num      = GPIO_NUM_36;
+        buscfg.mosi_io_num      = SDCARD_SPI_MOSI;
+        buscfg.miso_io_num      = SDCARD_SPI_MISO;
+        buscfg.sclk_io_num      = SDCARD_SPI_SCLK;
         buscfg.quadwp_io_num    = GPIO_NUM_NC;
         buscfg.quadhd_io_num    = GPIO_NUM_NC;
         buscfg.max_transfer_sz  = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
-        ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
+        ESP_ERROR_CHECK(spi_bus_initialize(SDCARD_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
     void InitializeIli9342Display()
@@ -422,7 +453,8 @@ private:
         io_config.trans_queue_depth             = 10;
         io_config.lcd_cmd_bits                  = 8;
         io_config.lcd_param_bits                = 8;
-        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &panel_io));
+        io_config.flags.sio_mode                = 1;
+        ESP_ERROR_CHECK(stackchan_new_panel_io_spi_shared_dc(SDCARD_SPI_HOST, &io_config, GPIO_NUM_35, &panel_io));
 
         ESP_LOGD(TAG, "Install LCD driver");
         esp_lcd_panel_dev_config_t panel_config = {};
@@ -490,15 +522,55 @@ private:
         camera_->SetHMirror(false);
     }
 
+    void InitializeSdCard()
+    {
+        ESP_LOGI(TAG, "Init SD card");
+        // Mount only. Runtime fopen(), opendir(), stat(), etc. under /sdcard
+        // must use GetHAL().withSdCard().
+
+        gpio_set_direction(GPIO_NUM_3, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_3, 1);
+        gpio_set_direction(SDCARD_SPI_CS, GPIO_MODE_OUTPUT);
+        gpio_set_level(SDCARD_SPI_CS, 1);
+
+        sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+        host.slot         = SDCARD_SPI_HOST;
+
+        sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+        slot_config.gpio_cs               = SDCARD_SPI_CS;
+        slot_config.host_id               = SDCARD_SPI_HOST;
+
+        esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+            .format_if_mount_failed = false,
+            .max_files              = 5,
+            .allocation_unit_size   = 0,
+            .disk_status_check_enable = false,
+            .use_one_fat            = false,
+        };
+
+        sdmmc_card_t* card = nullptr;
+        const esp_err_t ret =
+            esp_vfs_fat_sdspi_mount(SDCARD_MOUNT_POINT, &host, &slot_config, &mount_config, &card);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to mount SD card: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        sdmmc_card_print_info(stdout, card);
+        ESP_LOGI(TAG, "SD card mounted at %s", SDCARD_MOUNT_POINT);
+        LogSdCardRootEntries();
+    }
+
 public:
     M5StackCoreS3Board()
     {
         InitializeI2c();
         InitializeAxp2101();
-        InitializePowerSaveTimer();
         InitializeAw9523();
         I2cDetect();
         InitializeSpi();
+        InitializeSdCard();
+        InitializePowerSaveTimer();
         InitializeIli9342Display();
         InitializeCamera();
         InitializeFt6336TouchPad();

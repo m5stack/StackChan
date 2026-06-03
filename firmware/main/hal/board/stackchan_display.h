@@ -51,5 +51,6 @@ public:
 
     void LvglLock();
     void LvglUnlock();
+    void WaitForPendingPanelTransfers();
     lv_disp_t* GetLvglDisplay();
 };

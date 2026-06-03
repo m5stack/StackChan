@@ -204,13 +204,23 @@ void Hal::startXiaozhi()
 
 XiaozhiConfig_t Hal::getXiaozhiConfig()
 {
+    if (_xiaozhi_config_cached) {
+        return _xiaozhi_config_cache;
+    }
+
     auto bridge_config = hal_bridge::get_xiaozhi_config();
-    return XiaozhiConfig_t{
+    withSdCard([&]() {
+        hal_bridge::apply_xiaozhi_config_sd_overrides(bridge_config);
+    });
+
+    _xiaozhi_config_cache = XiaozhiConfig_t{
         .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
         .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
         .idleRandomMovementLevel   = bridge_config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = bridge_config.startAiAgentOnBoot,
     };
+    _xiaozhi_config_cached = true;
+    return _xiaozhi_config_cache;
 }
 
 void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
@@ -221,6 +231,8 @@ void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
         .idleRandomMovementLevel   = config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = config.startAiAgentOnBoot,
     });
+    _xiaozhi_config_cache  = config;
+    _xiaozhi_config_cached = true;
 }
 
 uint8_t Hal::getBatteryLevel()
@@ -253,6 +265,11 @@ void Hal::lvglLock()
 void Hal::lvglUnlock()
 {
     hal_bridge::disply_lvgl_unlock();
+}
+
+void Hal::waitForPendingPanelTransfers()
+{
+    hal_bridge::display_wait_idle();
 }
 
 void Hal::setBackLightBrightness(uint8_t brightness, bool permanent)

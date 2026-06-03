@@ -15,6 +15,7 @@
 #include <array>
 #include <lvgl_image.h>
 #include <string_view>
+#include <utility>
 
 /**
  * @brief
@@ -199,8 +200,40 @@ public:
     std::unique_ptr<BootLogo> bootLogo;
     void lvglLock();
     void lvglUnlock();
+    void waitForPendingPanelTransfers();
     void setBackLightBrightness(uint8_t brightness, bool permanent = false);
     uint8_t getBackLightBrightness();
+
+    // Runtime SD-card access must go through withSdCard().
+    //
+    // CoreS3/StackChan shares GPIO35 between LCD D/C and SD MISO. The custom
+    // panel I/O shim owns GPIO35 routing during LCD transfers and restores it
+    // after each transfer. withSdCard() does not manipulate GPIO35 directly.
+    // It locks LVGL/display and drains pending panel transfers before running
+    // filesystem work so LCD writes cannot overlap /sdcard access.
+    //
+    // Boot-time SD mount is allowed outside this helper before LCD init.
+    // Runtime fopen(), opendir(), stat(), etc. under /sdcard must stay inside
+    // the callback. Do not return open FILE*, DIR*, streams, iterators, or lazy
+    // readers from the callback.
+    template <typename Fn>
+    decltype(auto) withSdCard(Fn&& fn)
+    {
+        struct DisplayLockGuard {
+            Hal& hal;
+            explicit DisplayLockGuard(Hal& hal) : hal(hal)
+            {
+                hal.lvglLock();
+            }
+            ~DisplayLockGuard()
+            {
+                hal.lvglUnlock();
+            }
+        } lock(*this);
+
+        waitForPendingPanelTransfers();
+        return std::forward<Fn>(fn)();
+    }
 
     /* --------------------------------- Xiaozhi -------------------------------- */
     void requestXiaozhiStart()
@@ -303,6 +336,8 @@ public:
 
 private:
     bool _xiaozhi_start_requested = false;
+    bool _xiaozhi_config_cached   = false;
+    XiaozhiConfig_t _xiaozhi_config_cache;
 
     void xiaozhi_board_init();
     void lvgl_init();

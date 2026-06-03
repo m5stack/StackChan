@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "stackchan_display.h"
+#include "stackchan_panel_io_spi_shared_dc.h"
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_lvgl_port.h>
@@ -223,6 +224,14 @@ void StackChanAvatarDisplay::Unlock()
     lvgl_port_unlock();
 }
 
+void StackChanAvatarDisplay::WaitForPendingPanelTransfers()
+{
+    esp_err_t err = stackchan_panel_io_wait_idle(panel_io_);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "failed to wait for pending panel transfers: %s", esp_err_to_name(err));
+    }
+}
+
 lv_disp_t* StackChanAvatarDisplay::GetLvglDisplay()
 {
     return display_;
@@ -246,6 +255,8 @@ void StackChanAvatarDisplay::SetupUI()
         ESP_LOGW(TAG, "Avatar already created");
         return;
     }
+
+    auto config = GetHAL().getXiaozhiConfig();
 
     DisplayLockGuard lock(this);
 
@@ -272,7 +283,6 @@ void StackChanAvatarDisplay::SetupUI()
 
     // GetHAL().startStackChanAutoUpdate(24);
 
-    auto config        = hal_bridge::get_xiaozhi_config();
     idle_motion_level_ = config.idleRandomMovementLevel;
 
     ESP_LOGI(TAG, "Avatar created and started");
