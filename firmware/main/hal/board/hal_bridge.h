@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <lvgl.h>
 #include <driver/i2c_master.h>
+#include <string>
 #include <string_view>
 
 namespace hal_bridge {
@@ -56,6 +57,13 @@ void set_xiaozhi_config(const XiaozhiConfig_t& config);
 bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config);
 void set_boot_xiaozhi_config(const XiaozhiConfig_t& config);
 bool get_boot_xiaozhi_config(XiaozhiConfig_t& config);
+std::string get_local_control_token();
+void set_local_control_token(const std::string& token);
+bool apply_local_control_sd_overrides(std::string& token);
+bool read_sd_settings(std::string& contents);
+bool validate_settings_json(const std::string& contents, std::string* normalized_json, std::string* error_message);
+bool write_sd_settings(const std::string& contents, std::string* normalized_json, std::string* error_message);
+std::string get_effective_settings_json();
 
 i2c_master_bus_handle_t board_get_i2c_bus();
 StackChanCamera* board_get_camera();

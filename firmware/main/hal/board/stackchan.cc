@@ -254,6 +254,7 @@ private:
     esp_timer_handle_t touchpad_timer_;
     PowerSaveTimer* power_save_timer_;
     hal_bridge::XiaozhiConfig_t xiaozhi_config_;
+    std::string local_control_token_ = STACKCHAN_CONTROL_WS_TOKEN;
     bool last_power_save_enabled_      = false;
     int64_t last_power_state_check_ms_ = 0;
 
@@ -319,6 +320,7 @@ private:
         if (control_ws_server_ == nullptr) {
             control_ws_server_ = new LocalControlWebSocketServer();
         }
+        control_ws_server_->SetToken(local_control_token_);
 
         if (!control_ws_server_->Start(STACKCHAN_CONTROL_WS_PORT)) {
             delete control_ws_server_;
@@ -331,6 +333,15 @@ private:
         if (control_ws_server_ != nullptr) {
             control_ws_server_->Stop();
         }
+    }
+
+    void InitializeLocalControlConfig()
+    {
+        local_control_token_ = hal_bridge::get_local_control_token();
+        // Boot-time SD settings load is allowed here because the card is mounted
+        // before LCD init. Runtime /sdcard access must use GetHAL().withSdCard().
+        hal_bridge::apply_local_control_sd_overrides(local_control_token_);
+        ESP_LOGI(TAG, "Init local control token: length=%u", static_cast<unsigned>(local_control_token_.size()));
     }
 
     void InitializePowerSaveTimer()
@@ -597,6 +608,7 @@ public:
         I2cDetect();
         InitializeSpi();
         InitializeSdCard();
+        InitializeLocalControlConfig();
         InitializePowerSaveTimer();
         InitializeIli9342Display();
         InitializeCamera();

@@ -1,3 +1,35 @@
+# Unixtreme StackChan Firmware Fork
+
+This is my personal fork of the M5Stack StackChan project. The original upstream
+README is preserved below for product background and general project context.
+
+My goal with this fork is to turn StackChan into a device that can be controlled
+more directly and more reliably from a computer or local server, without turning
+the firmware into a large, complicated platform. The main idea is to keep the
+existing AI Agent and voice flow available, while adding a persistent,
+authenticated LAN control channel that is not tied to the wake-word or voice
+WebSocket lifecycle.
+
+The most important fork-specific pieces are documented here:
+
+- [Local control WebSocket API](docs/local-control-websocket.md)
+- [SD-card settings](docs/sdcard-settings.md)
+
+GitHub Actions builds publish firmware flash bundles for compatible
+StackChan/CoreS3 hardware. These bundles include the firmware binaries,
+`flash_args`, checksums, and short flashing instructions, so they can be used as
+testable checkpoints without building the firmware locally.
+
+One caveat: the stock Xiaozhi server does not know about this fork's new local
+control WebSocket workflow, and the default upstream experience still assumes
+the original server conventions. If you want to use the remote-control features
+from this fork, you will likely want to build your own server/dashboard against
+the documented WebSocket API, or wait for my companion server work to mature.
+
+The older voice-session MCP path still exists for compatibility. Long term,
+though, I expect new remote-control features in this fork to target the
+persistent local control WebSocket first.
+
 # StackChan Open-Source
 
 <img src="https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/K151_stack_chan_main_pictures_01.webp" width="60%">
@@ -23,10 +55,6 @@ The **factory firmware** is feature-rich, including an AI Agent, lively and expr
 - Product document page: [English](https://docs.m5stack.com/en/StackChan) | [日本語](https://docs.m5stack.com/ja/StackChan) | [中文](https://docs.m5stack.com/zh_CN/StackChan)
 
 - Board support package: https://github.com/m5stack/StackChan-BSP
-
-## Developer Notes
-
-- [Local control WebSocket API](docs/local-control-websocket.md)
 
 Thank you to the contributors of the StackChan community, especially: 
 

@@ -12,11 +12,29 @@ Connect directly to the device:
 ws://<device-ip>:8080/ws?token=<control-token>
 ```
 
-The current development token is configured in firmware as:
+The default development token is:
 
 ```text
 stackchan-local-dev
 ```
+
+Token precedence is:
+
+```text
+SD settings override > NVS setting > compiled default
+```
+
+Set an SD-card override in `/sdcard/stackchan/settings.json`:
+
+```json
+{
+  "localControl": {
+    "token": "your-token-here"
+  }
+}
+```
+
+Token changes loaded from SD settings require a reboot.
 
 The token can be passed as either:
 
@@ -100,6 +118,44 @@ Call a tool:
 
 Tool names and argument schemas come from `tools/list`.
 
+Read effective settings and any SD settings file. This is a local-control-only
+method and is not forwarded to Xiaozhi MCP:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "settings/get",
+  "params": {}
+}
+```
+
+Validate and write SD settings. This is also local-control-only:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "settings/write_sd",
+  "params": {
+    "settings_json": "{\"xiaozhi\":{\"startAiAgentOnBoot\":true},\"localControl\":{\"token\":\"stackchan-local-dev\"}}"
+  }
+}
+```
+
+Validate and persist the local-control token to NVS:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "local_control/set_token",
+  "params": {
+    "token": "stackchan-local-dev"
+  }
+}
+```
+
 ## Server Proxy
 
 The Go server adds authenticated proxy endpoints under the existing v2 API:
@@ -116,6 +172,15 @@ then bridges browser traffic to:
 ws://<device-ip>:8080/ws?token=stackchan-local-dev
 ```
 
+Set the backend proxy token with:
+
+```text
+STACKCHAN_CONTROL_WS_TOKEN=<control-token>
+```
+
+If `localControl.token` is changed on the device, update this backend
+environment variable to the same value before rebooting the device.
+
 The dashboard should treat these as separate states:
 
 - WiFi/control presence: whether the local control WebSocket is reachable.
@@ -123,7 +188,6 @@ The dashboard should treat these as separate states:
 
 ## Current Limitations
 
-- The firmware control token is currently compile-time configured.
 - The Go proxy only knows the device IP after a voice WebSocket connection has
   reported presence.
 - There is no TLS on the ESP32 endpoint by design; terminate TLS at the backend.

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"stackChan/internal/dao"
 	"stackChan/internal/model"
 	"strings"
@@ -23,11 +24,11 @@ import (
 )
 
 const (
-	controlWsPort       = 8080
-	controlWsPath       = "/ws"
-	controlWsToken      = "stackchan-local-dev"
-	controlPresenceTTL  = 5 * time.Minute
-	controlCloseTimeout = 2 * time.Second
+	controlWsPort         = 8080
+	controlWsPath         = "/ws"
+	controlWsDefaultToken = "stackchan-local-dev"
+	controlPresenceTTL    = 5 * time.Minute
+	controlCloseTimeout   = 2 * time.Second
 )
 
 type apiResponse struct {
@@ -193,7 +194,15 @@ func controlURL(ip string) string {
 }
 
 func deviceControlURL(ip string) string {
-	return fmt.Sprintf("%s?token=%s", controlURL(ip), url.QueryEscape(controlWsToken))
+	return fmt.Sprintf("%s?token=%s", controlURL(ip), url.QueryEscape(controlWsToken()))
+}
+
+func controlWsToken() string {
+	token := strings.TrimSpace(os.Getenv("STACKCHAN_CONTROL_WS_TOKEN"))
+	if token == "" {
+		return controlWsDefaultToken
+	}
+	return token
 }
 
 func proxyWebSocketMessages(dst *websocket.Conn, src *websocket.Conn, done chan<- error) {

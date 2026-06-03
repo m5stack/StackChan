@@ -1,7 +1,9 @@
 #include "local_control_websocket_server.h"
 
 #include "config.h"
+#include "hal_bridge.h"
 #include "mcp_server.h"
+#include "../hal.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -21,6 +23,96 @@
 
 static const char* TAG = "LocalControlWS";
 
+static std::string PrintAndDelete(cJSON* json)
+{
+    if (json == nullptr) {
+        return "{}";
+    }
+
+    char* printed = cJSON_PrintUnformatted(json);
+    std::string result = printed != nullptr ? printed : "{}";
+    if (printed != nullptr) {
+        cJSON_free(printed);
+    }
+    cJSON_Delete(json);
+    return result;
+}
+
+static cJSON* DuplicateJsonRpcId(const cJSON* payload)
+{
+    const cJSON* id = cJSON_GetObjectItem(payload, "id");
+    if (id == nullptr) {
+        return cJSON_CreateNull();
+    }
+    return cJSON_Duplicate(id, true);
+}
+
+static std::string JsonRpcResult(const cJSON* payload, cJSON* result)
+{
+    cJSON* response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
+    cJSON_AddItemToObject(response, "id", DuplicateJsonRpcId(payload));
+    cJSON_AddItemToObject(response, "result", result != nullptr ? result : cJSON_CreateObject());
+    return PrintAndDelete(response);
+}
+
+static std::string JsonRpcError(const cJSON* payload, int code, const char* message)
+{
+    cJSON* response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
+    cJSON_AddItemToObject(response, "id", DuplicateJsonRpcId(payload));
+
+    cJSON* error = cJSON_CreateObject();
+    cJSON_AddNumberToObject(error, "code", code);
+    cJSON_AddStringToObject(error, "message", message != nullptr ? message : "error");
+    cJSON_AddItemToObject(response, "error", error);
+
+    return PrintAndDelete(response);
+}
+
+static cJSON* BuildSettingsResult()
+{
+    std::string raw_settings;
+    std::string effective_settings;
+    bool exists = false;
+
+    GetHAL().withSdCard([&]() {
+        exists             = hal_bridge::read_sd_settings(raw_settings);
+        effective_settings = hal_bridge::get_effective_settings_json();
+        return true;
+    });
+
+    cJSON* result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "path", SDCARD_SETTINGS_PATH);
+    cJSON_AddBoolToObject(result, "exists", exists);
+    if (exists) {
+        cJSON_AddStringToObject(result, "raw", raw_settings.c_str());
+    }
+
+    cJSON* effective = cJSON_Parse(effective_settings.c_str());
+    if (effective != nullptr) {
+        cJSON_AddItemToObject(result, "effective", effective);
+    }
+    return result;
+}
+
+static bool ValidateTokenForNvs(const std::string& token, std::string& error_message)
+{
+    cJSON* root          = cJSON_CreateObject();
+    cJSON* local_control = cJSON_CreateObject();
+    cJSON_AddStringToObject(local_control, "token", token.c_str());
+    cJSON_AddItemToObject(root, "localControl", local_control);
+
+    char* printed = cJSON_PrintUnformatted(root);
+    std::string settings_json = printed != nullptr ? printed : "";
+    if (printed != nullptr) {
+        cJSON_free(printed);
+    }
+    cJSON_Delete(root);
+
+    return hal_bridge::validate_settings_json(settings_json, nullptr, &error_message);
+}
+
 LocalControlWebSocketServer* LocalControlWebSocketServer::instance_ = nullptr;
 
 struct QueuedWsMessage {
@@ -31,6 +123,7 @@ struct QueuedWsMessage {
 
 LocalControlWebSocketServer::LocalControlWebSocketServer()
 {
+    token_   = STACKCHAN_CONTROL_WS_TOKEN;
     instance_ = this;
 }
 
@@ -98,9 +191,17 @@ size_t LocalControlWebSocketServer::GetClientCount() const
     return clients_.size();
 }
 
+void LocalControlWebSocketServer::SetToken(std::string token)
+{
+    if (token.empty()) {
+        token = STACKCHAN_CONTROL_WS_TOKEN;
+    }
+    token_ = std::move(token);
+}
+
 bool LocalControlWebSocketServer::IsAuthorized(httpd_req_t* req) const
 {
-    const char* expected_token = STACKCHAN_CONTROL_WS_TOKEN;
+    const char* expected_token = token_.c_str();
     if (expected_token == nullptr || expected_token[0] == '\0') {
         ESP_LOGW(TAG, "control WebSocket token is empty; rejecting connection");
         return false;
@@ -108,7 +209,7 @@ bool LocalControlWebSocketServer::IsAuthorized(httpd_req_t* req) const
 
     char query[128] = {};
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        char token[96] = {};
+        char token[97] = {};
         if (httpd_query_key_value(query, "token", token, sizeof(token)) == ESP_OK &&
             std::strcmp(token, expected_token) == 0) {
             return true;
@@ -234,11 +335,91 @@ void LocalControlWebSocketServer::HandleMessage(httpd_req_t* req, const char* da
     }
 
     const int sock_fd = httpd_req_to_sockfd(req);
+    if (HandleLocalJsonRpc(req, payload)) {
+        cJSON_Delete(payload);
+        cJSON_Delete(root);
+        return;
+    }
+
     McpServer::GetInstance().ParseMessage(payload, [this, sock_fd](const std::string& response) {
         SendText(sock_fd, response);
     });
     cJSON_Delete(payload);
     cJSON_Delete(root);
+}
+
+bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJSON* payload)
+{
+    const cJSON* method = cJSON_GetObjectItem(payload, "method");
+    if (!cJSON_IsString(method)) {
+        return false;
+    }
+
+    const char* method_name = method->valuestring;
+    const cJSON* params     = cJSON_GetObjectItem(payload, "params");
+
+    if (std::strcmp(method_name, "settings/get") == 0) {
+        SendText(req, JsonRpcResult(payload, BuildSettingsResult()).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "settings/write_sd") == 0) {
+        const cJSON* settings_json = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "settings_json") : nullptr;
+        if (!cJSON_IsString(settings_json)) {
+            SendText(req, JsonRpcError(payload, -32602, "settings_json string is required").c_str());
+            return true;
+        }
+
+        std::string normalized_json;
+        std::string error_message;
+        const bool written = GetHAL().withSdCard([&]() {
+            return hal_bridge::write_sd_settings(settings_json->valuestring, &normalized_json, &error_message);
+        });
+
+        if (!written) {
+            const std::string message = "invalid settings: " + error_message;
+            SendText(req, JsonRpcError(payload, -32602, message.c_str()).c_str());
+            return true;
+        }
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "path", SDCARD_SETTINGS_PATH);
+        cJSON_AddBoolToObject(result, "written", true);
+        cJSON_AddBoolToObject(result, "reboot_required", true);
+
+        cJSON* settings = cJSON_ParseWithLength(normalized_json.data(), normalized_json.size());
+        if (settings != nullptr) {
+            cJSON_AddItemToObject(result, "settings", settings);
+        }
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "local_control/set_token") == 0) {
+        const cJSON* token = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "token") : nullptr;
+        if (!cJSON_IsString(token)) {
+            SendText(req, JsonRpcError(payload, -32602, "token string is required").c_str());
+            return true;
+        }
+
+        std::string error_message;
+        if (!ValidateTokenForNvs(token->valuestring, error_message)) {
+            const std::string message = "invalid token: " + error_message;
+            SendText(req, JsonRpcError(payload, -32602, message.c_str()).c_str());
+            return true;
+        }
+
+        hal_bridge::set_local_control_token(token->valuestring);
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "written", true);
+        cJSON_AddBoolToObject(result, "reboot_required", true);
+        cJSON_AddStringToObject(result, "source", "nvs");
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    return false;
 }
 
 void LocalControlWebSocketServer::AddClient(httpd_req_t* req)
