@@ -1,8 +1,8 @@
 diff --git a/main/application.cc b/main/application.cc
-index d69d43d..3b6f07e 100644
+index d54ac6b..47f71dd 100644
 --- a/main/application.cc
 +++ b/main/application.cc
-@@ -610,33 +610,36 @@ void Application::InitializeProtocol() {
+@@ -610,33 +610,8 @@ void Application::InitializeProtocol() {
  }
  
  void Application::ShowActivationCode(const std::string& code, const std::string& message) {
@@ -33,55 +33,30 @@ index d69d43d..3b6f07e 100644
 -            audio_service_.PlaySound(it->sound);
 -        }
 -    }
-+    // struct digit_sound {
-+    //     char digit;
-+    //     const std::string_view& sound;
-+    // };
-+    // static const std::array<digit_sound, 10> digit_sounds{{
-+    //     digit_sound{'0', Lang::Sounds::OGG_0},
-+    //     digit_sound{'1', Lang::Sounds::OGG_1}, 
-+    //     digit_sound{'2', Lang::Sounds::OGG_2},
-+    //     digit_sound{'3', Lang::Sounds::OGG_3},
-+    //     digit_sound{'4', Lang::Sounds::OGG_4},
-+    //     digit_sound{'5', Lang::Sounds::OGG_5},
-+    //     digit_sound{'6', Lang::Sounds::OGG_6},
-+    //     digit_sound{'7', Lang::Sounds::OGG_7},
-+    //     digit_sound{'8', Lang::Sounds::OGG_8},
-+    //     digit_sound{'9', Lang::Sounds::OGG_9}
-+    // }};
-+
-+    // // This sentence uses 9KB of SRAM, so we need to wait for it to finish
-+    // Alert(Lang::Strings::ACTIVATION, message.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
-+
-+    // for (const auto& digit : code) {
-+    //     auto it = std::find_if(digit_sounds.begin(), digit_sounds.end(),
-+    //         [digit](const digit_sound& ds) { return ds.digit == digit; });
-+    //     if (it != digit_sounds.end()) {
-+    //         audio_service_.PlaySound(it->sound);
-+    //     }
-+    // }
-+
 +    auto display = Board::GetInstance().GetDisplay();
 +    display->SetChatMessage("system", "Please bind and set up in the mobile app.");
  }
  
  void Application::Alert(const char* status, const char* message, const char* emotion, const std::string_view& sound) {
+@@ -1128,4 +1103,3 @@ void Application::ResetProtocol() {
+         protocol_.reset();
+     });
+ }
+-
 diff --git a/main/assets.cc b/main/assets.cc
-index ad61944..6b84daf 100644
+index 93e9521..27ed643 100644
 --- a/main/assets.cc
 +++ b/main/assets.cc
-@@ -3,8 +3,8 @@
+@@ -3,8 +3,6 @@
  #include "display.h"
  #include "application.h"
  #include "lvgl_theme.h"
 -#include "emote_display.h"
 -#include "expression_emote.h"
-+// #include "emote_display.h"
-+// #include "expression_emote.h"
  #if HAVE_LVGL
  #include "display/lcd_display.h"
  #include <spi_flash_mmap.h>
-@@ -356,72 +356,72 @@ bool Assets::LvglStrategy::Apply(Assets* assets) {
+@@ -358,73 +356,6 @@ bool Assets::LvglStrategy::Apply(Assets* assets, bool refresh_display_theme) {
  }
  #endif // HAVE_LVGL
  
@@ -140,7 +115,7 @@ index ad61944..6b84daf 100644
 -    return false;
 -}
 -
--bool Assets::EmoteStrategy::Apply(Assets* assets) {
+-bool Assets::EmoteStrategy::Apply(Assets* assets, bool refresh_display_theme) {
 -    Assets::LoadSrmodelsFromIndex(assets);
 -
 -    auto display = Board::GetInstance().GetDisplay();
@@ -151,114 +126,51 @@ index ad61944..6b84daf 100644
 -    }
 -    return true;
 -}
-+// bool Assets::EmoteStrategy::InitializePartition(Assets* assets) {
-+//     assets->partition_valid_ = false;
-+
-+//     if (!Assets::FindPartition(assets)) {
-+//         return false;
-+//     }
-+
-+//     esp_err_t ret = ESP_ERR_INVALID_STATE;
-+//     auto display = Board::GetInstance().GetDisplay();
-+//     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
-+//     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
-+//         const emote_data_t data = {
-+//             .type = EMOTE_SOURCE_PARTITION,
-+//             .source = {
-+//                 .partition_label = PARTITION_LABEL,
-+//             },
-+//             .flags = {
-+//                 .mmap_enable = true, //must be true here!!!
-+//             },
-+//         };
-+//         ret = emote_mount_assets(emote_display->GetEmoteHandle(), &data);
-+//     } else {
-+//         ESP_LOGE(TAG, "Emote display is not initialized");
-+//     }
-+//     assets->partition_valid_ = ((ret == ESP_OK) ? true : false);
-+//     return assets->partition_valid_;
-+// }
-+
-+// void Assets::EmoteStrategy::UnApplyPartition(Assets* assets) {
-+//     auto display = Board::GetInstance().GetDisplay();
-+//     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
-+//     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
-+//         emote_unmount_assets(emote_display->GetEmoteHandle());
-+//     }
-+//     (void)assets; // Unused parameter
-+// }
-+
-+// bool Assets::EmoteStrategy::GetAssetData(Assets* assets, const std::string& name, void*& ptr, size_t& size) {
-+//     auto display = Board::GetInstance().GetDisplay();
-+//     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
-+//     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
-+//         const uint8_t* data = nullptr;
-+//         size_t data_size = 0;
-+//         if (ESP_OK == emote_get_asset_data_by_name(emote_display->GetEmoteHandle(), name.c_str(), &data, &data_size)) {
-+//             ptr = const_cast<void*>(static_cast<const void*>(data));
-+//             size = data_size;
-+//             return true;
-+//         }
-+//         ESP_LOGE(TAG, "Failed to get asset data by name: %s", name.c_str());
-+//         return false;
-+//     }
-+//     (void)assets; // Unused parameter
-+//     return false;
-+// }
-+
-+// bool Assets::EmoteStrategy::Apply(Assets* assets) {
-+//     Assets::LoadSrmodelsFromIndex(assets);
-+
-+//     auto display = Board::GetInstance().GetDisplay();
-+//     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
-+
-+//     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
-+//         emote_load_assets(emote_display->GetEmoteHandle());
-+//     }
-+//     return true;
-+// }
- 
+-
  bool Assets::Download(std::string url, std::function<void(int progress, size_t speed)> progress_callback) {
      ESP_LOGI(TAG, "Downloading new version of assets from %s", url.c_str());
+ 
+@@ -612,4 +543,4 @@ bool Assets::Download(std::string url, std::function<void(int progress, size_t s
+     }
+ 
+     return true;
+-}
+\ No newline at end of file
++}
 diff --git a/main/assets.h b/main/assets.h
-index 3692e0c..7bfbc5c 100644
+index 2c1b7a1..eb9bad3 100644
 --- a/main/assets.h
 +++ b/main/assets.h
-@@ -68,13 +68,13 @@ private:
+@@ -68,14 +68,6 @@ private:
          bool checksum_valid_ = false;
      };
      
 -    class EmoteStrategy : public AssetStrategy {
 -    public:
--        bool Apply(Assets* assets) override;
+-        bool Apply(Assets* assets, bool refresh_display_theme = true) override;
 -        bool InitializePartition(Assets* assets) override;
 -        void UnApplyPartition(Assets* assets) override;
 -        bool GetAssetData(Assets* assets, const std::string& name, void*& ptr, size_t& size) override;
 -    };
-+    // class EmoteStrategy : public AssetStrategy {
-+    // public:
-+    //     bool Apply(Assets* assets) override;
-+    //     bool InitializePartition(Assets* assets) override;
-+    //     void UnApplyPartition(Assets* assets) override;
-+    //     bool GetAssetData(Assets* assets, const std::string& name, void*& ptr, size_t& size) override;
-+    // };
-     
+-    
      // Strategy instance
      std::unique_ptr<AssetStrategy> strategy_;
+ 
 diff --git a/main/boards/common/i2c_device.cc b/main/boards/common/i2c_device.cc
-index 835997d..ea50d51 100644
+index 835997d..d957b70 100644
 --- a/main/boards/common/i2c_device.cc
 +++ b/main/boards/common/i2c_device.cc
 @@ -32,4 +32,8 @@ uint8_t I2cDevice::ReadReg(uint8_t reg) {
  
  void I2cDevice::ReadRegs(uint8_t reg, uint8_t* buffer, size_t length) {
      ESP_ERROR_CHECK(i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, 100));
+-}
+\ No newline at end of file
 +}
 +
 +esp_err_t I2cDevice::TryReadRegs(uint8_t reg, uint8_t* buffer, size_t length, int timeout_ms) {
 +    return i2c_master_transmit_receive(i2c_device_, &reg, 1, buffer, length, timeout_ms);
- }
-\ No newline at end of file
++}
 diff --git a/main/boards/common/i2c_device.h b/main/boards/common/i2c_device.h
 index 7bc917b..874b137 100644
 --- a/main/boards/common/i2c_device.h
@@ -271,3 +183,16 @@ index 7bc917b..874b137 100644
  };
  
  #endif // I2C_DEVICE_H
+diff --git a/main/boards/common/nt26_board.cc b/main/boards/common/nt26_board.cc
+index f239cdf..8ca55e5 100644
+--- a/main/boards/common/nt26_board.cc
++++ b/main/boards/common/nt26_board.cc
+@@ -110,8 +110,6 @@ void Nt26Board::StartNetwork() {
+             case UartEthModem::UartEthModemEvent::InFlightMode:
+                 ESP_LOGW(TAG, "Modem in flight mode");
+                 break;
+-            case UartEthModem::UartEthModemEvent::RequestingPdpContext:
+-                break;
+         }
+     });
+ 

@@ -51,6 +51,9 @@ func V2TokenAuthMiddleware(r *ghttp.Request) {
 		return
 	}
 	tokenString := r.Header.Get("token")
+	if tokenString == "" && strings.HasPrefix(r.URL.Path, "/stackChan/v2/device/control/ws") {
+		tokenString = r.Get("token").String()
+	}
 	if tokenString == "" {
 		r.Response.WriteJsonExit(gerror.NewCode(gcode.CodeNotAuthorized, "The token cannot be empty."))
 	}

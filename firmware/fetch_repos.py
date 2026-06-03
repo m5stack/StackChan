@@ -11,10 +11,19 @@ def clone_or_update_repo(
     if not os.path.exists(path):
         subprocess.run(["git", "clone", repo_url, path], check=True)
     else:
+        subprocess.run(["git", "-C", path, "remote", "set-url", "origin", repo_url], check=True)
         subprocess.run(["git", "-C", path, "fetch"], check=True)
 
     if ref:
-        subprocess.run(["git", "-C", path, "checkout", ref], check=True)
+        remote_ref = f"origin/{ref}"
+        remote_branch = subprocess.run(
+            ["git", "-C", path, "rev-parse", "--verify", "--quiet", remote_ref]
+        )
+        if remote_branch.returncode == 0:
+            subprocess.run(["git", "-C", path, "checkout", ref], check=True)
+            subprocess.run(["git", "-C", path, "pull", "--ff-only"], check=True)
+        else:
+            subprocess.run(["git", "-C", path, "checkout", ref], check=True)
 
     if with_submodules:
         subprocess.run(

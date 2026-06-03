@@ -24,6 +24,10 @@ The **factory firmware** is feature-rich, including an AI Agent, lively and expr
 
 - Board support package: https://github.com/m5stack/StackChan-BSP
 
+## Developer Notes
+
+- [Local control WebSocket API](docs/local-control-websocket.md)
+
 Thank you to the contributors of the StackChan community, especially: 
 
 | ![](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/avatar_stack_chan.jpg) | ![](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/avatar_takao.jpg) |

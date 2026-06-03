@@ -7,6 +7,7 @@
 #include "power_save_timer.h"
 #include "i2c_device.h"
 #include "axp2101.h"
+#include "local_control_websocket_server.h"
 #include "settings.h"
 #include "stackchan_panel_io_spi_shared_dc.h"
 
@@ -22,6 +23,7 @@
 #include <driver/sdspi_host.h>
 #include <dirent.h>
 #include <algorithm>
+#include <utility>
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
 
@@ -248,6 +250,7 @@ private:
     Ft6336* ft6336_;
     LvglDisplay* display_;
     StackChanCamera* camera_;
+    LocalControlWebSocketServer* control_ws_server_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     PowerSaveTimer* power_save_timer_;
     hal_bridge::XiaozhiConfig_t xiaozhi_config_;
@@ -307,12 +310,36 @@ private:
         UpdatePowerSaveEnabled(pmic_->IsExternalPowerConnected(), pmic_->IsDischarging());
     }
 
+    void StartControlWebSocketServer()
+    {
+        if (control_ws_server_ != nullptr && control_ws_server_->IsRunning()) {
+            return;
+        }
+
+        if (control_ws_server_ == nullptr) {
+            control_ws_server_ = new LocalControlWebSocketServer();
+        }
+
+        if (!control_ws_server_->Start(STACKCHAN_CONTROL_WS_PORT)) {
+            delete control_ws_server_;
+            control_ws_server_ = nullptr;
+        }
+    }
+
+    void StopControlWebSocketServer()
+    {
+        if (control_ws_server_ != nullptr) {
+            control_ws_server_->Stop();
+        }
+    }
+
     void InitializePowerSaveTimer()
     {
         xiaozhi_config_ = hal_bridge::get_xiaozhi_config();
         // Boot-time SD settings load is allowed here because the card is mounted
         // before LCD init. Runtime /sdcard access must use GetHAL().withSdCard().
         hal_bridge::apply_xiaozhi_config_sd_overrides(xiaozhi_config_);
+        hal_bridge::set_boot_xiaozhi_config(xiaozhi_config_);
 
         const int seconds_to_shutdown = xiaozhi_config_.idleShutdownTimeSeconds > 0
                                             ? static_cast<int>(xiaozhi_config_.idleShutdownTimeSeconds)
@@ -575,6 +602,22 @@ public:
         InitializeCamera();
         InitializeFt6336TouchPad();
         GetBacklight()->RestoreBrightness();
+    }
+
+    virtual void SetNetworkEventCallback(NetworkEventCallback callback) override
+    {
+        WifiBoard::SetNetworkEventCallback([this, callback = std::move(callback)](NetworkEvent event,
+                                                                                  const std::string& data) mutable {
+            if (event == NetworkEvent::Connected) {
+                StartControlWebSocketServer();
+            } else if (event == NetworkEvent::Disconnected || event == NetworkEvent::WifiConfigModeEnter) {
+                StopControlWebSocketServer();
+            }
+
+            if (callback) {
+                callback(event, data);
+            }
+        });
     }
 
     virtual AudioCodec* GetAudioCodec() override

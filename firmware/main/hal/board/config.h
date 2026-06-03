@@ -47,6 +47,9 @@
 #define SDCARD_MOUNT_POINT "/sdcard"
 #define SDCARD_SETTINGS_PATH SDCARD_MOUNT_POINT "/stackchan/settings.json"
 
+#define STACKCHAN_CONTROL_WS_PORT 8080
+#define STACKCHAN_CONTROL_WS_TOKEN "stackchan-local-dev"
+
 
 
 /* Camera pins */

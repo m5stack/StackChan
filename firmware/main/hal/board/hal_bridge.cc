@@ -33,6 +33,8 @@ static constexpr std::string_view _xiaozhi_config_idle_random_movement_key      
 static constexpr std::string_view _xiaozhi_config_start_ai_agent_on_boot_key       = "boot_ai";
 
 static const char* _tag = "HAL_BRIDGE";
+static bool _boot_xiaozhi_config_loaded = false;
+static hal_bridge::XiaozhiConfig_t _boot_xiaozhi_config;
 
 static bool read_sd_settings_file(std::string& contents)
 {
@@ -262,6 +264,22 @@ bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config)
 
     cJSON_Delete(root);
     ESP_LOGI(_tag, "applied SD settings overrides from %s", SDCARD_SETTINGS_PATH);
+    return true;
+}
+
+void set_boot_xiaozhi_config(const XiaozhiConfig_t& config)
+{
+    _boot_xiaozhi_config        = config;
+    _boot_xiaozhi_config_loaded = true;
+}
+
+bool get_boot_xiaozhi_config(XiaozhiConfig_t& config)
+{
+    if (!_boot_xiaozhi_config_loaded) {
+        return false;
+    }
+
+    config = _boot_xiaozhi_config;
     return true;
 }
 

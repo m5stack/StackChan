@@ -54,6 +54,8 @@ bool is_xiaozhi_idle();
 XiaozhiConfig_t get_xiaozhi_config();
 void set_xiaozhi_config(const XiaozhiConfig_t& config);
 bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config);
+void set_boot_xiaozhi_config(const XiaozhiConfig_t& config);
+bool get_boot_xiaozhi_config(XiaozhiConfig_t& config);
 
 i2c_master_bus_handle_t board_get_i2c_bus();
 StackChanCamera* board_get_camera();

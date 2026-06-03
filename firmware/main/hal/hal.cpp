@@ -208,10 +208,13 @@ XiaozhiConfig_t Hal::getXiaozhiConfig()
         return _xiaozhi_config_cache;
     }
 
-    auto bridge_config = hal_bridge::get_xiaozhi_config();
-    withSdCard([&]() {
-        hal_bridge::apply_xiaozhi_config_sd_overrides(bridge_config);
-    });
+    hal_bridge::XiaozhiConfig_t bridge_config;
+    if (!hal_bridge::get_boot_xiaozhi_config(bridge_config)) {
+        bridge_config = hal_bridge::get_xiaozhi_config();
+        withSdCard([&]() {
+            hal_bridge::apply_xiaozhi_config_sd_overrides(bridge_config);
+        });
+    }
 
     _xiaozhi_config_cache = XiaozhiConfig_t{
         .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,

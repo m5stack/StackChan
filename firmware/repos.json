@@ -15,9 +15,9 @@
         "branch": "v2.12.0"
     },
     {
-        "url": "https://github.com/78/xiaozhi-esp32.git",
+        "url": "https://github.com/unixtreme/xiaozhi-esp32.git",
         "path": "xiaozhi-esp32",
-        "branch": "v2.2.4",
+        "branch": "d9d223c8dc057f03582b7a5e24cabaf0d8d1e850",
         "patch": "patches/xiaozhi-esp32.patch"
     },
     {
