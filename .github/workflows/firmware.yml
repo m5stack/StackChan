@@ -1,0 +1,81 @@
+name: Firmware
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/firmware.yml"
+      - "firmware/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build StackChan firmware
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:release-v5.5
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch firmware dependencies
+        run: |
+          source /opt/esp/idf/export.sh
+          cd firmware
+          python fetch_repos.py
+
+      - name: Build firmware
+        run: |
+          source /opt/esp/idf/export.sh
+          cd firmware
+          idf.py build
+
+      - name: Stage firmware artifact
+        id: stage
+        run: |
+          set -euo pipefail
+
+          firmware_datetime="$(date -u +'%Y%m%d-%H%M%S')"
+          artifact_dir="firmware-artifacts/stackchan-firmware-${firmware_datetime}"
+
+          mkdir -p "${artifact_dir}/bootloader" "${artifact_dir}/partition_table"
+          cp firmware/build/stack-chan.bin "${artifact_dir}/stack-chan.bin"
+          cp firmware/build/stack-chan.bin "${artifact_dir}/stackchan-firmware-${firmware_datetime}.bin"
+          cp firmware/build/bootloader/bootloader.bin "${artifact_dir}/bootloader/bootloader.bin"
+          cp firmware/build/partition_table/partition-table.bin "${artifact_dir}/partition_table/partition-table.bin"
+          cp firmware/build/ota_data_initial.bin "${artifact_dir}/ota_data_initial.bin"
+          cp firmware/build/generated_assets.bin "${artifact_dir}/generated_assets.bin"
+          cp firmware/build/flash_args "${artifact_dir}/flash_args"
+          cp firmware/build/flasher_args.json "${artifact_dir}/flasher_args.json"
+
+          printf '%s\n' \
+            'StackChan firmware flash bundle' \
+            '' \
+            'Install esptool:' \
+            '  python -m pip install esptool' \
+            '' \
+            'Flash from this directory:' \
+            '  python -m esptool --chip esp32s3 -p /dev/ttyACM0 -b 460800 --before default_reset --after hard_reset write_flash @flash_args' \
+            '' \
+            'Replace /dev/ttyACM0 with your serial port if needed.' \
+            > "${artifact_dir}/FLASHING.txt"
+
+          (cd "${artifact_dir}" && sha256sum stack-chan.bin stackchan-firmware-${firmware_datetime}.bin bootloader/bootloader.bin partition_table/partition-table.bin ota_data_initial.bin generated_assets.bin flash_args flasher_args.json FLASHING.txt > SHA256SUMS)
+
+          {
+            echo "artifact_name=stackchan-firmware-${firmware_datetime}"
+            echo "artifact_dir=${artifact_dir}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.stage.outputs.artifact_name }}
+          path: ${{ steps.stage.outputs.artifact_dir }}
+          if-no-files-found: error
