@@ -4,6 +4,7 @@
 #include "hal_bridge.h"
 #include "mcp_server.h"
 #include "../hal.h"
+#include "../../../xiaozhi-esp32/main/settings.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -139,7 +140,9 @@ static bool IsLocalControlMethod(const char* method_name)
         return false;
     }
     return std::strcmp(method_name, "settings/get") == 0 || std::strcmp(method_name, "settings/write_sd") == 0 ||
-           std::strcmp(method_name, "local_control/set_token") == 0;
+           std::strcmp(method_name, "local_control/set_token") == 0 || std::strcmp(method_name, "voice/get_config") == 0 ||
+           std::strcmp(method_name, "voice.get_config") == 0 || std::strcmp(method_name, "voice/set_config") == 0 ||
+           std::strcmp(method_name, "voice.set_config") == 0;
 }
 
 static std::string PrintAndDelete(cJSON* json)
@@ -215,6 +218,64 @@ static cJSON* BuildSettingsResult()
     return result;
 }
 
+static std::string PreviewSecret(const std::string& value)
+{
+    if (value.empty()) {
+        return "";
+    }
+    if (value.size() < 8) {
+        return "<set>";
+    }
+    return value.substr(0, 4) + "..." + value.substr(value.size() - 4);
+}
+
+static cJSON* BuildVoiceTransportResult()
+{
+    Settings websocket_settings("websocket", false);
+    const std::string websocket_url = websocket_settings.GetString("url");
+    const std::string websocket_token = websocket_settings.GetString("token");
+    const int websocket_version = websocket_settings.GetInt("version");
+
+    Settings mqtt_settings("mqtt", false);
+    const std::string mqtt_endpoint = mqtt_settings.GetString("endpoint");
+    const std::string mqtt_client_id = mqtt_settings.GetString("client_id");
+    const std::string mqtt_username = mqtt_settings.GetString("username");
+    const std::string mqtt_password = mqtt_settings.GetString("password");
+    const std::string mqtt_publish_topic = mqtt_settings.GetString("publish_topic");
+    const int mqtt_keepalive = mqtt_settings.GetInt("keepalive");
+
+    const bool has_mqtt_config = !mqtt_endpoint.empty();
+    const bool has_websocket_config = !websocket_url.empty() && !websocket_token.empty();
+    const char* selected_protocol = has_websocket_config ? "websocket" : "websocket-required";
+
+    cJSON* result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "selected_protocol", selected_protocol);
+    cJSON_AddBoolToObject(result, "has_mqtt_config", has_mqtt_config);
+    cJSON_AddBoolToObject(result, "has_websocket_config", has_websocket_config);
+
+    cJSON* websocket = cJSON_CreateObject();
+    cJSON_AddStringToObject(websocket, "url", websocket_url.c_str());
+    cJSON_AddBoolToObject(websocket, "url_present", !websocket_url.empty());
+    cJSON_AddBoolToObject(websocket, "token_present", !websocket_token.empty());
+    cJSON_AddStringToObject(websocket, "token_preview", PreviewSecret(websocket_token).c_str());
+    cJSON_AddNumberToObject(websocket, "version", websocket_version);
+    cJSON_AddBoolToObject(websocket, "configured", has_websocket_config);
+    cJSON_AddItemToObject(result, "websocket", websocket);
+
+    cJSON* mqtt = cJSON_CreateObject();
+    cJSON_AddStringToObject(mqtt, "endpoint", mqtt_endpoint.c_str());
+    cJSON_AddBoolToObject(mqtt, "endpoint_present", !mqtt_endpoint.empty());
+    cJSON_AddStringToObject(mqtt, "client_id", mqtt_client_id.c_str());
+    cJSON_AddBoolToObject(mqtt, "username_present", !mqtt_username.empty());
+    cJSON_AddBoolToObject(mqtt, "password_present", !mqtt_password.empty());
+    cJSON_AddStringToObject(mqtt, "publish_topic", mqtt_publish_topic.c_str());
+    cJSON_AddNumberToObject(mqtt, "keepalive", mqtt_keepalive);
+    cJSON_AddBoolToObject(mqtt, "configured", has_mqtt_config);
+    cJSON_AddItemToObject(result, "mqtt", mqtt);
+
+    return result;
+}
+
 static bool ValidateTokenForNvs(const std::string& token, std::string& error_message)
 {
     cJSON* root          = cJSON_CreateObject();
@@ -230,6 +291,11 @@ static bool ValidateTokenForNvs(const std::string& token, std::string& error_mes
     cJSON_Delete(root);
 
     return hal_bridge::validate_settings_json(settings_json, nullptr, &error_message);
+}
+
+static bool IsValidVoiceWebsocketUrl(const std::string& url)
+{
+    return url.rfind("ws://", 0) == 0 || url.rfind("wss://", 0) == 0;
 }
 
 LocalControlWebSocketServer* LocalControlWebSocketServer::instance_ = nullptr;
@@ -593,6 +659,48 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
 
     if (std::strcmp(method_name, "settings/get") == 0) {
         SendText(req, JsonRpcResult(payload, BuildSettingsResult()).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "voice/get_config") == 0 || std::strcmp(method_name, "voice.get_config") == 0) {
+        SendText(req, JsonRpcResult(payload, BuildVoiceTransportResult()).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "voice/set_config") == 0 || std::strcmp(method_name, "voice.set_config") == 0) {
+        const cJSON* url = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "url") : nullptr;
+        const cJSON* token = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "token") : nullptr;
+        const cJSON* version = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "version") : nullptr;
+
+        if (!cJSON_IsString(url) || !cJSON_IsString(token)) {
+            SendText(req, JsonRpcError(payload, -32602, "url and token strings are required").c_str());
+            return true;
+        }
+
+        const std::string url_value = url->valuestring;
+        const std::string token_value = token->valuestring;
+        const int version_value = cJSON_IsNumber(version) ? version->valueint : 1;
+
+        if (!IsValidVoiceWebsocketUrl(url_value)) {
+            SendText(req, JsonRpcError(payload, -32602, "url must start with ws:// or wss://").c_str());
+            return true;
+        }
+        if (token_value.empty()) {
+            SendText(req, JsonRpcError(payload, -32602, "token must not be empty").c_str());
+            return true;
+        }
+
+        Settings websocket_settings("websocket", true);
+        websocket_settings.SetString("url", url_value);
+        websocket_settings.SetString("token", token_value);
+        websocket_settings.SetInt("version", version_value);
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "written", true);
+        cJSON_AddBoolToObject(result, "reboot_required", false);
+        cJSON_AddStringToObject(result, "source", "nvs");
+        cJSON_AddItemToObject(result, "config", BuildVoiceTransportResult());
+        SendText(req, JsonRpcResult(payload, result).c_str());
         return true;
     }
 
