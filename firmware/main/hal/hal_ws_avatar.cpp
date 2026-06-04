@@ -30,6 +30,28 @@ static std::string _tag = "WS-Avatar";
 
 static const std::string _setting_ns              = "stackchan";
 static const std::string _setting_device_name_key = "device_name";
+static const std::string _websocket_setting_ns    = "websocket";
+static const std::string _websocket_url_key       = "url";
+static const std::string _websocket_token_key     = "token";
+
+struct VoiceWebsocketConfig {
+    std::string url;
+    std::string token;
+
+    bool isConfigured() const
+    {
+        return !url.empty() && !token.empty();
+    }
+};
+
+static VoiceWebsocketConfig load_voice_websocket_config()
+{
+    Settings settings(_websocket_setting_ns, false);
+    return {
+        .url   = settings.GetString(_websocket_url_key),
+        .token = settings.GetString(_websocket_token_key),
+    };
+}
 
 class WebSocketAvatar {
 public:
@@ -63,7 +85,16 @@ public:
 
     void init()
     {
-        _url = fmt::format("{}/stackChan/ws?deviceType=StackChan", secret_logic::get_server_url());
+        auto config = load_voice_websocket_config();
+        if (config.isConfigured()) {
+            _url   = std::move(config.url);
+            _token = std::move(config.token);
+            mclog::tagInfo(_tag, "using locally configured voice websocket transport");
+        } else {
+            _url   = fmt::format("{}/stackChan/ws?deviceType=StackChan", secret_logic::get_server_url());
+            _token = secret_logic::generate_auth_token();
+            mclog::tagInfo(_tag, "using default upstream websocket transport");
+        }
 
         connect();
 
@@ -97,8 +128,6 @@ public:
 
     void connect()
     {
-        auto token = secret_logic::generate_auth_token();
-
         // 销毁旧实例，确保状态复位
         _websocket.reset();
 
@@ -114,7 +143,7 @@ public:
         }
 
         // 设置认证头
-        _websocket->SetHeader("Authorization", token.c_str());
+        _websocket->SetHeader("Authorization", _token.c_str());
 
         // 设置回调
         _websocket->OnConnected([this]() {
@@ -427,6 +456,7 @@ public:
 private:
     std::unique_ptr<WebSocket> _websocket;
     std::string _url;
+    std::string _token;
     uint32_t _last_reconnect_attempt = 0;
     uint32_t _last_capture_time      = 0;
     uint32_t _last_heartbeat_time    = 0;
