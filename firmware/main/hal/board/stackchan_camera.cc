@@ -20,7 +20,7 @@
 #include "jpg/image_to_jpeg.h"
 #include "jpg/jpeg_to_image.h"
 #include "lvgl_display.h"
-#include "mcp_server.h"
+#include "mcp/server.h"
 #include "system_info.h"
 
 // #include "application.h"

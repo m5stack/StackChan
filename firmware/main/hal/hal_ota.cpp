@@ -18,6 +18,11 @@ bool Hal::updateFirmware(std::function<void(std::string_view)> onLog)
     Ota ota;
     esp_err_t err = ota.CheckVersion();
     if (err != ESP_OK) {
+        if (err == ESP_ERR_NOT_FOUND) {
+            mclog::tagWarn(_tag, "firmware update skipped: ota url not configured");
+            onLog("OTA URL not configured");
+            return false;
+        }
         mclog::tagError(_tag, "failed to check firmware version: {}", esp_err_to_name(err));
         onLog("Failed to check firmware updates");
         return false;

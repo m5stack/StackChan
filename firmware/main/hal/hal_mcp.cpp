@@ -5,7 +5,7 @@
  */
 #include "hal.h"
 #include <mooncake_log.h>
-#include <mcp_server.h>
+#include <mcp/server.h>
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
 

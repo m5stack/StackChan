@@ -2,9 +2,10 @@
 
 #include "config.h"
 #include "hal_bridge.h"
-#include "mcp_server.h"
+#include "mcp/server.h"
+#include "application.h"
+#include "settings.h"
 #include "../hal.h"
-#include "../../../xiaozhi-esp32/main/settings.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -109,7 +110,7 @@ static bool IsValidPrincipal(const char* principal)
     if (principal == nullptr) {
         return false;
     }
-    return std::strcmp(principal, "dashboard") == 0 || std::strcmp(principal, "backend_control") == 0 ||
+    return std::strcmp(principal, "dashboard") == 0 || std::strcmp(principal, "admin") == 0 ||
            std::strcmp(principal, "mcp_bridge") == 0 || std::strcmp(principal, "voice_bridge") == 0;
 }
 
@@ -142,7 +143,9 @@ static bool IsLocalControlMethod(const char* method_name)
     return std::strcmp(method_name, "settings/get") == 0 || std::strcmp(method_name, "settings/write_sd") == 0 ||
            std::strcmp(method_name, "local_control/set_token") == 0 || std::strcmp(method_name, "voice/get_config") == 0 ||
            std::strcmp(method_name, "voice.get_config") == 0 || std::strcmp(method_name, "voice/set_config") == 0 ||
-           std::strcmp(method_name, "voice.set_config") == 0;
+           std::strcmp(method_name, "voice.set_config") == 0 ||
+           std::strcmp(method_name, "voice/start_listening") == 0 || std::strcmp(method_name, "voice.start_listening") == 0 ||
+           std::strcmp(method_name, "voice/stop_listening") == 0 || std::strcmp(method_name, "voice.stop_listening") == 0;
 }
 
 static std::string PrintAndDelete(cJSON* json)
@@ -236,21 +239,11 @@ static cJSON* BuildVoiceTransportResult()
     const std::string websocket_token = websocket_settings.GetString("token");
     const int websocket_version = websocket_settings.GetInt("version");
 
-    Settings mqtt_settings("mqtt", false);
-    const std::string mqtt_endpoint = mqtt_settings.GetString("endpoint");
-    const std::string mqtt_client_id = mqtt_settings.GetString("client_id");
-    const std::string mqtt_username = mqtt_settings.GetString("username");
-    const std::string mqtt_password = mqtt_settings.GetString("password");
-    const std::string mqtt_publish_topic = mqtt_settings.GetString("publish_topic");
-    const int mqtt_keepalive = mqtt_settings.GetInt("keepalive");
-
-    const bool has_mqtt_config = !mqtt_endpoint.empty();
     const bool has_websocket_config = !websocket_url.empty() && !websocket_token.empty();
     const char* selected_protocol = has_websocket_config ? "websocket" : "websocket-required";
 
     cJSON* result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "selected_protocol", selected_protocol);
-    cJSON_AddBoolToObject(result, "has_mqtt_config", has_mqtt_config);
     cJSON_AddBoolToObject(result, "has_websocket_config", has_websocket_config);
 
     cJSON* websocket = cJSON_CreateObject();
@@ -261,17 +254,6 @@ static cJSON* BuildVoiceTransportResult()
     cJSON_AddNumberToObject(websocket, "version", websocket_version);
     cJSON_AddBoolToObject(websocket, "configured", has_websocket_config);
     cJSON_AddItemToObject(result, "websocket", websocket);
-
-    cJSON* mqtt = cJSON_CreateObject();
-    cJSON_AddStringToObject(mqtt, "endpoint", mqtt_endpoint.c_str());
-    cJSON_AddBoolToObject(mqtt, "endpoint_present", !mqtt_endpoint.empty());
-    cJSON_AddStringToObject(mqtt, "client_id", mqtt_client_id.c_str());
-    cJSON_AddBoolToObject(mqtt, "username_present", !mqtt_username.empty());
-    cJSON_AddBoolToObject(mqtt, "password_present", !mqtt_password.empty());
-    cJSON_AddStringToObject(mqtt, "publish_topic", mqtt_publish_topic.c_str());
-    cJSON_AddNumberToObject(mqtt, "keepalive", mqtt_keepalive);
-    cJSON_AddBoolToObject(mqtt, "configured", has_mqtt_config);
-    cJSON_AddItemToObject(result, "mqtt", mqtt);
 
     return result;
 }
@@ -546,7 +528,7 @@ bool LocalControlWebSocketServer::HandleAuthJsonRpc(httpd_req_t* req, const cJSO
 
         cJSON* principals = cJSON_CreateArray();
         cJSON_AddItemToArray(principals, cJSON_CreateString("dashboard"));
-        cJSON_AddItemToArray(principals, cJSON_CreateString("backend_control"));
+        cJSON_AddItemToArray(principals, cJSON_CreateString("admin"));
         cJSON_AddItemToArray(principals, cJSON_CreateString("mcp_bridge"));
         cJSON_AddItemToArray(principals, cJSON_CreateString("voice_bridge"));
         cJSON_AddItemToObject(result, "principals", principals);
@@ -629,12 +611,12 @@ bool LocalControlWebSocketServer::IsClientSessionAuthorized(int sock_fd, const c
 bool LocalControlWebSocketServer::IsPrincipalAllowedLocalMethod(const std::string& principal, const char* method_name) const
 {
     (void)method_name;
-    return principal == "dashboard" || principal == "backend_control";
+    return principal == "dashboard" || principal == "admin";
 }
 
 bool LocalControlWebSocketServer::IsPrincipalAllowedMcp(const std::string& principal) const
 {
-    return principal == "dashboard" || principal == "backend_control" || principal == "mcp_bridge";
+    return principal == "dashboard" || principal == "admin" || principal == "mcp_bridge";
 }
 
 bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJSON* payload)
@@ -700,6 +682,26 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
         cJSON_AddBoolToObject(result, "reboot_required", false);
         cJSON_AddStringToObject(result, "source", "nvs");
         cJSON_AddItemToObject(result, "config", BuildVoiceTransportResult());
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "voice/start_listening") == 0 ||
+        std::strcmp(method_name, "voice.start_listening") == 0) {
+        Application::GetInstance().StartListening();
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "requested", true);
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "voice/stop_listening") == 0 ||
+        std::strcmp(method_name, "voice.stop_listening") == 0) {
+        Application::GetInstance().StopListening();
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "requested", true);
         SendText(req, JsonRpcResult(payload, result).c_str());
         return true;
     }
