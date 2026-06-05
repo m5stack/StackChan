@@ -1,0 +1,894 @@
+{
+  "generated": {
+    "local_control_markdown": "docs/generated/local-control-websocket.md",
+    "mcp_tools_fixture": "docs/api/fixtures/tools-list.stackchan.json",
+    "mcp_tools_markdown": "docs/generated/mcp-tools.md",
+    "source_metadata": "docs/api/local-control.methods.json",
+    "voice_messages_metadata": "docs/api/voice-websocket.messages.json",
+    "voice_websocket_markdown": "docs/generated/voice-websocket.md"
+  },
+  "local_control_methods": [
+    {
+      "aliases": [],
+      "auth": {
+        "principals": [],
+        "required": false
+      },
+      "name": "local_control/auth_begin",
+      "params_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "algorithm": {
+            "const": "hmac-sha256-v1",
+            "type": "string"
+          },
+          "challenge_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "expires_in_ms": {
+            "type": "integer"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "principals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "algorithm",
+          "device_id",
+          "challenge_id",
+          "nonce",
+          "expires_in_ms",
+          "principals"
+        ],
+        "type": "object"
+      },
+      "stability": "stable"
+    },
+    {
+      "aliases": [],
+      "auth": {
+        "principals": [],
+        "required": false
+      },
+      "name": "local_control/auth_verify",
+      "params_schema": {
+        "properties": {
+          "challenge_id": {
+            "type": "string"
+          },
+          "principal": {
+            "enum": [
+              "dashboard",
+              "admin",
+              "mcp_bridge",
+              "voice_bridge"
+            ],
+            "type": "string"
+          },
+          "proof": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "principal",
+          "proof"
+        ],
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "session_token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_token",
+          "principal",
+          "device_id"
+        ],
+        "type": "object"
+      },
+      "stability": "stable"
+    },
+    {
+      "aliases": [],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "settings/get",
+      "params_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "effective": {
+            "type": "object"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "raw": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "exists"
+        ],
+        "type": "object"
+      },
+      "stability": "stable"
+    },
+    {
+      "aliases": [],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "settings/write_sd",
+      "params_schema": {
+        "properties": {
+          "settings_json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "settings_json"
+        ],
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "reboot_required": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object"
+          },
+          "written": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "written",
+          "reboot_required"
+        ],
+        "type": "object"
+      },
+      "stability": "stable"
+    },
+    {
+      "aliases": [],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "local_control/set_token",
+      "params_schema": {
+        "properties": {
+          "token": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "reboot_required": {
+            "type": "boolean"
+          },
+          "source": {
+            "const": "nvs",
+            "type": "string"
+          },
+          "written": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "written",
+          "reboot_required",
+          "source"
+        ],
+        "type": "object"
+      },
+      "stability": "stable"
+    },
+    {
+      "aliases": [
+        "voice.get_config"
+      ],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "voice/get_config",
+      "params_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "has_websocket_config": {
+            "type": "boolean"
+          },
+          "selected_protocol": {
+            "type": "string"
+          },
+          "websocket": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "selected_protocol",
+          "has_websocket_config",
+          "websocket"
+        ],
+        "type": "object"
+      },
+      "stability": "experimental"
+    },
+    {
+      "aliases": [
+        "voice.set_config"
+      ],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "voice/set_config",
+      "params_schema": {
+        "properties": {
+          "token": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "url": {
+            "pattern": "^wss?://",
+            "type": "string"
+          },
+          "version": {
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "token"
+        ],
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "config": {
+            "type": "object"
+          },
+          "reboot_required": {
+            "type": "boolean"
+          },
+          "source": {
+            "const": "nvs",
+            "type": "string"
+          },
+          "written": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "written",
+          "reboot_required",
+          "source",
+          "config"
+        ],
+        "type": "object"
+      },
+      "stability": "experimental"
+    },
+    {
+      "aliases": [
+        "voice.start_listening"
+      ],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "voice/start_listening",
+      "params_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "requested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requested"
+        ],
+        "type": "object"
+      },
+      "stability": "experimental"
+    },
+    {
+      "aliases": [
+        "voice.stop_listening"
+      ],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "voice/stop_listening",
+      "params_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "result_schema": {
+        "properties": {
+          "requested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requested"
+        ],
+        "type": "object"
+      },
+      "stability": "experimental"
+    }
+  ],
+  "mcp_tools": [
+    {
+      "description": "Provides the real-time information of the device, including the current status of the audio speaker, screen, battery, network, etc.\nUse this tool for: \n1. Answering questions about current condition (e.g. what is the current volume of the audio speaker?)\n2. As the first step to control the device (e.g. turn up / down the volume of the audio speaker, etc.)",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "self.get_device_status"
+    },
+    {
+      "description": "Set the volume of the audio speaker. If the current volume is unknown, you must call `self.get_device_status` tool first and then call this tool.",
+      "inputSchema": {
+        "properties": {
+          "volume": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "volume"
+        ],
+        "type": "object"
+      },
+      "name": "self.audio_speaker.set_volume"
+    },
+    {
+      "description": "Set the brightness of the screen.",
+      "inputSchema": {
+        "properties": {
+          "brightness": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "brightness"
+        ],
+        "type": "object"
+      },
+      "name": "self.screen.set_brightness"
+    },
+    {
+      "description": "Set the theme of the screen. The theme can be `light` or `dark`.",
+      "inputSchema": {
+        "properties": {
+          "theme": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "type": "object"
+      },
+      "name": "self.screen.set_theme"
+    },
+    {
+      "description": "Always remember you have a camera. If the user asks you to see something, use this tool to take a photo and then explain it.\nArgs:\n  `question`: The question that you want to ask about the photo.\nReturn:\n  A JSON object that provides the photo information.",
+      "inputSchema": {
+        "properties": {
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
+      },
+      "name": "self.camera.take_photo"
+    },
+    {
+      "description": "Returns current yaw/pitch in degrees. Neutral position is {yaw:0, pitch:0}.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "self.robot.get_head_angles"
+    },
+    {
+      "description": "Adjust head position. GUIDELINES: 1. For natural interaction, stay within +/- 45 degrees. 2. Only use values > 70 if the user explicitly asks to look far away/behind. 3. Max ranges: Yaw(-128 to 128, -128 as your left), Pitch(0 to 90, 90 as your up). Speed(100-1000, 150 is natural).",
+      "inputSchema": {
+        "properties": {
+          "pitch": {
+            "default": -9999,
+            "maximum": 90,
+            "minimum": -9999,
+            "type": "integer"
+          },
+          "speed": {
+            "default": 150,
+            "maximum": 1000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "yaw": {
+            "default": -9999,
+            "maximum": 128,
+            "minimum": -9999,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "self.robot.set_head_angles"
+    },
+    {
+      "description": "Set the color of the robot's INTERNAL onboard LED. This is NOT for room lights. Values: 0-168 (safe range). Red=168,0,0; Green=0,168,0; Blue=0,0,168; White=100,100,100; Off=0,0,0.",
+      "inputSchema": {
+        "properties": {
+          "blue": {
+            "default": 0,
+            "maximum": 168,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "green": {
+            "default": 0,
+            "maximum": 168,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "red": {
+            "default": 0,
+            "maximum": 168,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "self.robot.set_led_color"
+    },
+    {
+      "description": "Create a reminder. Duration is in seconds. Message is what to say when time is up. Set repeat to true to repeat the reminder.",
+      "inputSchema": {
+        "properties": {
+          "duration_seconds": {
+            "default": 60,
+            "maximum": 86400,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "message": {
+            "default": "Time's up!",
+            "type": "string"
+          },
+          "repeat": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "name": "self.robot.create_reminder"
+    },
+    {
+      "description": "Get list of active reminders.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "self.robot.get_reminders"
+    },
+    {
+      "description": "Stop a reminder by ID.",
+      "inputSchema": {
+        "properties": {
+          "id": {
+            "default": -1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "self.robot.stop_reminder"
+    }
+  ],
+  "version": 1,
+  "voice_messages": [
+    {
+      "direction": "device_to_server",
+      "name": "auth_begin",
+      "schema": {
+        "properties": {
+          "algorithm": {
+            "const": "hmac-sha256-v1",
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "device_nonce": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "integer"
+          },
+          "state": {
+            "const": "begin",
+            "type": "string"
+          },
+          "transport": {
+            "const": "websocket",
+            "type": "string"
+          },
+          "type": {
+            "const": "auth",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "state",
+          "algorithm",
+          "device_id",
+          "client_id",
+          "device_nonce",
+          "transport",
+          "protocol_version"
+        ],
+        "type": "object"
+      },
+      "summary": "Device starts voice WebSocket mutual authentication."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "auth_challenge",
+      "schema": {
+        "properties": {
+          "proof": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "server_nonce": {
+            "type": "string"
+          },
+          "state": {
+            "const": "challenge",
+            "type": "string"
+          },
+          "type": {
+            "const": "auth",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "state",
+          "server_id",
+          "server_nonce",
+          "proof"
+        ],
+        "type": "object"
+      },
+      "summary": "Server proves it knows the voice token and sends a server nonce."
+    },
+    {
+      "direction": "device_to_server",
+      "name": "auth_verify",
+      "schema": {
+        "properties": {
+          "proof": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "state": {
+            "const": "verify",
+            "type": "string"
+          },
+          "type": {
+            "const": "auth",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "state",
+          "proof"
+        ],
+        "type": "object"
+      },
+      "summary": "Device proves it knows the voice token for the same nonce pair."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "auth_ok",
+      "schema": {
+        "properties": {
+          "state": {
+            "const": "ok",
+            "type": "string"
+          },
+          "type": {
+            "const": "auth",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "state"
+        ],
+        "type": "object"
+      },
+      "summary": "Server accepts voice authentication."
+    },
+    {
+      "direction": "device_to_server",
+      "name": "device_hello",
+      "schema": {
+        "properties": {
+          "audio_params": {
+            "properties": {
+              "channels": {
+                "const": 1,
+                "type": "integer"
+              },
+              "format": {
+                "const": "opus",
+                "type": "string"
+              },
+              "frame_duration": {
+                "type": "integer"
+              },
+              "sample_rate": {
+                "const": 16000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format",
+              "sample_rate",
+              "channels",
+              "frame_duration"
+            ],
+            "type": "object"
+          },
+          "features": {
+            "type": "object"
+          },
+          "transport": {
+            "const": "websocket",
+            "type": "string"
+          },
+          "type": {
+            "const": "hello",
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "version",
+          "features",
+          "transport",
+          "audio_params"
+        ],
+        "type": "object"
+      },
+      "summary": "Device advertises voice transport and microphone audio format."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "server_hello",
+      "schema": {
+        "properties": {
+          "audio_params": {
+            "properties": {
+              "frame_duration": {
+                "type": "integer"
+              },
+              "sample_rate": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "sample_rate",
+              "frame_duration"
+            ],
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transport": {
+            "const": "websocket",
+            "type": "string"
+          },
+          "type": {
+            "const": "hello",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "transport",
+          "session_id",
+          "audio_params"
+        ],
+        "type": "object"
+      },
+      "summary": "Server creates the voice session and advertises playback audio parameters."
+    },
+    {
+      "direction": "device_to_server",
+      "name": "listen_start",
+      "schema": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "auto",
+              "manual",
+              "realtime"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "const": "start",
+            "type": "string"
+          },
+          "type": {
+            "const": "listen",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "type",
+          "state",
+          "mode"
+        ],
+        "type": "object"
+      },
+      "summary": "Device starts a listening window."
+    },
+    {
+      "direction": "device_to_server",
+      "name": "listen_stop",
+      "schema": {
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "const": "stop",
+            "type": "string"
+          },
+          "type": {
+            "const": "listen",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "type",
+          "state"
+        ],
+        "type": "object"
+      },
+      "summary": "Device stops the current listening window."
+    },
+    {
+      "direction": "device_to_server",
+      "name": "mcp",
+      "schema": {
+        "properties": {
+          "payload": {
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "type": {
+            "const": "mcp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "type",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "summary": "Transitional MCP envelope on the voice session."
+    }
+  ]
+}

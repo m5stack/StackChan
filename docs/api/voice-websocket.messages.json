@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "title": "StackChan Voice WebSocket",
+  "endpoint": "configured by local-control voice/set_config",
+  "transport": "device-initiated WebSocket",
+  "auth": {
+    "algorithm": "hmac-sha256-v1",
+    "server_proof_message": "server:<device_id>:<client_id>:<device_nonce>:<server_nonce>",
+    "device_proof_message": "device:<device_id>:<client_id>:<device_nonce>:<server_nonce>"
+  },
+  "binary_frames": [
+    {
+      "direction": "device_to_server",
+      "description": "Opus audio frames from the device microphone after authentication and server hello."
+    },
+    {
+      "direction": "server_to_device",
+      "description": "Binary audio frames for device playback after authentication and server hello."
+    }
+  ],
+  "messages": [
+    {
+      "name": "auth_begin",
+      "direction": "device_to_server",
+      "summary": "Device starts voice WebSocket mutual authentication.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "state", "algorithm", "device_id", "client_id", "device_nonce", "transport", "protocol_version"],
+        "properties": {
+          "type": {"type": "string", "const": "auth"},
+          "state": {"type": "string", "const": "begin"},
+          "algorithm": {"type": "string", "const": "hmac-sha256-v1"},
+          "device_id": {"type": "string"},
+          "client_id": {"type": "string"},
+          "device_nonce": {"type": "string"},
+          "transport": {"type": "string", "const": "websocket"},
+          "protocol_version": {"type": "integer"}
+        }
+      },
+      "example": {
+        "type": "auth",
+        "state": "begin",
+        "algorithm": "hmac-sha256-v1",
+        "device_id": "<redacted-device-id>",
+        "client_id": "<redacted-client-id>",
+        "device_nonce": "<device-nonce>",
+        "transport": "websocket",
+        "protocol_version": 1
+      }
+    },
+    {
+      "name": "auth_challenge",
+      "direction": "server_to_device",
+      "summary": "Server proves it knows the voice token and sends a server nonce.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "state", "server_id", "server_nonce", "proof"],
+        "properties": {
+          "type": {"type": "string", "const": "auth"},
+          "state": {"type": "string", "const": "challenge"},
+          "server_id": {"type": "string"},
+          "server_nonce": {"type": "string"},
+          "proof": {"type": "string"}
+        }
+      },
+      "example": {
+        "type": "auth",
+        "state": "challenge",
+        "server_id": "stackchan-server",
+        "server_nonce": "<server-nonce>",
+        "proof": "<server-proof>"
+      }
+    },
+    {
+      "name": "auth_verify",
+      "direction": "device_to_server",
+      "summary": "Device proves it knows the voice token for the same nonce pair.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "state", "proof"],
+        "properties": {
+          "type": {"type": "string", "const": "auth"},
+          "state": {"type": "string", "const": "verify"},
+          "server_id": {"type": "string"},
+          "proof": {"type": "string"}
+        }
+      },
+      "example": {
+        "type": "auth",
+        "state": "verify",
+        "server_id": "stackchan-server",
+        "proof": "<device-proof>"
+      }
+    },
+    {
+      "name": "auth_ok",
+      "direction": "server_to_device",
+      "summary": "Server accepts voice authentication.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "state"],
+        "properties": {
+          "type": {"type": "string", "const": "auth"},
+          "state": {"type": "string", "const": "ok"}
+        }
+      },
+      "example": {
+        "type": "auth",
+        "state": "ok"
+      }
+    },
+    {
+      "name": "device_hello",
+      "direction": "device_to_server",
+      "summary": "Device advertises voice transport and microphone audio format.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "version", "features", "transport", "audio_params"],
+        "properties": {
+          "type": {"type": "string", "const": "hello"},
+          "version": {"type": "integer"},
+          "features": {"type": "object"},
+          "transport": {"type": "string", "const": "websocket"},
+          "audio_params": {
+            "type": "object",
+            "required": ["format", "sample_rate", "channels", "frame_duration"],
+            "properties": {
+              "format": {"type": "string", "const": "opus"},
+              "sample_rate": {"type": "integer", "const": 16000},
+              "channels": {"type": "integer", "const": 1},
+              "frame_duration": {"type": "integer"}
+            }
+          }
+        }
+      },
+      "example": {
+        "type": "hello",
+        "version": 1,
+        "features": {"mcp": true},
+        "transport": "websocket",
+        "audio_params": {
+          "format": "opus",
+          "sample_rate": 16000,
+          "channels": 1,
+          "frame_duration": 60
+        }
+      }
+    },
+    {
+      "name": "server_hello",
+      "direction": "server_to_device",
+      "summary": "Server creates the voice session and advertises playback audio parameters.",
+      "schema": {
+        "type": "object",
+        "required": ["type", "transport", "session_id", "audio_params"],
+        "properties": {
+          "type": {"type": "string", "const": "hello"},
+          "transport": {"type": "string", "const": "websocket"},
+          "session_id": {"type": "string"},
+          "audio_params": {
+            "type": "object",
+            "required": ["sample_rate", "frame_duration"],
+            "properties": {
+              "sample_rate": {"type": "integer"},
+              "frame_duration": {"type": "integer"}
+            }
+          }
+        }
+      },
+      "example": {
+        "type": "hello",
+        "transport": "websocket",
+        "session_id": "<session-id>",
+        "audio_params": {
+          "sample_rate": 24000,
+          "frame_duration": 60
+        }
+      }
+    },
+    {
+      "name": "listen_start",
+      "direction": "device_to_server",
+      "summary": "Device starts a listening window.",
+      "schema": {
+        "type": "object",
+        "required": ["session_id", "type", "state", "mode"],
+        "properties": {
+          "session_id": {"type": "string"},
+          "type": {"type": "string", "const": "listen"},
+          "state": {"type": "string", "const": "start"},
+          "mode": {"type": "string", "enum": ["auto", "manual", "realtime"]}
+        }
+      },
+      "example": {
+        "session_id": "<session-id>",
+        "type": "listen",
+        "state": "start",
+        "mode": "auto"
+      }
+    },
+    {
+      "name": "listen_stop",
+      "direction": "device_to_server",
+      "summary": "Device stops the current listening window.",
+      "schema": {
+        "type": "object",
+        "required": ["session_id", "type", "state"],
+        "properties": {
+          "session_id": {"type": "string"},
+          "type": {"type": "string", "const": "listen"},
+          "state": {"type": "string", "const": "stop"}
+        }
+      },
+      "example": {
+        "session_id": "<session-id>",
+        "type": "listen",
+        "state": "stop"
+      }
+    },
+    {
+      "name": "mcp",
+      "direction": "device_to_server",
+      "summary": "Transitional MCP envelope on the voice session.",
+      "schema": {
+        "type": "object",
+        "required": ["session_id", "type", "payload"],
+        "properties": {
+          "session_id": {"type": "string"},
+          "type": {"type": "string", "const": "mcp"},
+          "payload": {"type": "object"}
+        }
+      },
+      "example": {
+        "session_id": "<session-id>",
+        "type": "mcp",
+        "payload": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/list",
+          "params": {}
+        }
+      }
+    }
+  ]
+}
