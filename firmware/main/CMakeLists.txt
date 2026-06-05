@@ -11,12 +11,15 @@ file(GLOB_RECURSE STACK_CHAN_SOURCES
     "hal/*.c"
     "hal/*.cc"
     "hal/*.cpp"
+    "mcp/*.c"
+    "mcp/*.cc"
+    "mcp/*.cpp"
     "stackchan/*.c"
     "stackchan/*.cc"
     "stackchan/*.cpp"
 )
-set(STACK_CHAN_INCLUDE_DIRS 
-    "."
+set(STACK_CHAN_INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 list(APPEND STACK_CHAN_SOURCES main.cpp)
 
@@ -48,16 +51,6 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lvgl_display/gif/gifdec.c"
             "display/lvgl_display/jpg/image_to_jpeg.cpp"
             "display/lvgl_display/jpg/jpeg_to_image.c"
-            "protocols/protocol.cc"
-            "protocols/mqtt_protocol.cc"
-            "protocols/websocket_protocol.cc"
-            "mcp_server.cc"
-            "system_info.cc"
-            "application.cc"
-            "ota.cc"
-            "settings.cc"
-            "device_state_machine.cc"
-            "assets.cc"
             # "main.cc"
             )
 
@@ -87,9 +80,19 @@ list(APPEND SOURCES
     "${XIAOZHI_MAIN_DIR}/boards/common/sleep_timer.cc"
     "${XIAOZHI_MAIN_DIR}/boards/common/sy6970.cc"
     "${XIAOZHI_MAIN_DIR}/boards/common/system_reset.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/application_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/assets_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/device_state_machine_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/mcp_server_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/ota_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/settings_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/system_info_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/protocol_runtime.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/websocket_protocol_runtime.cc"
     ${STACK_CHAN_SOURCES}
 )
-list(APPEND INCLUDE_DIRS ${XIAOZHI_MAIN_DIR}/boards/common ${STACK_CHAN_INCLUDE_DIRS})
+list(PREPEND INCLUDE_DIRS ${STACK_CHAN_INCLUDE_DIRS})
+list(APPEND INCLUDE_DIRS ${XIAOZHI_MAIN_DIR}/boards/common)
 
 
 idf_build_get_property(build_components BUILD_COMPONENTS)

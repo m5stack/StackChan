@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "title": "StackChan Local Control JSON-RPC",
+  "endpoint": "ws://<device-ip>:8080/ws",
+  "session_token_location": "top-level session_token field",
+  "auth_proof": "HMAC-SHA256(control_token, device_id:challenge_id:nonce:principal)",
+  "principals": ["dashboard", "admin", "mcp_bridge", "voice_bridge"],
+  "methods": [
+    {
+      "name": "local_control/auth_begin",
+      "summary": "Start the local-control HMAC challenge.",
+      "stability": "stable",
+      "auth": {"required": false, "principals": []},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["algorithm", "device_id", "challenge_id", "nonce", "expires_in_ms", "principals"],
+        "properties": {
+          "algorithm": {"type": "string", "const": "hmac-sha256-v1"},
+          "device_id": {"type": "string"},
+          "challenge_id": {"type": "string"},
+          "nonce": {"type": "string"},
+          "expires_in_ms": {"type": "integer"},
+          "principals": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "local_control/auth_verify",
+      "summary": "Complete local-control authentication and receive a session token.",
+      "stability": "stable",
+      "auth": {"required": false, "principals": []},
+      "params_schema": {
+        "type": "object",
+        "required": ["challenge_id", "principal", "proof"],
+        "properties": {
+          "challenge_id": {"type": "string"},
+          "principal": {"type": "string", "enum": ["dashboard", "admin", "mcp_bridge", "voice_bridge"]},
+          "proof": {"type": "string"}
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": ["session_token", "principal", "device_id"],
+        "properties": {
+          "session_token": {"type": "string"},
+          "principal": {"type": "string"},
+          "device_id": {"type": "string"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "settings/get",
+      "summary": "Read SD settings and effective merged settings.",
+      "stability": "stable",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["path", "exists"],
+        "properties": {
+          "path": {"type": "string"},
+          "exists": {"type": "boolean"},
+          "raw": {"type": "string"},
+          "effective": {"type": "object"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "settings/write_sd",
+      "summary": "Validate and write the SD-card settings JSON file.",
+      "stability": "stable",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {
+        "type": "object",
+        "required": ["settings_json"],
+        "properties": {
+          "settings_json": {"type": "string"}
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": ["path", "written", "reboot_required"],
+        "properties": {
+          "path": {"type": "string"},
+          "written": {"type": "boolean"},
+          "reboot_required": {"type": "boolean"},
+          "settings": {"type": "object"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "local_control/set_token",
+      "summary": "Validate and persist the local-control token to NVS.",
+      "stability": "stable",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {
+        "type": "object",
+        "required": ["token"],
+        "properties": {
+          "token": {"type": "string", "minLength": 1}
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": ["written", "reboot_required", "source"],
+        "properties": {
+          "written": {"type": "boolean"},
+          "reboot_required": {"type": "boolean"},
+          "source": {"type": "string", "const": "nvs"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "voice/get_config",
+      "aliases": ["voice.get_config"],
+      "summary": "Read the persisted voice WebSocket transport configuration.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["selected_protocol", "has_websocket_config", "websocket"],
+        "properties": {
+          "selected_protocol": {"type": "string"},
+          "has_websocket_config": {"type": "boolean"},
+          "websocket": {"type": "object"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "voice/set_config",
+      "aliases": ["voice.set_config"],
+      "summary": "Persist the voice WebSocket endpoint and shared token to NVS.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {
+        "type": "object",
+        "required": ["url", "token"],
+        "properties": {
+          "url": {"type": "string", "pattern": "^wss?://"},
+          "token": {"type": "string", "minLength": 1},
+          "version": {"type": "integer", "default": 1}
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": ["written", "reboot_required", "source", "config"],
+        "properties": {
+          "written": {"type": "boolean"},
+          "reboot_required": {"type": "boolean"},
+          "source": {"type": "string", "const": "nvs"},
+          "config": {"type": "object"}
+        }
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "voice/start_listening",
+      "aliases": ["voice.start_listening"],
+      "summary": "Request listening through the voice application path.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["requested"],
+        "properties": {"requested": {"type": "boolean"}}
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "voice/stop_listening",
+      "aliases": ["voice.stop_listening"],
+      "summary": "Request listening stop through the voice application path.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["requested"],
+        "properties": {"requested": {"type": "boolean"}}
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    }
+  ]
+}

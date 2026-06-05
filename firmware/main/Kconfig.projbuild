@@ -15,9 +15,10 @@ menu "Xiaozhi Assistant"
 
 config OTA_URL
     string "Default OTA URL"
-    default "https://api.tenclass.net/xiaozhi/ota/"
+    default ""
     help
-        The application will access this URL to check for new firmwares and server address.
+        Optional default OTA metadata URL. Leave empty unless you explicitly
+        control the update service for this firmware.
 
 choice
     prompt "Flash Assets"

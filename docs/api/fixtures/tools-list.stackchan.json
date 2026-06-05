@@ -1,0 +1,190 @@
+{
+    "device_id": "<redacted>",
+    "device_id_redacted": true,
+    "protocol_version": "2024-11-05",
+    "server_info": {
+        "name": "m5stack-stack-chan",
+        "version": "1.4.1"
+    },
+    "source": "live-device-tools-list",
+    "tools": [
+        {
+            "description": "Provides the real-time information of the device, including the current status of the audio speaker, screen, battery, network, etc.\nUse this tool for: \n1. Answering questions about current condition (e.g. what is the current volume of the audio speaker?)\n2. As the first step to control the device (e.g. turn up / down the volume of the audio speaker, etc.)",
+            "inputSchema": {
+                "properties": {},
+                "type": "object"
+            },
+            "name": "self.get_device_status"
+        },
+        {
+            "description": "Set the volume of the audio speaker. If the current volume is unknown, you must call `self.get_device_status` tool first and then call this tool.",
+            "inputSchema": {
+                "properties": {
+                    "volume": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "volume"
+                ],
+                "type": "object"
+            },
+            "name": "self.audio_speaker.set_volume"
+        },
+        {
+            "description": "Set the brightness of the screen.",
+            "inputSchema": {
+                "properties": {
+                    "brightness": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "brightness"
+                ],
+                "type": "object"
+            },
+            "name": "self.screen.set_brightness"
+        },
+        {
+            "description": "Set the theme of the screen. The theme can be `light` or `dark`.",
+            "inputSchema": {
+                "properties": {
+                    "theme": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "theme"
+                ],
+                "type": "object"
+            },
+            "name": "self.screen.set_theme"
+        },
+        {
+            "description": "Always remember you have a camera. If the user asks you to see something, use this tool to take a photo and then explain it.\nArgs:\n  `question`: The question that you want to ask about the photo.\nReturn:\n  A JSON object that provides the photo information.",
+            "inputSchema": {
+                "properties": {
+                    "question": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "question"
+                ],
+                "type": "object"
+            },
+            "name": "self.camera.take_photo"
+        },
+        {
+            "description": "Returns current yaw/pitch in degrees. Neutral position is {yaw:0, pitch:0}.",
+            "inputSchema": {
+                "properties": {},
+                "type": "object"
+            },
+            "name": "self.robot.get_head_angles"
+        },
+        {
+            "description": "Adjust head position. GUIDELINES: 1. For natural interaction, stay within +/- 45 degrees. 2. Only use values > 70 if the user explicitly asks to look far away/behind. 3. Max ranges: Yaw(-128 to 128, -128 as your left), Pitch(0 to 90, 90 as your up). Speed(100-1000, 150 is natural).",
+            "inputSchema": {
+                "properties": {
+                    "pitch": {
+                        "default": -9999,
+                        "maximum": 90,
+                        "minimum": -9999,
+                        "type": "integer"
+                    },
+                    "speed": {
+                        "default": 150,
+                        "maximum": 1000,
+                        "minimum": 100,
+                        "type": "integer"
+                    },
+                    "yaw": {
+                        "default": -9999,
+                        "maximum": 128,
+                        "minimum": -9999,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "name": "self.robot.set_head_angles"
+        },
+        {
+            "description": "Set the color of the robot's INTERNAL onboard LED. This is NOT for room lights. Values: 0-168 (safe range). Red=168,0,0; Green=0,168,0; Blue=0,0,168; White=100,100,100; Off=0,0,0.",
+            "inputSchema": {
+                "properties": {
+                    "blue": {
+                        "default": 0,
+                        "maximum": 168,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "green": {
+                        "default": 0,
+                        "maximum": 168,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "red": {
+                        "default": 0,
+                        "maximum": 168,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "name": "self.robot.set_led_color"
+        },
+        {
+            "description": "Create a reminder. Duration is in seconds. Message is what to say when time is up. Set repeat to true to repeat the reminder.",
+            "inputSchema": {
+                "properties": {
+                    "duration_seconds": {
+                        "default": 60,
+                        "maximum": 86400,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "message": {
+                        "default": "Time's up!",
+                        "type": "string"
+                    },
+                    "repeat": {
+                        "default": false,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "name": "self.robot.create_reminder"
+        },
+        {
+            "description": "Get list of active reminders.",
+            "inputSchema": {
+                "properties": {},
+                "type": "object"
+            },
+            "name": "self.robot.get_reminders"
+        },
+        {
+            "description": "Stop a reminder by ID.",
+            "inputSchema": {
+                "properties": {
+                    "id": {
+                        "default": -1,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "name": "self.robot.stop_reminder"
+        }
+    ]
+}

@@ -29,6 +29,17 @@ ctest --test-dir build-host-tests --output-on-failure
 
 ### Flash
 
+Flash only the app partition for normal development:
+
 ```bash
-idf.py flash
+make flash
 ```
+
+Flash the bootloader, app, partition table, OTA data, and generated assets:
+
+```bash
+make fullflash
+```
+
+If flashing hangs at `Connecting...`, stop `ModemManager`; it can probe
+Espressif USB CDC devices during reconnect.
