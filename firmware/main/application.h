@@ -11,11 +11,15 @@
 #include <mutex>
 #include <string>
 
-#include "audio_service.h"
+#include "audio_system.h"
 #include "device_state.h"
 #include "device_state_machine.h"
 #include "ota.h"
 #include "protocol.h"
+
+enum class NetworkEvent;
+class Display;
+struct cJSON;
 
 #define MAIN_EVENT_SCHEDULE             (1 << 0)
 #define MAIN_EVENT_SEND_AUDIO           (1 << 1)
@@ -52,7 +56,7 @@ public:
     void Run();
 
     DeviceState GetDeviceState() const { return state_machine_.GetState(); }
-    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }
+    bool IsVoiceDetected() const { return audio_system_.IsVoiceDetected(); }
     bool SetDeviceState(DeviceState state);
     void Schedule(std::function<void()>&& callback);
     void Alert(const char* status, const char* message, const char* emotion = "", const std::string_view& sound = "");
@@ -70,7 +74,7 @@ public:
     void SetAecMode(AecMode mode);
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
-    AudioService& GetAudioService() { return audio_service_; }
+    AudioSystem& GetAudioSystem() { return audio_system_; }
     void ResetProtocol();
 
 private:
@@ -87,7 +91,7 @@ private:
     ListeningMode listening_mode_ = kListeningModeAutoStop;
     AecMode aec_mode_ = kAecOff;
     std::string last_error_message_;
-    AudioService audio_service_;
+    AudioSystem audio_system_;
     std::unique_ptr<Ota> ota_;
 
     std::function<void(const std::string&)> mcp_broadcast_callback_;
@@ -107,12 +111,25 @@ private:
     void HandleNetworkDisconnectedEvent();
     void HandleActivationDoneEvent();
     void HandleWakeWordDetectedEvent();
+    void HandleNetworkEvent(NetworkEvent event, const std::string& data);
+    void HandleSendAudioEvent();
+    void HandleVadChangedEvent();
+    void RunScheduledTasks();
+    void HandleClockTickEvent();
     void ContinueOpenAudioChannel(ListeningMode mode);
     void ContinueWakeWordInvoke(const std::string& wake_word);
     void ActivationTask();
     void LoadLocalAssets();
     void CheckNewVersion();
     void InitializeProtocol();
+    void HandleIncomingProtocolJson(const cJSON* root, Display* display);
+    bool HandleIncomingTtsMessage(const cJSON* root, Display* display);
+    bool HandleIncomingSttMessage(const cJSON* root, Display* display);
+    bool HandleIncomingLlmMessage(const cJSON* root, Display* display);
+    bool HandleIncomingMcpMessage(const cJSON* root);
+    bool HandleIncomingSystemMessage(const cJSON* root);
+    bool HandleIncomingAlertMessage(const cJSON* root);
+    bool HandleIncomingCustomMessage(const cJSON* root, Display* display);
     void StartAutoListenTimeout();
     void StopAutoListenTimeout();
     void ShowActivationCode(const std::string& code, const std::string& message);

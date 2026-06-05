@@ -363,6 +363,11 @@ private:
                  seconds_to_sleep, seconds_to_shutdown, xiaozhi_config_.allowShutdownWhenCharging);
 
         power_save_timer_ = new PowerSaveTimer(-1, seconds_to_sleep, seconds_to_shutdown);
+        power_save_timer_->SetSleepEligibilityCallback([]() { return Application::GetInstance().CanEnterSleepMode(); });
+        power_save_timer_->SetWakeWordRunningCallback(
+            []() { return Application::GetInstance().GetAudioSystem().IsWakeWordRunning(); });
+        power_save_timer_->SetWakeWordDetectionCallback(
+            [](bool enabled) { Application::GetInstance().GetAudioSystem().EnableWakeWordDetection(enabled); });
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
             // GetBacklight()->SetBrightness(10);

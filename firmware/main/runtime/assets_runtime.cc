@@ -107,7 +107,7 @@ bool Assets::LoadSrmodelsFromIndex(Assets* assets, cJSON* root)
             assets->models_list_ = srmodel_load(static_cast<uint8_t*>(ptr));
             if (assets->models_list_ != nullptr) {
                 auto& app = Application::GetInstance();
-                app.GetAudioService().SetModelsList(assets->models_list_);
+                app.GetAudioSystem().SetModelsList(assets->models_list_);
                 if (need_delete_root) {
                     cJSON_Delete(root);
                 }
