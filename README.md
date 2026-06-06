@@ -1,64 +1,164 @@
 # Unixtreme StackChan Firmware Fork
 
-This is my personal fork of the M5Stack StackChan project. The original upstream
-README is preserved below for product background and general project context.
+This is my personal fork of the [M5Stack StackChan](https://github.com/m5stack/StackChan)
+project.
 
-My goal with this fork is to turn StackChan into a device that can be controlled
-more directly and more reliably from a computer or local server, without turning
-the firmware into a large, complicated platform. The main idea is to keep the
-existing AI Agent and voice flow available, while adding a persistent,
-authenticated LAN control channel that is not tied to the wake-word or voice
-WebSocket lifecycle.
+This fork exists because I want a different product shape: more local-first,
+more explicit about network behavior, and easier for me to inspect and extend.
 
-The most important fork-specific pieces are documented here:
+## Project Goals
+
+After getting my StackChan and looking at its network behavior, I was not
+comfortable with firmware paths that could contact remote services without a
+clear local decision from the user. A major goal of this fork is to make network
+behavior explicit and opt-in wherever practical.
+
+The longer-term goal is to create a lean base for expanding the AI Agent while
+still hiding unnecessary complexity from normal users. The device should remain
+pleasant to use, but the firmware contract should be explicit enough that a
+custom server, dashboard, or local automation layer can control it without
+reverse engineering.
+
+## Why Use This Fork?
+
+This fork focuses on StackChan as a more local-first AI Agent device. It removes
+the direct xiaozhi-esp32 firmware dependency, reduces upstream remote-service
+coupling, and documents the local contracts this fork currently relies on.
+
+- Network behavior is intended to be explicit and opt-in. Known upstream remote
+  service paths have been disabled or guarded where found.
+- Authenticated local control WebSocket for settings, robot actions, device
+  status, and firmware-owned tools.
+- HMAC challenge/response local-control authentication uses session tokens and
+  named principals for dashboards, admin tools, MCP bridges, and voice bridges.
+- Voice WebSocket transport can be configured locally, including endpoint and
+  token, instead of relying on upstream-seeded voice service settings.
+- Voice WebSocket traffic is being moved toward explicit authentication and
+  session-bound messages.
+- JSON-RPC and MCP handling has been tightened, with generated machine-readable
+  and human-readable API documentation.
+- Auto-generated API docs that are checked against firmware source strings by
+  local tooling, so documented remote methods do not silently drift from the
+  implementation.
+- Host-side API smoke tests can exercise authentication, settings, voice
+  control, expected rejects, and documented schemas against a live device.
+- SD-card settings overrides for practical field testing and recovery.
+- Runtime SD-card access is guarded through firmware helpers so the CoreS3 LCD
+  and SD card do not fight over the shared GPIO35/SPI path.
+- Firmware identity metadata, including fork identity, exposed through runtime
+  APIs and the on-device Firmware settings UI.
+- OTA and activation paths reject known upstream service URLs discovered during
+  this work, reducing the chance that a stock or previously-seeded device drifts
+  back toward the old remote service flow.
+- Reduced firmware baggage by removing unused board, display, GIF, LED, codec,
+  and vendor paths that are not relevant to the target StackChan/CoreS3 build.
+- Asset packaging through `assets.tar.gz`, keeping generated/binary asset
+  noise out of the normal source tree while preserving deterministic builds.
+- Simple firmware `make build`, `make flash`, and `make fullflash` targets use a
+  repo-relative ESP-IDF path by default instead of depending on machine-local
+  absolute paths.
+- CI builds produce downloadable flash bundles with binaries, `flash_args`,
+  checksums, and flashing instructions.
+- xiaozhi-esp32 is no longer cloned and patched during firmware builds; the
+  remaining firmware runtime now lives in this tree where it can be reviewed
+  directly.
+- Future server/dashboard work is expected to build on the local protocol first,
+  with higher-level bridges routing only authorized capabilities.
+
+The current fork-specific documentation is here:
 
 - [Local control WebSocket API](docs/local-control-websocket.md)
 - [SD-card settings](docs/sdcard-settings.md)
+- Generated API docs under `docs/generated/`
+- API metadata under `docs/api/`
 
-GitHub Actions builds publish firmware flash bundles for compatible
-StackChan/CoreS3 hardware. These bundles include the firmware binaries,
-`flash_args`, checksums, and short flashing instructions, so they can be used as
-testable checkpoints without building the firmware locally.
+Pipeline-generated firmware bundles can be used to flash compatible
+StackChan/CoreS3 hardware. They include the firmware binaries, `flash_args`,
+checksums, and short flashing instructions. The default upstream xiaozhi server
+does not implement this fork's local-control protocol, so these fork-specific
+remote-control features require a compatible custom server/dashboard.
 
-One caveat: the stock Xiaozhi server does not know about this fork's new local
-control WebSocket workflow, and the default upstream experience still assumes
-the original server conventions. If you want to use the remote-control features
-from this fork, you will likely want to build your own server/dashboard against
-the documented WebSocket API, or wait for my companion server work to mature.
+## License
 
-The older voice-session MCP path still exists for compatibility. Long term,
-though, I expect new remote-control features in this fork to target the
-persistent local control WebSocket first.
+Code in this fork is distributed under the MIT License except where otherwise
+noted: [LICENSE](./LICENSE).
 
-# StackChan Open-Source
+Bundled third-party assets remain under their respective licenses. Physical
+license texts and legal notices are included under
+[third_party_licenses/](third_party_licenses/).
 
-<img src="https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/K151_stack_chan_main_pictures_01.webp" width="60%">
+## Attributions
 
-Here are StackChan related open-source resources, including source code of the StackChan firmware, remote controller firmware, mobile app (iOS and Android), and server. 
+### Code
 
-Update of this repo could be a little late than the released firmware and mobile app. 
+- [M5Stack StackChan](https://github.com/m5stack/StackChan) is still the source
+  of much of the firmware, app shell, UI, hardware integration, and device
+  behavior. StackChan is distributed under the MIT License.
+- [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) informed the original AI
+  Agent/runtime direction. This fork is progressively replacing that runtime
+  surface with firmware-owned code, but attribution is retained for the original
+  implementation lineage. xiaozhi-esp32 is distributed under the MIT License.
 
-----
+### Sound Files
 
-<img src="https://cdn.shopify.com/s/files/1/0056/7689/2250/files/5a589623895f65487717894d9240f6b8.png" width="60%">
+Most bundled sound files are inherited from the upstream StackChan firmware
+asset set. I did not find separate per-file licensing notices in the source
+tree, so they are currently treated as covered by the upstream StackChan MIT
+license unless proven otherwise.
 
-**StackChan is a super kawaii AI desktop robot co-created by M5Stack and the user community.** It uses the M5Stack **flagship IoT development kit [CoreS3](https://docs.m5stack.com/en/core/CoreS3)** as its main controller, powered by an ESP32-S3 SoC featuring a 240 MHz dual-core processor, with 16MB Flash and 8MB PSRAM onboard, and supporting Wi-Fi and BLE. The main unit also integrates a 2.0-inch capacitive touch display with a high-strength glass cover, a 0.3 MP camera, a proximity & ambient light sensor, a 9-axis IMU (accelerometer + gyroscope + magnetometer), a microSD card slot, a 1W speaker, dual microphones, and power/reset buttons. 
+Current bundled sound groups:
 
-The **robot body**, connected to the main unit, includes a USB-C interface for power and data, a 550 mAh battery, two feedback servos (360-degree continuous rotation on the horizontal axis and 90-degree movement on the vertical axis), two rows totaling 12 RGB LEDs, infrared transmitter and receiver, a three-zone touch panel, and a full-featured NFC module. 
+- Locale voice prompts under `main_assets/locales/*/*.ogg`
+- Common UI sounds: `exclamation.ogg`, `low_battery.ogg`, `popup.ogg`,
+  `success.ogg`, `vibration.ogg`
+- Camera/app sounds: `camera_shutter.ogg`, `new_notification.ogg`
 
-The **factory firmware** is feature-rich, including an AI Agent, lively and expressive animations, ESP-NOW wireless remote control, and online app downloads. It can connect to a mobile app for video viewing, remote avatar control, and more, and also supports online updates (OTA). The product also supports programming via Arduino, UiFlow2, and other methods, and can connect to various expansion units in the M5Stack ecosystem, making it easy to implement a wide range of custom functions. 
+### Images
 
-> ⚠️ Do not forcibly rotate any movable parts connected to the motors by hand when you are unsure whether the motors are powered and under control, as this may cause hardware damage. 
+StackChan/M5 UI assets, currently treated as covered by the upstream StackChan
+MIT license:
 
-- Purchase link: [M5Stack Official Store](https://shop.m5stack.com/products/stackchan-kawaii-co-created-open-source-ai-desktop-robot) | [淘宝 Taobao](https://item.taobao.com/item.htm?id=1042238294510)
+- `app_center_bg.png`
+- `icon_ai_agent.bin`
+- `icon_app_center.bin`
+- `icon_bat_lightning.bin`
+- `icon_bell.bin`
+- `icon_controller.bin`
+- `icon_dance.bin`
+- `icon_ezdata.bin`
+- `icon_home.bin`
+- `icon_indicator_left.bin`
+- `icon_indicator_right.bin`
+- `icon_sentinel.bin`
+- `icon_setup.bin`
+- `icon_wifi_high.bin`
+- `icon_wifi_low.bin`
+- `icon_wifi_medium.bin`
+- `icon_wifi_slash.bin`
+- `setup_stackchan_front_view.bin`
 
-- Product document page: [English](https://docs.m5stack.com/en/StackChan) | [日本語](https://docs.m5stack.com/ja/StackChan) | [中文](https://docs.m5stack.com/zh_CN/StackChan)
+Twemoji graphics:
 
-- Board support package: https://github.com/m5stack/StackChan-BSP
+- `twemoji_32/*.png`
+- `twemoji_64/*.png`
 
-Thank you to the contributors of the StackChan community, especially: 
+Twemoji code is MIT-licensed, but the Twemoji graphics shipped here are licensed
+under Creative Commons Attribution 4.0 International.
 
-| ![](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/avatar_stack_chan.jpg) | ![](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/avatar_takao.jpg) |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [@stack_chan](https://x.com/stack_chan)                                          | [@mongonta555](https://x.com/mongonta555)                                   |
-| Shinya Ishikawa                                                                  | Takao Akaki                                                                 |
+### Fonts
+
+- Montserrat: `MontserratSemiBold26.c` is generated from Montserrat SemiBold.
+  Montserrat is distributed under the SIL Open Font License.
+- Font Awesome: `font_awesome_20_4.c` is generated from Font Awesome Free. Font
+  Awesome Free uses SIL OFL for fonts, CC BY 4.0 for icons, and MIT for code.
+- Alibaba PuHuiTi / 阿里巴巴普惠体: `font_puhui_basic_20_4.c` and
+  `font_puhui_common_20_4.bin` appear to be generated from Alibaba PuHuiTi
+  assets. Alibaba PuHuiTi is free for personal and commercial use under
+  Alibaba's font legal terms, but it is not an open-source font license.
+
+### Firmware Model Assets
+
+The generated firmware asset partition also includes the ESP-SR wake-word model
+from Espressif's managed ESP-SR component. This is not stored in
+`main/assets/assets.tar.gz`, but it is included in generated firmware artifacts.
+Its licensing follows Espressif ESP-SR/component terms.

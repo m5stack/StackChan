@@ -9,9 +9,7 @@
 #include <memory>
 #include <string>
 
-#if HAVE_LVGL
 #include <spi_flash_mmap.h>
-#endif
 
 struct Asset {
     size_t size;

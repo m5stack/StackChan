@@ -12,6 +12,8 @@ from typing import Any
 
 import websockets
 
+RESULTS: list[tuple[str, bool, str]] = []
+
 
 def build_parser() -> argparse.ArgumentParser:
     repo_root = Path(__file__).resolve().parent.parent
@@ -39,6 +41,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-negative-tests",
         action="store_true",
         help="Skip unauthenticated/invalid-request negative coverage",
+    )
+    parser.add_argument(
+        "--audio-lifecycle-smoke",
+        action="store_true",
+        help="Exercise start/stop/start voice-listening lifecycle after the read-only checks",
+    )
+    parser.add_argument(
+        "--debug-events-smoke",
+        action="store_true",
+        help="Subscribe to local-control debug events and verify a short manual listen cycle emits notifications",
     )
     return parser
 
@@ -209,6 +221,7 @@ async def rpc(
     req_id: int,
     timeout_seconds: float,
     session_token: str | None = None,
+    notifications: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     # The transport still gates the initial WebSocket upgrade with the persisted
     # local-control token. The HMAC challenge then binds the session principal and
@@ -224,6 +237,10 @@ async def rpc(
         if isinstance(raw, bytes):
             continue
         data = json.loads(raw)
+        if data.get("method") == "debug/event":
+            if notifications is not None:
+                notifications.append(data.get("params", {}))
+            continue
         if data.get("id") == req_id:
             return data
 
@@ -236,6 +253,19 @@ def require_error(response: dict[str, Any], expected_code: int, label: str) -> N
         raise RuntimeError(
             f"{label}: expected error code {expected_code}, got {error.get('code')}: {json.dumps(response)}"
         )
+
+
+def record_result(label: str, passed: bool, detail: str = "") -> None:
+    RESULTS.append((label, passed, detail))
+
+
+def print_results() -> None:
+    width = max((len(label) for label, _, _ in RESULTS), default=4)
+    for label, passed, detail in RESULTS:
+        line = f"{label.ljust(width)}  {'PASS' if passed else 'FAIL'}"
+        if detail:
+            line += f"  {detail}"
+        print(line)
 
 
 async def authenticate(
@@ -271,7 +301,6 @@ async def run_negative_tests(
     ws: websockets.ClientConnection,
     api_index: dict[str, Any],
     timeout_seconds: float,
-    summary: list[str],
 ) -> None:
     req_id = 200
     unauth_methods = [
@@ -284,7 +313,7 @@ async def run_negative_tests(
     for method, params in unauth_methods:
         response = await rpc(ws, method, params, req_id, timeout_seconds)
         require_error(response, -32001, f"{method} unauthenticated")
-        summary.append(f"{method} unauth rejected")
+        record_result(f"{method} unauth", True, "rejected as expected")
         req_id += 1
 
     local_methods = api_index.get("local_control_methods", [])
@@ -299,12 +328,12 @@ async def run_negative_tests(
             for key, params in missing_variants:
                 response = await rpc(ws, method_name, params, req_id, timeout_seconds)
                 require_error(response, -32602, f"{method_name} missing {key}")
-                summary.append(f"{method_name} missing {key} rejected")
+                record_result(f"{method_name} missing {key}", True, "rejected as expected")
                 req_id += 1
             for key, params in wrong_type_variants:
                 response = await rpc(ws, method_name, params, req_id, timeout_seconds)
                 require_error(response, -32602, f"{method_name} wrong type {key}")
-                summary.append(f"{method_name} wrong type {key} rejected")
+                record_result(f"{method_name} wrong type {key}", True, "rejected as expected")
                 req_id += 1
             continue
 
@@ -313,13 +342,13 @@ async def run_negative_tests(
 
         response = await rpc(ws, method_name, {}, req_id, timeout_seconds, session_token="bad-session-token")
         require_error(response, -32001, f"{method_name} bad session")
-        summary.append(f"{method_name} bad session rejected")
+        record_result(f"{method_name} bad session", True, "rejected as expected")
         req_id += 1
 
         for key, params in build_missing_required_variants(schema):
             response = await rpc(ws, method_name, params, req_id, timeout_seconds, session_token="bad-session-token")
             require_error(response, -32001, f"{method_name} unauth missing {key}")
-            summary.append(f"{method_name} unauth missing {key} rejected")
+            record_result(f"{method_name} unauth missing {key}", True, "rejected as expected")
             req_id += 1
 
 
@@ -328,7 +357,6 @@ async def run_negative_tests_authenticated(
     api_index: dict[str, Any],
     timeout_seconds: float,
     session_token: str,
-    summary: list[str],
 ) -> None:
     req_id = 400
     local_methods = api_index.get("local_control_methods", [])
@@ -341,24 +369,131 @@ async def run_negative_tests_authenticated(
         for key, params in build_missing_required_variants(schema):
             response = await rpc(ws, method_name, params, req_id, timeout_seconds, session_token=session_token)
             require_error(response, -32602, f"{method_name} missing {key}")
-            summary.append(f"{method_name} missing {key} rejected")
+            record_result(f"{method_name} missing {key}", True, "rejected as expected")
             req_id += 1
 
         for key, params in build_wrong_type_variants(schema):
             response = await rpc(ws, method_name, params, req_id, timeout_seconds, session_token=session_token)
             require_error(response, -32602, f"{method_name} wrong type {key}")
-            summary.append(f"{method_name} wrong type {key} rejected")
+            record_result(f"{method_name} wrong type {key}", True, "rejected as expected")
             req_id += 1
+
+
+async def run_audio_lifecycle_smoke(
+    ws: websockets.ClientConnection,
+    timeout_seconds: float,
+    session_token: str,
+) -> None:
+    req_id = 800
+    steps = [
+        ("voice/start_listening", {"mode": "manual"}, "voice/start_listening #1"),
+        ("voice/stop_listening", {}, "voice/stop_listening #1"),
+        ("voice/start_listening", {"mode": "manual"}, "voice/start_listening #2"),
+        ("voice/stop_listening", {}, "voice/stop_listening #2"),
+    ]
+    for method_name, params, label in steps:
+        response = await rpc(ws, method_name, params, req_id, timeout_seconds, session_token=session_token)
+        req_id += 1
+        if "error" in response:
+            raise RuntimeError(f"{label} failed: {json.dumps(response)}")
+        requested = response.get("result", {}).get("requested")
+        if requested is not True:
+            raise RuntimeError(f"{label} returned unexpected result: {json.dumps(response)}")
+        record_result(label, True)
+
+
+async def drain_debug_events(
+    ws: websockets.ClientConnection,
+    timeout_seconds: float,
+) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    while True:
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=timeout_seconds)
+        except TimeoutError:
+            break
+        if isinstance(raw, bytes):
+            continue
+        data = json.loads(raw)
+        if data.get("method") == "debug/event":
+            events.append(data.get("params", {}))
+    return events
+
+
+async def run_debug_events_smoke(
+    ws: websockets.ClientConnection,
+    timeout_seconds: float,
+    session_token: str,
+) -> None:
+    notifications: list[dict[str, Any]] = []
+
+    subscribe = await rpc(
+        ws,
+        "debug/subscribe_events",
+        {},
+        900,
+        timeout_seconds,
+        session_token=session_token,
+        notifications=notifications,
+    )
+    if subscribe.get("result", {}).get("subscribed") is not True:
+        raise RuntimeError(f"debug/subscribe_events failed: {json.dumps(subscribe)}")
+    record_result("debug/subscribe_events", True)
+
+    start = await rpc(
+        ws,
+        "voice/start_listening",
+        {"mode": "manual"},
+        901,
+        timeout_seconds,
+        session_token=session_token,
+        notifications=notifications,
+    )
+    if start.get("result", {}).get("requested") is not True:
+        raise RuntimeError(f"debug-events start failed: {json.dumps(start)}")
+    await asyncio.sleep(0.75)
+
+    stop = await rpc(
+        ws,
+        "voice/stop_listening",
+        {},
+        902,
+        timeout_seconds,
+        session_token=session_token,
+        notifications=notifications,
+    )
+    if stop.get("result", {}).get("requested") is not True:
+        raise RuntimeError(f"debug-events stop failed: {json.dumps(stop)}")
+    await asyncio.sleep(0.5)
+    notifications.extend(await drain_debug_events(ws, 0.2))
+
+    unsubscribe = await rpc(
+        ws,
+        "debug/unsubscribe_events",
+        {},
+        903,
+        timeout_seconds,
+        session_token=session_token,
+    )
+    if unsubscribe.get("result", {}).get("subscribed") is not False:
+        raise RuntimeError(f"debug/unsubscribe_events failed: {json.dumps(unsubscribe)}")
+    record_result("debug/unsubscribe_events", True)
+
+    event_types = [event.get("type") for event in notifications if isinstance(event, dict)]
+    expected = {"state_transition", "listen_start_requested", "listen_enter", "listen_stop_requested"}
+    missing = sorted(expected - set(event_types))
+    if missing:
+        raise RuntimeError(f"missing debug events: {missing}; saw {event_types}")
+    record_result("debug/event stream", True, ", ".join(event_types))
 
 
 async def run_smoke_test(args: argparse.Namespace) -> int:
     api_index = load_api_index(Path(args.api_index))
     url = f"ws://{args.device_ip}:8080/ws?token={args.token}"
-    summary: list[str] = []
 
     async with websockets.connect(url, open_timeout=args.timeout_seconds, ping_interval=20) as ws:
         if not args.skip_negative_tests:
-            await run_negative_tests(ws, api_index, args.timeout_seconds, summary)
+            await run_negative_tests(ws, api_index, args.timeout_seconds)
 
         session_token, verify = await authenticate(ws, args.token, args.principal, args.timeout_seconds)
 
@@ -369,7 +504,7 @@ async def run_smoke_test(args: argparse.Namespace) -> int:
         if verify_errors:
             print("\n".join(verify_errors), file=sys.stderr)
             return 1
-        summary.append("auth ok")
+        record_result("auth", True)
 
         initialize = await rpc(ws, "initialize", {}, 10, args.timeout_seconds, session_token=session_token)
         if "error" in initialize:
@@ -378,7 +513,7 @@ async def run_smoke_test(args: argparse.Namespace) -> int:
         if initialize.get("result", {}).get("protocolVersion") != "2024-11-05":
             print("initialize.protocolVersion mismatch", file=sys.stderr)
             return 1
-        summary.append("initialize ok")
+        record_result("initialize", True)
 
         tools_list = await rpc(ws, "tools/list", {}, 11, args.timeout_seconds, session_token=session_token)
         if "error" in tools_list:
@@ -390,7 +525,7 @@ async def run_smoke_test(args: argparse.Namespace) -> int:
         if missing_tools:
             print(f"tools/list missing expected tools: {missing_tools}", file=sys.stderr)
             return 1
-        summary.append(f"tools/list ok ({len(live_tool_names)} tools)")
+        record_result("tools/list", True, f"{len(live_tool_names)} tools")
 
         local_methods = api_index.get("local_control_methods", [])
         req_id = 20
@@ -412,7 +547,7 @@ async def run_smoke_test(args: argparse.Namespace) -> int:
                 print(f"{method_name} schema validation failed:", file=sys.stderr)
                 print("\n".join(errors), file=sys.stderr)
                 return 1
-            summary.append(f"{method_name} ok")
+            record_result(method_name, True)
             for alias in method_spec.get("aliases", []):
                 alias_response = await rpc(ws, alias, {}, req_id, args.timeout_seconds, session_token=session_token)
                 req_id += 1
@@ -424,12 +559,17 @@ async def run_smoke_test(args: argparse.Namespace) -> int:
                     print(f"{alias} schema validation failed:", file=sys.stderr)
                     print("\n".join(alias_errors), file=sys.stderr)
                     return 1
-                summary.append(f"{alias} ok")
+                record_result(alias, True)
 
         if not args.skip_negative_tests:
-            await run_negative_tests_authenticated(ws, api_index, args.timeout_seconds, session_token, summary)
+            await run_negative_tests_authenticated(ws, api_index, args.timeout_seconds, session_token)
 
-    print("\n".join(summary))
+        if args.audio_lifecycle_smoke:
+            await run_audio_lifecycle_smoke(ws, args.timeout_seconds, session_token)
+        if args.debug_events_smoke:
+            await run_debug_events_smoke(ws, args.timeout_seconds, session_token)
+
+    print_results()
     return 0
 
 

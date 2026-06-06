@@ -5,6 +5,7 @@
 #include <display.h>
 #include <system_info.h>
 
+#include <cJSON.h>
 #include <esp_log.h>
 
 #define TAG "Application"
@@ -38,6 +39,19 @@ void Application::HandleStateChangedEvent()
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
+            if (HasDebugEventSubscribers()) {
+                cJSON* fields = cJSON_CreateObject();
+                if (fields != nullptr) {
+                    const char* mode = "manual";
+                    if (listening_mode_ == kListeningModeAutoStop) {
+                        mode = "auto";
+                    } else if (listening_mode_ == kListeningModeRealtime) {
+                        mode = "realtime";
+                    }
+                    cJSON_AddStringToObject(fields, "mode", mode);
+                    PublishDebugEvent("listen_enter", fields);
+                }
+            }
             if (listening_mode_ == kListeningModeAutoStop) {
                 StartAutoListenTimeout();
             } else {
@@ -128,4 +142,18 @@ void Application::HandleActivationDoneEvent()
     Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
 
     Schedule([this]() { audio_system_.PlaySound(Lang::Sounds::OGG_SUCCESS); });
+}
+
+void Application::OnStateChanged(DeviceState old_state, DeviceState new_state)
+{
+    if (!HasDebugEventSubscribers()) {
+        return;
+    }
+
+    cJSON* fields = cJSON_CreateObject();
+    if (fields != nullptr) {
+        cJSON_AddStringToObject(fields, "old_state", DeviceStateMachine::GetStateName(old_state));
+        cJSON_AddStringToObject(fields, "new_state", DeviceStateMachine::GetStateName(new_state));
+        PublishDebugEvent("state_transition", fields);
+    }
 }

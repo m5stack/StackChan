@@ -38,6 +38,10 @@
 build/
 cmake-build-*/
 /components/
+!/components/
+/components/*
+!/components/stackchan_fonts/
+!/components/stackchan_fonts/**
 managed_components/
 
 # PlatformIO

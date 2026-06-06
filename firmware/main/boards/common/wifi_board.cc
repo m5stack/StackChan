@@ -9,7 +9,6 @@
 #include <wifi_station.h>
 #include <ssid_manager.h>
 
-#include "afsk_demod.h"
 #include "audio_codec.h"
 #include "application.h"
 #include "assets/lang_config.h"
@@ -206,22 +205,6 @@ void WifiBoard::StartWifiConfigMode()
     Blufi::GetInstance().init();
 #endif
 
-#if CONFIG_USE_ACOUSTIC_WIFI_PROVISIONING
-    AudioCodec* codec = Board::GetInstance().GetAudioCodec();
-    const int channel = codec != nullptr ? codec->input_channels() : 1;
-    ESP_LOGI(kTag, "Starting acoustic WiFi provisioning, channels: %d", channel);
-
-    xTaskCreate(
-        [](void* arg) {
-            const auto input_channels = reinterpret_cast<intptr_t>(arg);
-            auto& app = Application::GetInstance();
-            auto& wifi = WifiManager::GetInstance();
-            Display* display = Board::GetInstance().GetDisplay();
-            audio_wifi_config::ReceiveWifiCredentialsFromAudio(&app, &wifi, display, input_channels);
-            vTaskDelete(nullptr);
-        },
-        "acoustic_wifi", 4096, reinterpret_cast<void*>(channel), 2, nullptr);
-#endif
 }
 
 void WifiBoard::EnterWifiConfigMode()

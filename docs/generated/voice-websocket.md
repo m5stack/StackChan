@@ -21,9 +21,18 @@ pairing, and durable robot control.
 - `auth_ok`: Server accepts voice authentication.
 - `device_hello`: Device advertises voice transport and microphone audio format.
 - `server_hello`: Server creates the voice session and advertises playback audio parameters.
-- `listen_start`: Device starts a listening window.
-- `listen_stop`: Device stops the current listening window.
-- `mcp`: Transitional MCP envelope on the voice session.
+- `listen.start`: Device starts a listening window.
+- `listen.stop`: Device stops the current listening window.
+- `listen.detect`: Device reports the detected wake phrase for the current session.
+- `tts.start`: Server starts TTS playback on the device.
+- `tts.sentence`: Server streams one assistant sentence for subtitle display.
+- `tts.stop`: Server ends TTS playback on the device.
+- `stt.transcript`: Server sends the recognized user transcript for subtitle display.
+- `ui.emotion`: Server requests a UI emotion change on the device display.
+- `ui.alert`: Server requests a UI alert banner, message, and emotion.
+- `ui.custom`: Server sends a custom UI payload for firmware-defined rendering.
+- `system.reboot`: Server requests an immediate device reboot.
+- `mcp.message`: JSON-RPC MCP envelope carried over the voice session.
 
 ## Binary Frames
 
@@ -378,7 +387,7 @@ Schema:
 }
 ```
 
-## listen_start
+## listen.start
 
 Device starts a listening window.
 
@@ -390,8 +399,7 @@ Example:
 {
   "mode": "auto",
   "session_id": "<session-id>",
-  "state": "start",
-  "type": "listen"
+  "type": "listen.start"
 }
 ```
 
@@ -411,26 +419,21 @@ Schema:
     "session_id": {
       "type": "string"
     },
-    "state": {
-      "const": "start",
-      "type": "string"
-    },
     "type": {
-      "const": "listen",
+      "const": "listen.start",
       "type": "string"
     }
   },
   "required": [
     "session_id",
     "type",
-    "state",
     "mode"
   ],
   "type": "object"
 }
 ```
 
-## listen_stop
+## listen.stop
 
 Device stops the current listening window.
 
@@ -441,8 +444,7 @@ Example:
 ```json
 {
   "session_id": "<session-id>",
-  "state": "stop",
-  "type": "listen"
+  "type": "listen.stop"
 }
 ```
 
@@ -454,29 +456,351 @@ Schema:
     "session_id": {
       "type": "string"
     },
-    "state": {
-      "const": "stop",
+    "type": {
+      "const": "listen.stop",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "type"
+  ],
+  "type": "object"
+}
+```
+
+## listen.detect
+
+Device reports the detected wake phrase for the current session.
+
+- Direction: `device_to_server`
+
+Example:
+
+```json
+{
+  "session_id": "<session-id>",
+  "text": "hi stackchan",
+  "type": "listen.detect"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "text": {
       "type": "string"
     },
     "type": {
-      "const": "listen",
+      "const": "listen.detect",
       "type": "string"
     }
   },
   "required": [
     "session_id",
     "type",
-    "state"
+    "text"
   ],
   "type": "object"
 }
 ```
 
-## mcp
+## tts.start
 
-Transitional MCP envelope on the voice session.
+Server starts TTS playback on the device.
 
-- Direction: `device_to_server`
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "type": "tts.start"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "type": {
+      "const": "tts.start",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type"
+  ],
+  "type": "object"
+}
+```
+
+## tts.sentence
+
+Server streams one assistant sentence for subtitle display.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "text": "Hello there.",
+  "type": "tts.sentence"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "type": {
+      "const": "tts.sentence",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "text"
+  ],
+  "type": "object"
+}
+```
+
+## tts.stop
+
+Server ends TTS playback on the device.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "type": "tts.stop"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "type": {
+      "const": "tts.stop",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type"
+  ],
+  "type": "object"
+}
+```
+
+## stt.transcript
+
+Server sends the recognized user transcript for subtitle display.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "text": "What is the weather?",
+  "type": "stt.transcript"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "type": {
+      "const": "stt.transcript",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "text"
+  ],
+  "type": "object"
+}
+```
+
+## ui.emotion
+
+Server requests a UI emotion change on the device display.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "emotion": "happy",
+  "type": "ui.emotion"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "emotion": {
+      "type": "string"
+    },
+    "type": {
+      "const": "ui.emotion",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "emotion"
+  ],
+  "type": "object"
+}
+```
+
+## ui.alert
+
+Server requests a UI alert banner, message, and emotion.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "emotion": "happy",
+  "message": "emotion check",
+  "status": "TEST",
+  "type": "ui.alert"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "emotion": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "type": {
+      "const": "ui.alert",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "status",
+    "message",
+    "emotion"
+  ],
+  "type": "object"
+}
+```
+
+## ui.custom
+
+Server sends a custom UI payload for firmware-defined rendering.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "payload": {
+    "message": "hello",
+    "screen": "debug"
+  },
+  "type": "ui.custom"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "payload": {
+      "type": "object"
+    },
+    "type": {
+      "const": "ui.custom",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "payload"
+  ],
+  "type": "object"
+}
+```
+
+## system.reboot
+
+Server requests an immediate device reboot.
+
+- Direction: `server_to_device`
+
+Example:
+
+```json
+{
+  "type": "system.reboot"
+}
+```
+
+Schema:
+
+```json
+{
+  "properties": {
+    "type": {
+      "const": "system.reboot",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type"
+  ],
+  "type": "object"
+}
+```
+
+## mcp.message
+
+JSON-RPC MCP envelope carried over the voice session.
+
+- Direction: `bidirectional`
 
 Example:
 
@@ -489,7 +813,7 @@ Example:
     "params": {}
   },
   "session_id": "<session-id>",
-  "type": "mcp"
+  "type": "mcp.message"
 }
 ```
 
@@ -505,7 +829,7 @@ Schema:
       "type": "string"
     },
     "type": {
-      "const": "mcp",
+      "const": "mcp.message",
       "type": "string"
     }
   },

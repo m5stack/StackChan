@@ -15,6 +15,9 @@ public:
     uint8_t brightness() const { return brightness_; }
 
 protected:
+    void StartTransition();
+    void StopTransition();
+    bool TransitionActive() const;
     void OnTransitionTimer();
     virtual void SetBrightnessImpl(uint8_t brightness) = 0;
 

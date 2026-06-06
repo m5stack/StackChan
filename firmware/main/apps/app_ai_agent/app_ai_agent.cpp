@@ -39,9 +39,9 @@ void AppAiAgent::onOpen()
 {
     mclog::tagInfo(getAppInfo().name, "on open");
 
-    // Request to start Xiaozhi service
+    // Request to start the AI agent runtime.
     // All apps will be uninstall in next mooncake update
-    GetHAL().requestXiaozhiStart();
+    GetHAL().requestAiAgentStart();
 }
 
 // Called repeatedly while the App is running

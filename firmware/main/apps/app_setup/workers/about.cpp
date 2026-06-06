@@ -308,7 +308,7 @@ SystemUpdateWorker::SystemUpdateWorker()
     });
 
     // Update Firmware
-    bool result = GetHAL().updateFirmware([&](std::string_view msg) {
+    GetHAL().updateFirmware([&](std::string_view msg) {
         LvglLockGuard lock;
         loading_page->setMessage(msg);
     });

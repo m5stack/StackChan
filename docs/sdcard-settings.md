@@ -9,11 +9,13 @@ The firmware reads optional settings from:
 The file overrides NVS settings in memory. It does not rewrite persistent NVS
 values.
 
+AI-agent settings use the `agent` object.
+
 Example:
 
 ```json
 {
-  "xiaozhi": {
+  "agent": {
     "idleShutdownTimeSeconds": 600,
     "allowShutdownWhenCharging": false,
     "idleRandomMovementLevel": 2,
@@ -21,6 +23,9 @@ Example:
   },
   "localControl": {
     "token": "stackchan-local-dev"
+  },
+  "settings": {
+    "syncToSd": true
   }
 }
 ```
@@ -29,7 +34,7 @@ Short NVS-style keys are also accepted:
 
 ```json
 {
-  "xiaozhi": {
+  "agent": {
     "idle_sec": 600,
     "ext_pwr": false,
     "idle_lv": 2,
@@ -42,13 +47,13 @@ Runtime settings methods are available only on an authenticated local control
 WebSocket session:
 
 - `settings/get`
-- `settings/write_sd`
+- `settings/sync_to_sd`
 - `local_control/set_token`
 
-`settings/write_sd` accepts a `settings_json` string, validates it, and only
-writes the file if it is valid. It returns `reboot_required: true`; reboot
-separately after changing settings that are loaded at startup, such as the local
-control token.
+`settings/sync_to_sd` accepts a `settings_json` string and `sync_to_sd: true`,
+validates the settings, and only writes the file if it is valid. It returns
+`reboot_required: true`; reboot separately after changing settings that are
+loaded at startup, such as the local control token.
 
 Validation rules:
 
@@ -58,6 +63,8 @@ Validation rules:
 - `startAiAgentOnBoot` / `boot_ai`: boolean
 - `localControl.token`: `8..96` characters, using only letters, numbers, `.`,
   `-`, `_`, and `~`
+- `settings.syncToSd`: boolean, written as `true` when settings are explicitly
+  synced to SDCard.
 
 Runtime SD-card access in firmware code must use `GetHAL().withSdCard(...)`.
 Do not call `fopen()`, `opendir()`, `stat()`, or similar directly under

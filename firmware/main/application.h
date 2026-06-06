@@ -5,6 +5,7 @@
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
 
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -41,6 +42,11 @@ enum AecMode {
     kAecOnServerSide,
 };
 
+enum ListenStopReason {
+    kListenStopManualRequest,
+    kListenStopAutoTimeout,
+};
+
 class Application {
 public:
     static Application& GetInstance()
@@ -71,6 +77,8 @@ public:
     bool CanEnterSleepMode();
     void SendMcpMessage(const std::string& payload);
     void RegisterMcpBroadcastCallback(std::function<void(const std::string&)> callback);
+    void RegisterDebugEventCallback(std::function<bool()> has_subscribers,
+                                    std::function<void(const char*, cJSON*)> callback);
     void SetAecMode(AecMode mode);
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
@@ -95,6 +103,9 @@ private:
     std::unique_ptr<Ota> ota_;
 
     std::function<void(const std::string&)> mcp_broadcast_callback_;
+    std::function<bool()> has_debug_event_subscribers_callback_;
+    std::function<void(const char*, cJSON*)> debug_event_callback_;
+    std::atomic<ListenStopReason> pending_listen_stop_reason_{kListenStopManualRequest};
 
     bool has_server_time_ = false;
     bool aborted_ = false;
@@ -123,19 +134,24 @@ private:
     void CheckNewVersion();
     void InitializeProtocol();
     void HandleIncomingProtocolJson(const cJSON* root, Display* display);
-    bool HandleIncomingTtsMessage(const cJSON* root, Display* display);
-    bool HandleIncomingSttMessage(const cJSON* root, Display* display);
-    bool HandleIncomingLlmMessage(const cJSON* root, Display* display);
-    bool HandleIncomingMcpMessage(const cJSON* root);
-    bool HandleIncomingSystemMessage(const cJSON* root);
-    bool HandleIncomingAlertMessage(const cJSON* root);
-    bool HandleIncomingCustomMessage(const cJSON* root, Display* display);
+    bool HandleIncomingTtsStart(const cJSON* root, Display* display);
+    bool HandleIncomingTtsSentence(const cJSON* root, Display* display);
+    bool HandleIncomingTtsStop(const cJSON* root, Display* display);
+    bool HandleIncomingSttTranscript(const cJSON* root, Display* display);
+    bool HandleIncomingUiEmotion(const cJSON* root, Display* display);
+    bool HandleIncomingUiAlert(const cJSON* root);
+    bool HandleIncomingSystemReboot(const cJSON* root);
+    bool HandleIncomingMcp(const cJSON* root);
+    bool HandleIncomingUiCustom(const cJSON* root, Display* display);
     void StartAutoListenTimeout();
     void StopAutoListenTimeout();
     void ShowActivationCode(const std::string& code, const std::string& message);
     void SetListeningMode(ListeningMode mode);
     ListeningMode GetDefaultListeningMode() const;
     void OnStateChanged(DeviceState old_state, DeviceState new_state);
+    void RequestStopListening(ListenStopReason reason);
+    bool HasDebugEventSubscribers() const;
+    void PublishDebugEvent(const char* type, cJSON* fields);
 };
 
 class TaskPriorityReset {

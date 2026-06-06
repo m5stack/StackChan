@@ -29,10 +29,10 @@ private:
         v4l2_pix_fmt_t format = 0;
     } frame_;
     v4l2_pix_fmt_t sensor_format_ = 0;
-#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+#ifdef CONFIG_STACKCHAN_ENABLE_ROTATE_CAMERA_IMAGE
     uint16_t sensor_width_  = 0;
     uint16_t sensor_height_ = 0;
-#endif  // CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+#endif  // CONFIG_STACKCHAN_ENABLE_ROTATE_CAMERA_IMAGE
     int video_fd_      = -1;
     bool streaming_on_ = false;
     struct MmapBuffer {
@@ -52,7 +52,6 @@ public:
     virtual bool Capture() override;
     bool StreamCaptures();
 
-    // 翻转控制函数
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual std::string Explain(const std::string& question);

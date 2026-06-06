@@ -548,9 +548,6 @@ void LauncherView::handle_state_normal()
 
     int current_scroll_x = _panel->getScrollX();
 
-    // Define safe zone (Copy 2)
-    int center_set_start_x = _center_copy_index * set_width_px;
-
     // Thresholds: midpoint of Wrap sets
     int left_trigger_limit  = 1 * set_width_px + (set_width_px / 2);  // Middle of Set 1
     int right_trigger_limit = 3 * set_width_px + (set_width_px / 2);  // Middle of Set 3

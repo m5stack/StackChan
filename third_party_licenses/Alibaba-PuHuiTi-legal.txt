@@ -1,0 +1,21 @@
+Alibaba PuHuiTi / 阿里巴巴普惠体 legal note
+
+This firmware includes LVGL-generated font artifacts that appear to derive from
+Alibaba PuHuiTi / 阿里巴巴普惠体 assets:
+
+- firmware/components/stackchan_fonts/src/font_puhui_basic_20_4.c
+- firmware/components/stackchan_fonts/cbin/font_puhui_common_20_4.bin
+
+Alibaba PuHuiTi is not an open-source font under MIT/OFL/Apache-style terms.
+Public Alibaba-facing materials describe the font as free for personal and
+commercial use, but with separate legal terms and restrictions. This file is
+included as a provenance and compliance note, not as a replacement for Alibaba's
+legal terms and not as an independent license grant.
+
+Before distributing releases that retain these generated font artifacts, review
+Alibaba's current font legal terms and confirm that firmware embedding is within
+scope. If that cannot be confirmed, replace these assets with a fully
+open-source CJK font such as Noto Sans CJK or Source Han Sans.
+
+Known public source page:
+https://www.alibabafonts.com/

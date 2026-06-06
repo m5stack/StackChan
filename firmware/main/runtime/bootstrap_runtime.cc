@@ -31,7 +31,8 @@ void Application::Initialize()
     };
     audio_system_.SetCallbacks(callbacks);
 
-    state_machine_.AddStateChangeListener([this](DeviceState, DeviceState) {
+    state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
+        OnStateChanged(old_state, new_state);
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
     });
 

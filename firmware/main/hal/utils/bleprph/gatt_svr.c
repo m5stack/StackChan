@@ -71,8 +71,6 @@ static stackchan_ble_callbacks_t g_stackchan_callbacks = {0};
 /* Connection handle for notifications */
 static uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
-static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
-
 static int stackchan_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt,
                                 void *arg);
 
@@ -282,15 +280,6 @@ static int battery_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct
             break;
     }
 
-    return BLE_ATT_ERR_UNLIKELY;
-}
-
-/**
- * Old GATT service access callback (kept for compatibility)
- */
-static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    /* This can be removed if not needed */
     return BLE_ATT_ERR_UNLIKELY;
 }
 

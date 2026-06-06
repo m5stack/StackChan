@@ -1,14 +1,14 @@
 # Local Control WebSocket
 
 StackChan exposes a LAN-only control WebSocket while the device is connected to
-WiFi. This channel is separate from the Xiaozhi voice WebSocket, so robot
+WiFi. This channel is separate from the voice WebSocket, so robot
 control can stay available even when the voice session is asleep.
 
 The method reference is generated from machine-readable metadata:
 
 - [Generated local-control API reference](generated/local-control-websocket.md)
+- [Generated local-control debug event reference](generated/local-control-events.md)
 - [Generated voice WebSocket reference](generated/voice-websocket.md)
-- [Generated MCP tool reference](generated/mcp-tools.md)
 - Source metadata: `docs/api/local-control.methods.json`
 - Generator: `tools/generate_api_docs.py`
 
@@ -69,7 +69,7 @@ outside the LAN.
 Clients should treat these as separate states:
 
 - WiFi/control presence: whether the local control WebSocket is reachable.
-- Voice activity: whether the Xiaozhi voice WebSocket is currently connected.
+- Voice activity: whether the voice WebSocket is currently connected.
 
 ## Current Limitations
 

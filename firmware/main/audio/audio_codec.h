@@ -38,6 +38,8 @@ public:
     float input_gain() const { return input_gain_; }
 
 protected:
+    static constexpr int kDefaultOutputVolume = 70;
+
     i2s_chan_handle_t tx_handle_ = nullptr;
     i2s_chan_handle_t rx_handle_ = nullptr;
 
@@ -49,7 +51,7 @@ protected:
     int output_sample_rate_ = 0;
     int input_channels_ = 1;
     int output_channels_ = 1;
-    int output_volume_ = 70;
+    int output_volume_ = kDefaultOutputVolume;
     float input_gain_ = 0.0f;
 
     virtual int Read(int16_t* dest, int samples) = 0;

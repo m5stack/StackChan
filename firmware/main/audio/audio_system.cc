@@ -149,16 +149,21 @@ void AudioSystem::SetCallbacks(const AudioSystemCallbacks& callbacks)
 
 void AudioSystem::SetModelsList(srmodel_list_t* models_list)
 {
-    if (!service_stopped_) {
-        ESP_LOGW(kTag, "Ignoring models update while audio system is running");
-        return;
-    }
-
     models_list_ = models_list;
+
+    if (audio_capture_worker_ != nullptr) {
+        audio_capture_worker_->EnableWakeWord(false);
+        audio_capture_worker_->EnableVoiceProcessing(false);
+    }
+    wake_word_controller_->Stop();
+    voice_processor_controller_->Stop();
+
     wake_word_initialized_ = false;
     audio_processor_initialized_ = false;
     voice_processor_controller_->SetModelsList(models_list_);
     wake_word_controller_->SetModelsList(models_list_);
+
+    ESP_LOGI(kTag, "Updated audio models list%s", service_stopped_ ? " while stopped" : " while running");
 }
 
 void AudioSystem::PlaySound(const std::string_view& ogg)

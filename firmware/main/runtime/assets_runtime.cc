@@ -5,10 +5,7 @@
 #include "display.h"
 #include "lvgl_theme.h"
 
-#if HAVE_LVGL
-#include "display/lcd_display.h"
 #include <spi_flash_mmap.h>
-#endif
 
 #include <cbin_font.h>
 #include <esp_heap_caps.h>
@@ -30,11 +27,7 @@ struct mmap_assets_table {
 
 Assets::Assets()
 {
-#if HAVE_LVGL
     strategy_ = std::make_unique<Assets::LvglStrategy>();
-#else
-    strategy_ = std::make_unique<Assets::EmoteStrategy>();
-#endif
     InitializePartition();
 }
 
@@ -125,7 +118,6 @@ bool Assets::LoadSrmodelsFromIndex(Assets* assets, cJSON* root)
     return false;
 }
 
-#if HAVE_LVGL
 uint32_t Assets::LvglStrategy::CalculateChecksum(const char* data, uint32_t length)
 {
     uint32_t checksum = 0;
@@ -364,18 +356,14 @@ bool Assets::LvglStrategy::Apply(Assets* assets, bool refresh_display_theme)
         cJSON* hide_subtitle = cJSON_GetObjectItem(root, "hide_subtitle");
         if (cJSON_IsBool(hide_subtitle)) {
             const bool hide = cJSON_IsTrue(hide_subtitle);
-            auto* lcd_display = dynamic_cast<LcdDisplay*>(display);
-            if (lcd_display != nullptr) {
-                lcd_display->SetHideSubtitle(hide);
-                ESP_LOGI(kTag, "Set hide_subtitle to %s", hide ? "true" : "false");
-            }
+            display->SetHideSubtitle(hide);
+            ESP_LOGI(kTag, "Set hide_subtitle to %s", hide ? "true" : "false");
         }
     }
 
     cJSON_Delete(root);
     return true;
 }
-#endif
 
 bool Assets::Download(std::string url, std::function<void(int progress, size_t speed)> progress_callback)
 {

@@ -15,66 +15,75 @@ void Application::HandleIncomingProtocolJson(const cJSON* root, Display* display
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
     if (!cJSON_IsString(type)) {
-        ESP_LOGW(TAG, "Unknown message without type");
+        ESP_LOGW(TAG, "Unknown voice message without type");
         return;
     }
 
-    if (HandleIncomingTtsMessage(root, display) || HandleIncomingSttMessage(root, display) ||
-        HandleIncomingLlmMessage(root, display) || HandleIncomingMcpMessage(root) ||
-        HandleIncomingSystemMessage(root) || HandleIncomingAlertMessage(root) ||
-        HandleIncomingCustomMessage(root, display)) {
+    if (HandleIncomingTtsStart(root, display) || HandleIncomingTtsSentence(root, display) ||
+        HandleIncomingTtsStop(root, display) || HandleIncomingSttTranscript(root, display) ||
+        HandleIncomingUiEmotion(root, display) || HandleIncomingUiAlert(root) ||
+        HandleIncomingSystemReboot(root) || HandleIncomingMcp(root) ||
+        HandleIncomingUiCustom(root, display)) {
         return;
     }
 
-    ESP_LOGW(TAG, "Unknown message type: %s", type->valuestring);
+    ESP_LOGW(TAG, "Unknown voice message type: %s", type->valuestring);
 }
 
-bool Application::HandleIncomingTtsMessage(const cJSON* root, Display* display)
+bool Application::HandleIncomingTtsStart(const cJSON* root, Display* display)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "tts") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "tts.start") != 0) {
         return false;
     }
-
-    const cJSON* state = cJSON_GetObjectItem(root, "state");
-    if (cJSON_IsString(state) && std::strcmp(state->valuestring, "start") == 0) {
-        Schedule([this]() {
-            aborted_ = false;
-            SetDeviceState(kDeviceStateSpeaking);
-        });
-        return true;
-    }
-
-    if (cJSON_IsString(state) && std::strcmp(state->valuestring, "stop") == 0) {
-        Schedule([this]() {
-            if (GetDeviceState() == kDeviceStateSpeaking) {
-                if (listening_mode_ == kListeningModeManualStop) {
-                    SetDeviceState(kDeviceStateIdle);
-                } else {
-                    SetDeviceState(kDeviceStateListening);
-                }
-            }
-        });
-        return true;
-    }
-
-    if (cJSON_IsString(state) && std::strcmp(state->valuestring, "sentence_start") == 0) {
-        const cJSON* text = cJSON_GetObjectItem(root, "text");
-        if (cJSON_IsString(text)) {
-            ESP_LOGI(TAG, "<< %s", text->valuestring);
-            Schedule([display, message = std::string(text->valuestring)]() {
-                display->SetChatMessage("assistant", message.c_str());
-            });
-        }
-    }
-
+    (void)display;
+    Schedule([this]() {
+        aborted_ = false;
+        SetDeviceState(kDeviceStateSpeaking);
+    });
     return true;
 }
 
-bool Application::HandleIncomingSttMessage(const cJSON* root, Display* display)
+bool Application::HandleIncomingTtsSentence(const cJSON* root, Display* display)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "stt") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "tts.sentence") != 0) {
+        return false;
+    }
+
+    const cJSON* text = cJSON_GetObjectItem(root, "text");
+    if (cJSON_IsString(text)) {
+        ESP_LOGI(TAG, "<< %s", text->valuestring);
+        Schedule([display, message = std::string(text->valuestring)]() {
+            display->SetChatMessage("assistant", message.c_str());
+        });
+    }
+    return true;
+}
+
+bool Application::HandleIncomingTtsStop(const cJSON* root, Display* display)
+{
+    const cJSON* type = cJSON_GetObjectItem(root, "type");
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "tts.stop") != 0) {
+        return false;
+    }
+    (void)display;
+    Schedule([this]() {
+        if (GetDeviceState() == kDeviceStateSpeaking) {
+            if (listening_mode_ == kListeningModeManualStop) {
+                SetDeviceState(kDeviceStateIdle);
+            } else {
+                SetDeviceState(kDeviceStateListening);
+            }
+        }
+    });
+    return true;
+}
+
+bool Application::HandleIncomingSttTranscript(const cJSON* root, Display* display)
+{
+    const cJSON* type = cJSON_GetObjectItem(root, "type");
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "stt.transcript") != 0) {
         return false;
     }
 
@@ -88,13 +97,12 @@ bool Application::HandleIncomingSttMessage(const cJSON* root, Display* display)
     return true;
 }
 
-bool Application::HandleIncomingLlmMessage(const cJSON* root, Display* display)
+bool Application::HandleIncomingUiEmotion(const cJSON* root, Display* display)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "llm") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "ui.emotion") != 0) {
         return false;
     }
-
     const cJSON* emotion = cJSON_GetObjectItem(root, "emotion");
     if (cJSON_IsString(emotion)) {
         Schedule([display, emotion_str = std::string(emotion->valuestring)]() {
@@ -104,10 +112,10 @@ bool Application::HandleIncomingLlmMessage(const cJSON* root, Display* display)
     return true;
 }
 
-bool Application::HandleIncomingMcpMessage(const cJSON* root)
+bool Application::HandleIncomingMcp(const cJSON* root)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "mcp") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "mcp.message") != 0) {
         return false;
     }
 
@@ -118,24 +126,20 @@ bool Application::HandleIncomingMcpMessage(const cJSON* root)
     return true;
 }
 
-bool Application::HandleIncomingSystemMessage(const cJSON* root)
+bool Application::HandleIncomingSystemReboot(const cJSON* root)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "system") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "system.reboot") != 0) {
         return false;
     }
-
-    const cJSON* command = cJSON_GetObjectItem(root, "command");
-    if (cJSON_IsString(command) && std::strcmp(command->valuestring, "reboot") == 0) {
-        Schedule([this]() { Reboot(); });
-    }
+    Schedule([this]() { Reboot(); });
     return true;
 }
 
-bool Application::HandleIncomingAlertMessage(const cJSON* root)
+bool Application::HandleIncomingUiAlert(const cJSON* root)
 {
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "alert") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "ui.alert") != 0) {
         return false;
     }
 
@@ -148,11 +152,11 @@ bool Application::HandleIncomingAlertMessage(const cJSON* root)
     return true;
 }
 
-bool Application::HandleIncomingCustomMessage(const cJSON* root, Display* display)
+bool Application::HandleIncomingUiCustom(const cJSON* root, Display* display)
 {
 #if CONFIG_RECEIVE_CUSTOM_MESSAGE
     const cJSON* type = cJSON_GetObjectItem(root, "type");
-    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "custom") != 0) {
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "ui.custom") != 0) {
         return false;
     }
 

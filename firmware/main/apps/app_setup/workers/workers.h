@@ -303,9 +303,9 @@ private:
  * @brief
  *
  */
-class XiaozhiPowerSavingWorker : public WorkerBase {
+class AIAgentPowerSavingWorker : public WorkerBase {
 public:
-    XiaozhiPowerSavingWorker();
+    AIAgentPowerSavingWorker();
     void update() override;
 
 private:
@@ -321,7 +321,7 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_charging;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
 
-    XiaozhiConfig_t _config;
+    AiAgentConfig_t _config;
     std::vector<uint32_t> _idle_shutdown_levels;
     int32_t _pending_idle_index = -1;
     bool _confirm_flag          = false;
@@ -331,9 +331,9 @@ private:
  * @brief
  *
  */
-class XiaozhiGeneralWorker : public WorkerBase {
+class AIAgentGeneralWorker : public WorkerBase {
 public:
-    XiaozhiGeneralWorker();
+    AIAgentGeneralWorker();
     void update() override;
 
 private:
@@ -349,7 +349,7 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_start_ai_on_boot;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
 
-    XiaozhiConfig_t _config;
+    AiAgentConfig_t _config;
     std::vector<uint8_t> _idle_motion_levels;
     int32_t _pending_idle_motion_index = -1;
     bool _confirm_flag                 = false;

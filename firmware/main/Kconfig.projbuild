@@ -11,7 +11,7 @@ config STACKCHAN_SERVER_URL
 
 endmenu
 
-menu "Xiaozhi Assistant"
+menu "AI Agent Runtime"
 
 config OTA_URL
     string "Default OTA URL"
@@ -22,8 +22,7 @@ config OTA_URL
 
 choice
     prompt "Flash Assets"
-    default FLASH_DEFAULT_ASSETS if !USE_EMOTE_MESSAGE_STYLE
-    default FLASH_EXPRESSION_ASSETS if USE_EMOTE_MESSAGE_STYLE
+    default FLASH_DEFAULT_ASSETS
     help
         Select the assets to flash.
 
@@ -31,12 +30,8 @@ choice
         bool "Do not flash assets"
     config FLASH_DEFAULT_ASSETS
         bool "Flash Default Assets"
-        depends on !USE_EMOTE_MESSAGE_STYLE
     config FLASH_CUSTOM_ASSETS
         bool "Flash Custom Assets"
-    config FLASH_EXPRESSION_ASSETS
-        bool "Flash Emote Assets"
-        depends on USE_EMOTE_MESSAGE_STYLE
 endchoice
 
 config CUSTOM_ASSETS_FILE
@@ -44,8 +39,8 @@ config CUSTOM_ASSETS_FILE
     string "Custom Assets File"
     default "assets.bin"
     help
-        The custom assets file to flash.
-        It can be a local file relative to the project directory or a remote url.
+        The custom assets file to flash. It must be a local file relative to
+        the project directory or an absolute local path.
 
 choice
     prompt "Default Language"
@@ -659,7 +654,7 @@ choice DISPLAY_STYLE
     prompt "Select display style"
     default USE_DEFAULT_MESSAGE_STYLE
     help
-        Select display style for Xiaozhi device
+        Select display style for the AI agent device runtime
 
     config USE_DEFAULT_MESSAGE_STYLE
         bool "Enable default message style"
@@ -667,11 +662,6 @@ choice DISPLAY_STYLE
     config USE_WECHAT_MESSAGE_STYLE
         bool "Enable WeChat Message Style"
 
-    config USE_EMOTE_MESSAGE_STYLE
-        bool "Emote animation style"
-        depends on BOARD_TYPE_ESP_BOX || BOARD_TYPE_ESP_BOX_3 \
-            || BOARD_TYPE_ECHOEAR || BOARD_TYPE_LICHUANG_DEV_S3 \
-            || BOARD_TYPE_ESP_SENSAIRSHUTTLE
 endchoice
 
 config USE_MULTILINE_CHAT_MESSAGE
@@ -830,7 +820,7 @@ menu "Camera Configuration"
 
     comment "Warning: Please read the help text before modifying these settings."
 
-    config XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
+    config STACKCHAN_CAMERA_ALLOW_JPEG_INPUT
         bool "Allow JPEG Input"
         default n
         help
@@ -838,9 +828,9 @@ menu "Camera Configuration"
 
             This option may need to be enabled when using a USB camera.
 
-            Not currently supported when used simultaneously with XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE.
+            Not currently supported when used simultaneously with STACKCHAN_ENABLE_ROTATE_CAMERA_IMAGE.
 
-    config XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
+    config STACKCHAN_ENABLE_HARDWARE_JPEG_ENCODER
         bool "Enable Hardware JPEG Encoder"
         default y
         depends on SOC_JPEG_ENCODE_SUPPORTED
@@ -848,22 +838,22 @@ menu "Camera Configuration"
             Use hardware JPEG encoder on ESP32-P4 to encode image to JPEG.
             See https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/peripherals/jpeg.html for more details.
 
-    config XIAOZHI_ENABLE_HARDWARE_JPEG_DECODER
+    config STACKCHAN_ENABLE_HARDWARE_JPEG_DECODER
         bool "Enable Hardware JPEG Decoder"
         default n
-        depends on SOC_JPEG_DECODE_SUPPORTED && XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
+        depends on SOC_JPEG_DECODE_SUPPORTED && STACKCHAN_CAMERA_ALLOW_JPEG_INPUT
         help
             Use hardware JPEG decoder on ESP32-P4 to decode JPEG to image.
             See https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/peripherals/jpeg.html for more details.
 
-    config XIAOZHI_ENABLE_CAMERA_DEBUG_MODE
+    config STACKCHAN_ENABLE_CAMERA_DEBUG_MODE
         bool "Enable Camera Debug Mode"
         default n
         help
             Enable camera debug mode, print camera debug information to the console.
             Only works on boards that support camera.
 
-    config XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+    config STACKCHAN_ENABLE_CAMERA_ENDIANNESS_SWAP
         bool "Enable software camera buffer endianness swapping"
         default n
         depends on !CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER
@@ -876,27 +866,27 @@ menu "Camera Configuration"
 
             ATTENTION: If the option CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER is available for your sensor, please use that instead.
 
-    menuconfig XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+    menuconfig STACKCHAN_ENABLE_ROTATE_CAMERA_IMAGE
         bool "Enable Camera Image Rotation"
         default n
-        depends on !XIAOZHI_CAMERA_ALLOW_JPEG_INPUT
+        depends on !STACKCHAN_CAMERA_ALLOW_JPEG_INPUT
         help
             Enable camera image rotation, rotate the camera image to the correct orientation.
             - On ESP32-P4, rotation is handled by PPA hardware.
             - On other chips, rotation is done in software with performance cost.
             - For 180° rotation, use HFlip + VFlip instead of this option.
 
-            Not currently supported when used simultaneously with XIAOZHI_CAMERA_ALLOW_JPEG_INPUT.
+            Not currently supported when used simultaneously with STACKCHAN_CAMERA_ALLOW_JPEG_INPUT.
 
-    if XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
-        choice XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE
+    if STACKCHAN_ENABLE_ROTATE_CAMERA_IMAGE
+        choice STACKCHAN_CAMERA_IMAGE_ROTATION_ANGLE
             prompt "Camera Image Rotation Angle (clockwise)"
-            default XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE_90
+            default STACKCHAN_CAMERA_IMAGE_ROTATION_ANGLE_90
             help
                 Camera image rotation angle.
-            config XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE_90
+            config STACKCHAN_CAMERA_IMAGE_ROTATION_ANGLE_90
                 bool "90°"
-            config XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE_270
+            config STACKCHAN_CAMERA_IMAGE_ROTATION_ANGLE_270
                 bool "270°"
             comment "For 180° rotation, use HFlip + VFlip instead of this option"
         endchoice

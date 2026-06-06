@@ -29,7 +29,7 @@ Application::Application()
     esp_timer_create_args_t auto_listen_timeout_timer_args = {
         .callback = [](void* arg) {
             auto* app = static_cast<Application*>(arg);
-            app->StopListening();
+            app->RequestStopListening(kListenStopAutoTimeout);
         },
         .arg = this,
         .dispatch_method = ESP_TIMER_TASK,
