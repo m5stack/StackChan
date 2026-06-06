@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "title": "StackChan Voice WebSocket",
+  "title": "StackChan Voice Session WebSocket",
   "endpoint": "configured by local-control voice/set_config",
   "transport": "device-initiated WebSocket",
   "auth": {
@@ -119,7 +119,14 @@
         "properties": {
           "type": {"type": "string", "const": "hello"},
           "version": {"type": "integer"},
-          "features": {"type": "object"},
+          "features": {
+            "type": "object",
+            "properties": {
+              "mcp": {"type": "boolean"},
+              "aec": {"type": "boolean"},
+              "remote_wake": {"type": "boolean"}
+            }
+          },
           "transport": {"type": "string", "const": "websocket"},
           "audio_params": {
             "type": "object",
@@ -136,7 +143,7 @@
       "example": {
         "type": "hello",
         "version": 1,
-        "features": {"mcp": true},
+        "features": {"mcp": true, "remote_wake": true},
         "transport": "websocket",
         "audio_params": {
           "format": "opus",
@@ -187,7 +194,7 @@
         "properties": {
           "session_id": {"type": "string"},
           "type": {"type": "string", "const": "listen.start"},
-          "mode": {"type": "string", "enum": ["auto", "manual", "realtime"]}
+          "mode": {"type": "string", "enum": ["auto", "manual", "realtime", "remote_wake"]}
         }
       },
       "example": {
@@ -215,11 +222,11 @@
     },
     {
       "name": "listen.detect",
-      "direction": "device_to_server",
-      "summary": "Device reports the detected wake phrase for the current session.",
+      "direction": "bidirectional",
+      "summary": "A peer reports the detected wake phrase for the current session.",
       "schema": {
         "type": "object",
-        "required": ["session_id", "type", "text"],
+        "required": ["type", "text"],
         "properties": {
           "session_id": {"type": "string"},
           "type": {"type": "string", "const": "listen.detect"},

@@ -32,6 +32,10 @@ struct AiAgentConfig_t {
     bool startAiAgentOnBoot          = false;
 };
 
+struct AvatarConfig_t {
+    std::string skin = "ineffa";
+};
+
 void lock();
 void unlock();
 Data_t& get_data();
@@ -55,6 +59,9 @@ bool is_ai_agent_idle();
 AiAgentConfig_t get_ai_agent_config();
 void set_ai_agent_config(const AiAgentConfig_t& config);
 bool apply_ai_agent_config_sd_overrides(AiAgentConfig_t& config);
+AvatarConfig_t get_avatar_config();
+void set_avatar_config(const AvatarConfig_t& config);
+bool apply_avatar_config_sd_overrides(AvatarConfig_t& config);
 void set_boot_ai_agent_config(const AiAgentConfig_t& config);
 bool get_boot_ai_agent_config(AiAgentConfig_t& config);
 std::string get_local_control_token();

@@ -15,6 +15,7 @@ file(GLOB_RECURSE STACK_CHAN_SOURCES
     "stackchan/*.cc"
     "stackchan/*.cpp"
 )
+list(FILTER STACK_CHAN_SOURCES EXCLUDE REGEX "(^|.*/)apps/app_template/.*")
 set(STACK_CHAN_INCLUDE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/audio"
@@ -40,6 +41,7 @@ set(SOURCES
     "audio/wake_word_factory.cc"
     "audio/demuxer/ogg_demuxer.cc"
     "audio/processors/afe_audio_processor.cc"
+    "audio/wake_words/afe_custom_wake_word.cc"
     "audio/wake_words/afe_wake_word.cc"
     "audio/wake_words/custom_wake_word.cc"
     "audio/wake_words/wake_word_history_encoder.cc"
@@ -156,113 +158,45 @@ endif()
 if (CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING)
     list(APPEND SOURCES "boards/common/blufi.cpp")
 endif ()
-# Select language directory according to Kconfig
-if(CONFIG_LANGUAGE_ZH_CN)
-    set(LANG_DIR "zh-CN")
-elseif(CONFIG_LANGUAGE_ZH_TW)
-    set(LANG_DIR "zh-TW")
-elseif(CONFIG_LANGUAGE_EN_US)
+# Select language directory according to Kconfig.
+if(CONFIG_LANGUAGE)
+    set(LANG_DIR "${CONFIG_LANGUAGE}")
+else()
     set(LANG_DIR "en-US")
-elseif(CONFIG_LANGUAGE_JA_JP)
-    set(LANG_DIR "ja-JP")
-elseif(CONFIG_LANGUAGE_KO_KR)
-    set(LANG_DIR "ko-KR")
-elseif(CONFIG_LANGUAGE_VI_VN)
-    set(LANG_DIR "vi-VN")
-elseif(CONFIG_LANGUAGE_TH_TH)
-    set(LANG_DIR "th-TH")
-elseif(CONFIG_LANGUAGE_DE_DE)
-    set(LANG_DIR "de-DE")
-elseif(CONFIG_LANGUAGE_FR_FR)
-    set(LANG_DIR "fr-FR")
-elseif(CONFIG_LANGUAGE_ES_ES)
-    set(LANG_DIR "es-ES")
-elseif(CONFIG_LANGUAGE_IT_IT)
-    set(LANG_DIR "it-IT")
-elseif(CONFIG_LANGUAGE_RU_RU)
-    set(LANG_DIR "ru-RU")
-elseif(CONFIG_LANGUAGE_AR_SA)
-    set(LANG_DIR "ar-SA")
-elseif(CONFIG_LANGUAGE_HI_IN)
-    set(LANG_DIR "hi-IN")
-elseif(CONFIG_LANGUAGE_PT_PT)
-    set(LANG_DIR "pt-PT")
-elseif(CONFIG_LANGUAGE_PL_PL)
-    set(LANG_DIR "pl-PL")
-elseif(CONFIG_LANGUAGE_CS_CZ)
-    set(LANG_DIR "cs-CZ")
-elseif(CONFIG_LANGUAGE_FI_FI)
-    set(LANG_DIR "fi-FI")
-elseif(CONFIG_LANGUAGE_TR_TR)
-    set(LANG_DIR "tr-TR")
-elseif(CONFIG_LANGUAGE_ID_ID)
-    set(LANG_DIR "id-ID")
-elseif(CONFIG_LANGUAGE_UK_UA)
-    set(LANG_DIR "uk-UA")
-elseif(CONFIG_LANGUAGE_RO_RO)
-    set(LANG_DIR "ro-RO")
-elseif(CONFIG_LANGUAGE_BG_BG)
-    set(LANG_DIR "bg-BG")
-elseif(CONFIG_LANGUAGE_CA_ES)
-    set(LANG_DIR "ca-ES")
-elseif(CONFIG_LANGUAGE_DA_DK)
-    set(LANG_DIR "da-DK")
-elseif(CONFIG_LANGUAGE_EL_GR)
-    set(LANG_DIR "el-GR")
-elseif(CONFIG_LANGUAGE_FA_IR)
-    set(LANG_DIR "fa-IR")
-elseif(CONFIG_LANGUAGE_FIL_PH)
-    set(LANG_DIR "fil-PH")
-elseif(CONFIG_LANGUAGE_HE_IL)
-    set(LANG_DIR "he-IL")
-elseif(CONFIG_LANGUAGE_HR_HR)
-    set(LANG_DIR "hr-HR")
-elseif(CONFIG_LANGUAGE_HU_HU)
-    set(LANG_DIR "hu-HU")
-elseif(CONFIG_LANGUAGE_MS_MY)
-    set(LANG_DIR "ms-MY")
-elseif(CONFIG_LANGUAGE_NB_NO)
-    set(LANG_DIR "nb-NO")
-elseif(CONFIG_LANGUAGE_NL_NL)
-    set(LANG_DIR "nl-NL")
-elseif(CONFIG_LANGUAGE_SK_SK)
-    set(LANG_DIR "sk-SK")
-elseif(CONFIG_LANGUAGE_SL_SI)
-    set(LANG_DIR "sl-SI")
-elseif(CONFIG_LANGUAGE_SV_SE)
-    set(LANG_DIR "sv-SE")
-elseif(CONFIG_LANGUAGE_SR_RS)
-    set(LANG_DIR "sr-RS")
 endif()
 
-# Define generation path
 set(LANG_JSON "${STACKCHAN_RUNTIME_ASSETS_DIR}/locales/${LANG_DIR}/language.json")
+if(NOT EXISTS "${LANG_JSON}")
+    message(FATAL_ERROR "Configured language '${LANG_DIR}' has no language.json under ${STACKCHAN_RUNTIME_ASSETS_DIR}/locales")
+endif()
+
 set(LANG_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/assets/lang_config.h")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated/assets")
 
-# Collect current language audio files
-file(GLOB LANG_SOUNDS ${STACKCHAN_RUNTIME_ASSETS_DIR}/locales/${LANG_DIR}/*.ogg)
+set(LANG_SOUND_FILES
+    err_pin.ogg
+    err_reg.ogg
+    upgrade.ogg
+    wificonfig.ogg
+)
 
-# If not en-US, collect en-US audio files as fallback for missing files
-if(NOT LANG_DIR STREQUAL "en-US")
-    file(GLOB EN_US_SOUNDS ${STACKCHAN_RUNTIME_ASSETS_DIR}/locales/en-US/*.ogg)
-    
-    # Extract filenames (without path) from current language
-    set(EXISTING_NAMES "")
-    foreach(SOUND_FILE ${LANG_SOUNDS})
-        get_filename_component(FILENAME ${SOUND_FILE} NAME)
-        list(APPEND EXISTING_NAMES ${FILENAME})
-    endforeach()
-    
-    # Only add en-US audio files that are missing in current language
-    foreach(EN_SOUND ${EN_US_SOUNDS})
-        get_filename_component(FILENAME ${EN_SOUND} NAME)
-        if(NOT ${FILENAME} IN_LIST EXISTING_NAMES)
-            list(APPEND LANG_SOUNDS ${EN_SOUND})
+set(LANG_SOUNDS "")
+set(LANG_SOUND_ARGS "")
+foreach(FILENAME ${LANG_SOUND_FILES})
+    list(APPEND LANG_SOUND_ARGS "--sound" "${FILENAME}")
+    set(SOUND_FILE "${STACKCHAN_RUNTIME_ASSETS_DIR}/locales/${LANG_DIR}/${FILENAME}")
+    if(EXISTS "${SOUND_FILE}")
+        list(APPEND LANG_SOUNDS "${SOUND_FILE}")
+    else()
+        set(EN_SOUND "${STACKCHAN_RUNTIME_ASSETS_DIR}/locales/en-US/${FILENAME}")
+        if(NOT LANG_DIR STREQUAL "en-US" AND EXISTS "${EN_SOUND}")
+            list(APPEND LANG_SOUNDS "${EN_SOUND}")
             message(STATUS "Using en-US fallback for missing audio: ${FILENAME}")
+        else()
+            message(FATAL_ERROR "Configured language '${LANG_DIR}' is missing required audio: ${FILENAME}")
         endif()
-    endforeach()
-endif()
+    endif()
+endforeach()
 
 file(GLOB COMMON_SOUNDS 
     ${STACKCHAN_RUNTIME_ASSETS_DIR}/common/*.ogg
@@ -317,6 +251,7 @@ add_custom_command(
             --language "${LANG_DIR}"
             --assets-dir "${STACKCHAN_RUNTIME_ASSETS_DIR}"
             --output "${LANG_HEADER}"
+            ${LANG_SOUND_ARGS}
     DEPENDS
         ${LANG_JSON}
         ${STACKCHAN_ASSET_ARCHIVE}
@@ -339,7 +274,26 @@ if(NOT EXISTS "${STACKCHAN_FONTS_PATH}")
     message(FATAL_ERROR "Missing extracted stackchan_fonts assets: ${STACKCHAN_FONTS_PATH}")
 endif()
 
-set(DEFAULT_ASSETS_EXTRA_FILES "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin")
+set(DEFAULT_ASSET_FILES
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/app_center_bg.png"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_ai_agent.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_app_center.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_bat_lightning.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_bell.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_controller.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_dance.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_ezdata.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_home.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_indicator_left.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_indicator_right.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_sentinel.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_setup.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_wifi_high.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_wifi_low.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_wifi_medium.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/icon_wifi_slash.bin"
+    "${STACKCHAN_RUNTIME_ASSETS_DIR}/assets_bin/setup_stackchan_front_view.bin"
+)
 
 # Function to build default assets based on configuration
 function(build_default_assets_bin)
@@ -362,14 +316,13 @@ function(build_default_assets_bin)
         list(APPEND BUILD_ARGS "--emoji_collection" "${DEFAULT_EMOJI_COLLECTION}")
     endif()
     
-    # Add default assets extra files if defined
-    if(DEFAULT_ASSETS_EXTRA_FILES)
-        list(APPEND BUILD_ARGS "--extra_files" "${DEFAULT_ASSETS_EXTRA_FILES}")
-    endif()
+    foreach(DEFAULT_ASSET_FILE ${DEFAULT_ASSET_FILES})
+        list(APPEND BUILD_ARGS "--extra_file" "${DEFAULT_ASSET_FILE}")
+    endforeach()
     
     list(APPEND BUILD_ARGS "--esp_sr_model_path" "${ESP_SR_MODEL_PATH}")
     list(APPEND BUILD_ARGS "--stackchan_fonts_path" "${STACKCHAN_FONTS_PATH}")
-    
+
     # Create custom command to build assets
     add_custom_command(
         OUTPUT ${GENERATED_ASSETS_BIN}

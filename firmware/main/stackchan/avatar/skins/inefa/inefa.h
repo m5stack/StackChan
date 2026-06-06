@@ -1,8 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
 #pragma once
 #include "../../avatar/avatar.h"
 #include "../../avatar/elements/feature.h"
@@ -16,7 +11,7 @@ namespace stackchan::avatar {
  * @brief
  *
  */
-class DefaultAvatar : public Avatar {
+class InefaAvatar : public Avatar {
 public:
     lv_color_t primaryColor   = lv_color_white();
     lv_color_t secondaryColor = lv_color_black();
@@ -32,10 +27,10 @@ private:
  * @brief
  *
  */
-class DefaultEyes : public Feature {
+class InefaEyes : public Feature {
 public:
-    DefaultEyes(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, bool isLeftEye);
-    ~DefaultEyes();
+    InefaEyes(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, bool isLeftEye);
+    ~InefaEyes();
 
     void setPosition(const uitk::Vector2i& position) override;
     void setWeight(int weight) override;
@@ -68,10 +63,10 @@ private:
  * @brief
  *
  */
-class DefaultMouth : public Feature {
+class InefaMouth : public Feature {
 public:
-    DefaultMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor);
-    ~DefaultMouth();
+    InefaMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor);
+    ~InefaMouth();
 
     void setPosition(const uitk::Vector2i& position) override;
     void setWeight(int weight) override;
@@ -94,10 +89,10 @@ private:
  * @brief
  *
  */
-class DefaultSpeechBubble : public SpeechBubble {
+class InefaSpeechBubble : public SpeechBubble {
 public:
-    DefaultSpeechBubble(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, const lv_font_t* font);
-    ~DefaultSpeechBubble();
+    InefaSpeechBubble(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, const lv_font_t* font);
+    ~InefaSpeechBubble();
 
     void setSpeech(std::string_view text) override;
     void clearSpeech() override;

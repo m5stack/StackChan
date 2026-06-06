@@ -6,6 +6,7 @@
 #include "hal_bridge.h"
 #include "config.h"
 #include "stackchan_display.h"
+#include <stackchan/avatar/avatar_factory.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <nvs.h>
@@ -35,6 +36,8 @@ static constexpr std::string_view _ai_agent_config_idle_random_movement_key     
 static constexpr std::string_view _ai_agent_config_start_on_boot_key                = "boot_ai";
 static constexpr std::string_view _local_control_config_nvs_ns                    = "local_ctrl";
 static constexpr std::string_view _local_control_config_token_key                  = "token";
+static constexpr std::string_view _avatar_config_nvs_ns                            = "avatar";
+static constexpr std::string_view _avatar_config_skin_key                          = "skin";
 
 static constexpr const char* _sdcard_settings_dir      = SDCARD_MOUNT_POINT "/stackchan";
 static constexpr const char* _sdcard_settings_tmp_path = SDCARD_MOUNT_POINT "/stackchan/settings.tmp";
@@ -213,6 +216,28 @@ static bool validate_ai_agent_settings_object(cJSON* object, std::string& error)
     return true;
 }
 
+static bool validate_avatar_settings_object(cJSON* object, std::string& error)
+{
+    cJSON* skin = cJSON_GetObjectItem(object, "skin");
+    if (skin == nullptr) {
+        skin = cJSON_GetObjectItem(object, _avatar_config_skin_key.data());
+    }
+    if (skin == nullptr) {
+        return true;
+    }
+    if (!cJSON_IsString(skin)) {
+        error = "avatar.skin must be a string";
+        return false;
+    }
+
+    stackchan::avatar::AvatarSkin parsed_skin;
+    if (!stackchan::avatar::parse_avatar_skin(skin->valuestring, parsed_skin)) {
+        error = "avatar.skin must be one of: default, ineffa";
+        return false;
+    }
+    return true;
+}
+
 static bool validate_control_token(const char* token, std::string& error)
 {
     if (token == nullptr) {
@@ -299,6 +324,17 @@ static bool validate_settings_root(cJSON* root, std::string& error)
             return false;
         }
         if (!validate_local_control_settings_object(local_control, error)) {
+            return false;
+        }
+    }
+
+    cJSON* avatar = cJSON_GetObjectItem(root, "avatar");
+    if (avatar != nullptr) {
+        if (!cJSON_IsObject(avatar)) {
+            error = "avatar must be a JSON object";
+            return false;
+        }
+        if (!validate_avatar_settings_object(avatar, error)) {
             return false;
         }
     }
@@ -470,6 +506,33 @@ void set_ai_agent_config(const AiAgentConfig_t& config)
     settings.SetBool(_ai_agent_config_start_on_boot_key.data(), config.startAiAgentOnBoot);
 }
 
+AvatarConfig_t get_avatar_config()
+{
+    AvatarConfig_t config;
+
+    Settings settings(_avatar_config_nvs_ns.data(), false);
+    const std::string skin = settings.GetString(_avatar_config_skin_key.data(), config.skin);
+
+    stackchan::avatar::AvatarSkin parsed_skin;
+    if (stackchan::avatar::parse_avatar_skin(skin, parsed_skin)) {
+        config.skin = stackchan::avatar::to_string(parsed_skin);
+    }
+
+    return config;
+}
+
+void set_avatar_config(const AvatarConfig_t& config)
+{
+    stackchan::avatar::AvatarSkin parsed_skin;
+    if (!stackchan::avatar::parse_avatar_skin(config.skin, parsed_skin)) {
+        ESP_LOGW(_tag, "ignored invalid avatar skin: %s", config.skin.c_str());
+        return;
+    }
+
+    Settings settings(_avatar_config_nvs_ns.data(), true);
+    settings.SetString(_avatar_config_skin_key.data(), stackchan::avatar::to_string(parsed_skin));
+}
+
 bool apply_ai_agent_config_sd_overrides(AiAgentConfig_t& config)
 {
     std::string settings_json;
@@ -506,6 +569,44 @@ bool apply_ai_agent_config_sd_overrides(AiAgentConfig_t& config)
 
     cJSON_Delete(root);
     ESP_LOGI(_tag, "applied SD settings overrides from %s", SDCARD_SETTINGS_PATH);
+    return true;
+}
+
+bool apply_avatar_config_sd_overrides(AvatarConfig_t& config)
+{
+    std::string settings_json;
+    if (!read_sd_settings_file(settings_json)) {
+        return false;
+    }
+
+    std::string error;
+    if (!validate_settings_json(settings_json, nullptr, &error)) {
+        ESP_LOGW(_tag, "ignored invalid SD settings file: %s", error.c_str());
+        return false;
+    }
+
+    cJSON* root = cJSON_ParseWithLength(settings_json.data(), settings_json.size());
+    if (root == nullptr) {
+        ESP_LOGW(_tag, "failed to parse SD settings file: %s", SDCARD_SETTINGS_PATH);
+        return false;
+    }
+
+    cJSON* avatar = cJSON_GetObjectItem(root, "avatar");
+    if (cJSON_IsObject(avatar)) {
+        cJSON* skin = cJSON_GetObjectItem(avatar, "skin");
+        if (skin == nullptr) {
+            skin = cJSON_GetObjectItem(avatar, _avatar_config_skin_key.data());
+        }
+        if (cJSON_IsString(skin)) {
+            stackchan::avatar::AvatarSkin parsed_skin;
+            if (stackchan::avatar::parse_avatar_skin(skin->valuestring, parsed_skin)) {
+                config.skin = stackchan::avatar::to_string(parsed_skin);
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    ESP_LOGI(_tag, "applied avatar SD settings overrides from %s", SDCARD_SETTINGS_PATH);
     return true;
 }
 
@@ -690,6 +791,9 @@ std::string get_effective_settings_json()
     std::string local_control_token = get_local_control_token();
     apply_local_control_sd_overrides(local_control_token);
 
+    AvatarConfig_t avatar_config = get_avatar_config();
+    apply_avatar_config_sd_overrides(avatar_config);
+
     cJSON* root  = cJSON_CreateObject();
     cJSON* agent = cJSON_CreateObject();
     cJSON_AddNumberToObject(agent, "idleShutdownTimeSeconds", agent_config.idleShutdownTimeSeconds);
@@ -701,6 +805,10 @@ std::string get_effective_settings_json()
     cJSON* local_control = cJSON_CreateObject();
     cJSON_AddStringToObject(local_control, "token", local_control_token.c_str());
     cJSON_AddItemToObject(root, "localControl", local_control);
+
+    cJSON* avatar = cJSON_CreateObject();
+    cJSON_AddStringToObject(avatar, "skin", avatar_config.skin.c_str());
+    cJSON_AddItemToObject(root, "avatar", avatar);
 
     char* printed = cJSON_PrintUnformatted(root);
     std::string result = printed != nullptr ? printed : "{}";

@@ -1,9 +1,4 @@
-/*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
-#include "default.h"
+#include "inefa.h"
 #include <hal/hal.h>
 
 using namespace uitk;
@@ -27,7 +22,7 @@ static const int _angry_piece_height  = 8;
 static const int _happy_eye_lift      = -16;
 static const int _happy_anim_period_ms = 1200;
 
-DefaultEyes::DefaultEyes(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, bool isLeftEye)
+InefaEyes::InefaEyes(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor, bool isLeftEye)
 {
     (void)primaryColor;
 
@@ -101,7 +96,7 @@ DefaultEyes::DefaultEyes(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t s
     setRotation(0);
 }
 
-DefaultEyes::~DefaultEyes()
+InefaEyes::~InefaEyes()
 {
     _lower_eyelid.reset();
     _eyelid.reset();
@@ -112,7 +107,7 @@ DefaultEyes::~DefaultEyes()
     _container.reset();
 }
 
-void DefaultEyes::applyPosition(int extra_y)
+void InefaEyes::applyPosition(int extra_y)
 {
     auto pos_x = _is_left_eye ? _eye_pos.x : -_eye_pos.x;
     pos_x += map_range(_position.x, -100, 100, _eye_min_offset.x, _eye_max_offset.x);
@@ -125,7 +120,7 @@ void DefaultEyes::applyPosition(int extra_y)
     _container->setPos(pos_x, pos_y);
 }
 
-void DefaultEyes::setPosition(const Vector2i& position)
+void InefaEyes::setPosition(const Vector2i& position)
 {
     Element::setPosition(position);
 
@@ -133,7 +128,7 @@ void DefaultEyes::setPosition(const Vector2i& position)
     _eyelid->setY(_eyelid_offset_y);
 }
 
-void DefaultEyes::setWeight(int weight)
+void InefaEyes::setWeight(int weight)
 {
     Feature::setWeight(weight);
 
@@ -150,14 +145,14 @@ void DefaultEyes::setWeight(int weight)
     _eyelid->setY(_eyelid_offset_y);
 }
 
-void DefaultEyes::setRotation(int rotation)
+void InefaEyes::setRotation(int rotation)
 {
     Element::setRotation(rotation);
 
     _container->setRotation(rotation);
 }
 
-void DefaultEyes::setEmotion(const Emotion& emotion)
+void InefaEyes::setEmotion(const Emotion& emotion)
 {
     if (getIgnoreEmotion()) {
         return;
@@ -214,14 +209,14 @@ void DefaultEyes::setEmotion(const Emotion& emotion)
     }
 }
 
-void DefaultEyes::setVisible(bool visible)
+void InefaEyes::setVisible(bool visible)
 {
     Element::setVisible(visible);
 
     _container->setHidden(!visible);
 }
 
-void DefaultEyes::setSize(int size)
+void InefaEyes::setSize(int size)
 {
     Feature::setSize(size);
 
@@ -241,7 +236,7 @@ void DefaultEyes::setSize(int size)
     setWeight(getWeight());
 }
 
-void DefaultEyes::_update()
+void InefaEyes::_update()
 {
     if (!_is_happy || _is_angry || !_lower_eyelid || _eye_height <= 0) {
         return;

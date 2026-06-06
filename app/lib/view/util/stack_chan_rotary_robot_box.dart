@@ -162,11 +162,15 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint();
 
+    const backgroundColor = ui.Color(0xB3000000);
+    const inefaColor = ui.Color(0xFFD8B3B6);
+
     //background:With / Carry 70% transparency (0xB3 = 179/255)
-    paint.color = const ui.Color(0xB3000000);
+    paint.color = backgroundColor;
     canvas.drawRect(ui.Rect.fromLTWH(0, 0, canvasWidth, canvasHeight), paint);
 
-    final eyeSize = canvasWidth / 10;
+    final eyeBaseWidth = canvasWidth * 0.085;
+    final eyeBaseHeight = canvasHeight * 0.55;
 
     //draweyefunction
     void drawEye(ExpressionItem item, ui.Offset centerOffset) {
@@ -178,17 +182,18 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
           ? 1.0 + clampedSize / 100.0
           : 1.0 + clampedSize / 200.0;
 
-      final scaledEyeSize = eyeSize * sizeScale;
-      final visibleHeight = scaledEyeSize * (item.weight / 100);
+      final scaledEyeWidth = eyeBaseWidth * sizeScale;
+      final scaledEyeHeight = eyeBaseHeight * sizeScale;
+      final visibleHeight = scaledEyeHeight * (item.weight / 100);
 
       //positionoffset
-      final centerX = centerOffset.dx + item.x / 10 + eyeSize / 2;
-      final centerY = centerOffset.dy + item.y / 10 + eyeSize / 2;
+      final centerX = centerOffset.dx + item.x / 10;
+      final centerY = centerOffset.dy + item.y / 10;
 
       final eyeRect = ui.Rect.fromCenter(
         center: ui.Offset(centerX, centerY),
-        width: scaledEyeSize,
-        height: scaledEyeSize,
+        width: scaledEyeWidth,
+        height: scaledEyeHeight,
       );
 
       //rotatehandle
@@ -207,19 +212,21 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
       canvas.clipRect(clipRect);
 
       //draweye
-      paint.color = const ui.Color(0xFFFFFFFF);
-      canvas.drawOval(eyeRect, paint);
+      const radius = ui.Radius.circular(1);
+      paint
+        ..color = inefaColor
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3);
+      canvas.drawRRect(ui.RRect.fromRectAndRadius(eyeRect, radius), paint);
+      paint.maskFilter = null;
+      canvas.drawRRect(ui.RRect.fromRectAndRadius(eyeRect, radius), paint);
 
       canvas.restore();
     }
 
     //calculateeyeposition
-    final eyeY = (canvasHeight * 0.4) - (eyeSize / 2);
-    final leftEyePoint = ui.Offset((canvasWidth / 4) - (eyeSize / 2), eyeY);
-    final rightEyePoint = ui.Offset(
-      (canvasWidth / 4 * 3) - (eyeSize / 2),
-      eyeY,
-    );
+    final eyeY = canvasHeight * 0.46;
+    final leftEyePoint = ui.Offset(canvasWidth * 0.33, eyeY);
+    final rightEyePoint = ui.Offset(canvasWidth * 0.67, eyeY);
 
     drawEye(data.leftEye, leftEyePoint);
     drawEye(data.rightEye, rightEyePoint);
@@ -227,14 +234,10 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     //2. drawmouth
     canvas.save();
 
-    final mouthWidth = (canvasWidth * 0.3 - data.mouth.weight / 10).toDouble();
-    final mouthHeight = (3 + data.mouth.weight * 0.2).toDouble();
-    final mouthX = ((canvasWidth - mouthWidth) / 2) + data.mouth.x / 10;
-    final mouthY = (canvasHeight * 0.65) + data.mouth.y / 10;
-
+    final mouthWeight = data.mouth.weight.clamp(0, 100);
     final mouthCenter = ui.Offset(
-      mouthX + mouthWidth / 2,
-      mouthY + mouthHeight / 2,
+      canvasWidth * 0.5 + data.mouth.x / 10,
+      canvasHeight * 0.66 + data.mouth.y / 10,
     );
     final mRotation = data.mouth.rotation / 10.0;
 
@@ -242,16 +245,52 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     canvas.rotate(mRotation * pi / 180);
     canvas.translate(-mouthCenter.dx, -mouthCenter.dy);
 
-    final mouthRect = ui.Rect.fromLTWH(mouthX, mouthY, mouthWidth, mouthHeight);
-    paint.color = const ui.Color(0xFFFFFFFF);
-
+    double mouthWidth;
+    double mouthHeight;
+    bool hollow = false;
+    if (mouthWeight < 35) {
+      mouthWidth = canvasWidth * (0.135 + mouthWeight * 0.0008);
+      mouthHeight = canvasHeight * (0.02 + mouthWeight * 0.0003);
+    } else if (mouthWeight < 70) {
+      mouthWidth = canvasWidth * (0.2 + (mouthWeight - 35) * 0.0007);
+      mouthHeight = canvasHeight * (0.06 + (mouthWeight - 35) * 0.0008);
+    } else {
+      mouthWidth = canvasWidth * (0.145 + (mouthWeight - 70) * 0.0006);
+      mouthHeight = canvasHeight * (0.19 + (mouthWeight - 70) * 0.0009);
+      hollow = true;
+    }
+    final mouthRect = ui.Rect.fromCenter(
+      center: mouthCenter,
+      width: mouthWidth,
+      height: mouthHeight,
+    );
+    paint
+      ..color = inefaColor
+      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3);
     canvas.drawRRect(
-      ui.RRect.fromRectAndRadius(
-        mouthRect,
-        ui.Radius.circular(mouthHeight / 2),
-      ),
+      ui.RRect.fromRectAndRadius(mouthRect, ui.Radius.circular(mouthHeight / 2)),
       paint,
     );
+    paint.maskFilter = null;
+    canvas.drawRRect(
+      ui.RRect.fromRectAndRadius(mouthRect, ui.Radius.circular(mouthHeight / 2)),
+      paint,
+    );
+    if (hollow) {
+      final holeRect = ui.Rect.fromCenter(
+        center: mouthCenter,
+        width: mouthWidth * 0.45,
+        height: mouthHeight * 0.5,
+      );
+      paint.color = backgroundColor;
+      canvas.drawRRect(
+        ui.RRect.fromRectAndRadius(
+          holeRect,
+          ui.Radius.circular(holeRect.height / 2),
+        ),
+        paint,
+      );
+    }
     canvas.restore();
 
     //3. will Canvas convertastexturedata

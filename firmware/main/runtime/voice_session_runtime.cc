@@ -6,7 +6,10 @@
 #include <cJSON.h>
 #include <esp_log.h>
 
+#include <algorithm>
+
 #define TAG "Application"
+
 
 void Application::HandleToggleChatEvent()
 {
@@ -124,6 +127,7 @@ void Application::HandleWakeWordDetectedEvent()
     }
 
     if (state == kDeviceStateIdle) {
+        StopRemoteWakeMonitoring();
         audio_system_.EncodeWakeWord();
 
         if (!protocol_->IsAudioChannelOpened()) {
@@ -204,7 +208,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word)
     }
 
     ESP_LOGI(TAG, "Wake word detected: %s", wake_word.c_str());
-#if CONFIG_SEND_WAKE_WORD_DATA
+#if CONFIG_SEND_WAKE_WORD_DATA && !CONFIG_USE_REMOTE_WAKE_WORD
     while (auto packet = audio_system_.PopWakeWordPacket()) {
         protocol_->SendAudio(std::move(packet));
     }
@@ -213,5 +217,76 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word)
 #else
     play_popup_on_listening_ = true;
     SetListeningMode(GetDefaultListeningMode());
+#endif
+}
+
+void Application::StartRemoteWakeMonitoring()
+{
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    if (protocol_ == nullptr ||
+        remote_wake_state_ == RemoteWakeMonitorState::kConnecting ||
+        remote_wake_state_ == RemoteWakeMonitorState::kMonitoring ||
+        remote_wake_state_ == RemoteWakeMonitorState::kRetryPending) {
+        return;
+    }
+    remote_wake_state_ = RemoteWakeMonitorState::kDisconnected;
+    remote_wake_retry_delay_ticks_ = 0;
+    remote_wake_retry_due_tick_ = clock_ticks_;
+    Schedule([this]() { ContinueRemoteWakeMonitoring(); });
+#endif
+}
+
+void Application::StopRemoteWakeMonitoring()
+{
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    if (remote_wake_state_ == RemoteWakeMonitorState::kDisabled) {
+        return;
+    }
+    remote_wake_state_ = RemoteWakeMonitorState::kDisabled;
+    remote_wake_retry_delay_ticks_ = 0;
+    remote_wake_retry_due_tick_ = 0;
+    audio_system_.EnableVoiceProcessing(false);
+#endif
+}
+
+void Application::ContinueRemoteWakeMonitoring()
+{
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    if (remote_wake_state_ == RemoteWakeMonitorState::kDisabled ||
+        remote_wake_state_ == RemoteWakeMonitorState::kConnecting ||
+        remote_wake_state_ == RemoteWakeMonitorState::kMonitoring ||
+        GetDeviceState() != kDeviceStateIdle) {
+        return;
+    }
+    if (remote_wake_state_ == RemoteWakeMonitorState::kRetryPending && clock_ticks_ < remote_wake_retry_due_tick_) {
+        return;
+    }
+    if (protocol_ == nullptr) {
+        remote_wake_state_ = RemoteWakeMonitorState::kDisabled;
+        return;
+    }
+
+    auto& board = Board::GetInstance();
+    board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    remote_wake_state_ = RemoteWakeMonitorState::kConnecting;
+
+    if (!protocol_->IsAudioChannelOpened() && !protocol_->OpenAudioChannel()) {
+        audio_system_.EnableVoiceProcessing(false);
+        board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+        remote_wake_retry_delay_ticks_ =
+            remote_wake_retry_delay_ticks_ == 0
+                ? kRemoteWakeInitialRetryDelayTicks
+                : std::min(remote_wake_retry_delay_ticks_ * 2, kRemoteWakeMaxRetryDelayTicks);
+        remote_wake_retry_due_tick_ = clock_ticks_ + remote_wake_retry_delay_ticks_;
+        remote_wake_state_ = RemoteWakeMonitorState::kRetryPending;
+        return;
+    }
+
+    remote_wake_retry_delay_ticks_ = 0;
+    remote_wake_retry_due_tick_ = 0;
+    remote_wake_state_ = RemoteWakeMonitorState::kMonitoring;
+    protocol_->SendStartListening(kListeningModeRemoteWake);
+    audio_system_.EnableWakeWordDetection(false);
+    audio_system_.EnableVoiceProcessing(true);
 #endif
 }

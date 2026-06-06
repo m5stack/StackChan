@@ -122,6 +122,10 @@ struct AiAgentConfig_t {
     bool startAiAgentOnBoot          = false;
 };
 
+struct AvatarConfig_t {
+    std::string skin = "ineffa";
+};
+
 /**
  * @brief
  *
@@ -247,6 +251,8 @@ public:
     void startAiAgent();
     AiAgentConfig_t getAiAgentConfig();
     void setAiAgentConfig(AiAgentConfig_t config);
+    AvatarConfig_t getAvatarConfig();
+    void setAvatarConfig(AvatarConfig_t config);
 
     /* ----------------------------------- BLE ---------------------------------- */
     uitk::Signal<const char*> onBleMotionData;
@@ -338,6 +344,8 @@ private:
     bool _ai_agent_start_requested = false;
     bool _ai_agent_config_cached   = false;
     AiAgentConfig_t _ai_agent_config_cache;
+    bool _avatar_config_cached = false;
+    AvatarConfig_t _avatar_config_cache;
 
     void ai_agent_board_init();
     void lvgl_init();

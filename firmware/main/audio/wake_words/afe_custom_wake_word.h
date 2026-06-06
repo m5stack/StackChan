@@ -4,20 +4,22 @@
 #include "wake_word.h"
 #include "wake_word_history_encoder.h"
 
+#include <esp_afe_sr_models.h>
 #include <esp_mn_iface.h>
 #include <model_path.h>
 
 #include <atomic>
-#include <deque>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
 
-class CustomWakeWord final : public WakeWord {
+// Wake word engine that combines AFE preprocessing (AEC + NS) with MultiNet
+// command recognition, giving custom phrases the same audio quality as WakeNet.
+class AfeCustomWakeWord final : public WakeWord {
 public:
-    CustomWakeWord();
-    ~CustomWakeWord() override;
+    AfeCustomWakeWord();
+    ~AfeCustomWakeWord() override;
 
     bool Initialize(AudioCodec* codec, srmodel_list_t* models_list) override;
     void Feed(const std::vector<int16_t>& data) override;
@@ -39,19 +41,27 @@ private:
 
     bool LoadModels(srmodel_list_t* models_list);
     bool LoadAssetConfig();
+    bool CreateAfe();
     bool CreateMultinet();
     bool ConfigureCommands();
-    void AppendInput(const std::vector<int16_t>& data);
-    void ProcessBufferedInput();
+    std::string BuildInputFormat() const;
+    static void DetectionTaskEntry(void* arg);
+    void DetectionLoop();
     void HandleDetection();
 
     AudioCodec* codec_ = nullptr;
     srmodel_list_t* models_ = nullptr;
     bool owns_models_ = false;
 
+    const esp_afe_sr_iface_t* afe_iface_ = nullptr;
+    esp_afe_sr_data_t* afe_data_ = nullptr;
+    TaskHandle_t detection_task_ = nullptr;
+    std::atomic_bool stop_task_{false};
+
     esp_mn_iface_t* multinet_ = nullptr;
     model_iface_data_t* model_data_ = nullptr;
     char* model_name_ = nullptr;
+    const char* ns_model_name_ = nullptr;
 
     std::string language_ = "cn";
     int duration_ms_ = 3000;
@@ -59,8 +69,10 @@ private:
     std::vector<Command> commands_;
 
     std::atomic_bool running_{false};
-    std::deque<int16_t> input_buffer_;
+    std::vector<int16_t> input_buffer_;  // audio task → AFE feed (needs contiguous)
     std::mutex input_mutex_;
+
+    std::vector<int16_t> mn_buffer_;  // AFE fetch output → MultiNet (detection task only)
 
     std::function<void(const std::string& wake_word)> wake_word_detected_callback_;
     std::string last_detected_wake_word_;

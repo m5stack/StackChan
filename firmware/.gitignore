@@ -37,9 +37,15 @@
 # Build files
 build/
 cmake-build-*/
+.deps/
 /components/
 !/components/
 /components/*
+!/components/ArduinoJson/
+!/components/esp-now/
+!/components/mooncake/
+!/components/mooncake_log/
+!/components/smooth_ui_toolkit/
 !/components/stackchan_fonts/
 !/components/stackchan_fonts/**
 managed_components/

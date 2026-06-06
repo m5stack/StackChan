@@ -258,7 +258,7 @@ void StackChanAvatarDisplay::SetupUI()
 
     ESP_LOGI(TAG, "Creating Stack-chan Avatar...");
 
-    auto avatar = std::make_unique<DefaultAvatar>();
+    auto avatar = avatar::create_avatar(GetHAL().getAvatarConfig().skin);
     avatar->init(lv_screen_active());
     avatar->getPanel()->onClick().connect([]() {
         if (hal_bridge::is_ai_agent_ready()) {

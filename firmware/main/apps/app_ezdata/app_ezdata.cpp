@@ -38,7 +38,7 @@ void AppEzdata::onOpen()
         LvglLockGuard lock;
 
         // Create default avatar
-        auto avatar = std::make_unique<avatar::DefaultAvatar>();
+        auto avatar = avatar::create_avatar(GetHAL().getAvatarConfig().skin);
         avatar->init(lv_screen_active());
         GetStackChan().attachAvatar(std::move(avatar));
 

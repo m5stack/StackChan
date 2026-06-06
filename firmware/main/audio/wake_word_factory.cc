@@ -2,6 +2,7 @@
 
 #include "esp_wake_word.h"
 #include "wake_word.h"
+#include "wake_words/afe_custom_wake_word.h"
 #include "wake_words/afe_wake_word.h"
 #include "wake_words/custom_wake_word.h"
 
@@ -85,22 +86,32 @@ private:
 
 std::unique_ptr<WakeWord> CreateWakeWordEngine(srmodel_list_t* models_list)
 {
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    (void)models_list;
+    return nullptr;
+#else
     if (models_list == nullptr) {
         return nullptr;
     }
 
 #if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4
+#if CONFIG_USE_CUSTOM_WAKE_WORD
     if (esp_srmodel_filter(models_list, ESP_MN_PREFIX, nullptr) != nullptr) {
-        return std::make_unique<WakeWordAdapter>(std::make_unique<CustomWakeWord>(), false);
+        return std::make_unique<WakeWordAdapter>(std::make_unique<AfeCustomWakeWord>(), false);
     }
+#elif CONFIG_USE_AFE_WAKE_WORD
     if (esp_srmodel_filter(models_list, ESP_WN_PREFIX, nullptr) != nullptr) {
         return std::make_unique<WakeWordAdapter>(std::make_unique<AfeWakeWord>(), true);
     }
+#endif
 #else
+#if CONFIG_USE_ESP_WAKE_WORD
     if (esp_srmodel_filter(models_list, ESP_WN_PREFIX, nullptr) != nullptr) {
         return std::make_unique<EspWakeWord>();
     }
 #endif
+#endif
 
     return nullptr;
+#endif
 }

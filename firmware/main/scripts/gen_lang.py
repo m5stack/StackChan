@@ -51,7 +51,7 @@ def infer_assets_dir(output_path):
         main_dir = os.path.dirname(main_dir)
     return os.path.join(main_dir, 'assets')
 
-def generate_header(lang_code, output_path, assets_dir=None):
+def generate_header(lang_code, output_path, assets_dir=None, sound_names=None):
     if assets_dir is None:
         assets_dir = infer_assets_dir(output_path)
     
@@ -102,18 +102,26 @@ def generate_header(lang_code, output_path, assets_dir=None):
     base_sounds = get_sound_files(base_lang_dir)
     current_sounds = get_sound_files(current_lang_dir)
     common_sounds = get_sound_files(common_dir)
-    
-    all_sound_files = set(base_sounds)
-    all_sound_files.update(current_sounds)
+
+    if sound_names:
+        all_sound_files = set(sound_names)
+        missing_sounds = all_sound_files - set(base_sounds) - set(current_sounds)
+        if missing_sounds:
+            raise FileNotFoundError(f"Required sound files not found: {', '.join(sorted(missing_sounds))}")
+    else:
+        all_sound_files = set(base_sounds)
+        all_sound_files.update(current_sounds)
     
     base_sound_count = len(base_sounds)
     user_sound_count = len(current_sounds)
     common_sound_count = len(common_sounds)
-    sound_fallback_count = len(set(base_sounds) - set(current_sounds))
+    current_selected_count = len(all_sound_files & set(current_sounds))
+    base_selected_count = len(all_sound_files & set(base_sounds))
+    sound_fallback_count = len((all_sound_files & set(base_sounds)) - set(current_sounds))
     
     print(f"Language {lang_code} sound statistics:")
-    print(f"  - Base language (en-US): {base_sound_count} sounds")
-    print(f"  - User language: {user_sound_count} sounds")
+    print(f"  - Base language (en-US): {base_selected_count} selected sounds ({base_sound_count} available)")
+    print(f"  - User language: {current_selected_count} selected sounds ({user_sound_count} available)")
     print(f"  - Common sounds: {common_sound_count} sounds")
     if sound_fallback_count > 0:
         print(f"  - Sound fallback to en-US: {sound_fallback_count} sounds")
@@ -159,10 +167,11 @@ if __name__ == "__main__":
     parser.add_argument("--language", required=True, help="Language code (e.g: zh-CN, en-US, ja-JP)")
     parser.add_argument("--output", required=True, help="Output header file path")
     parser.add_argument("--assets-dir", help="Directory containing locales/ and common/ assets")
+    parser.add_argument("--sound", action="append", default=[], help="Localized sound file to declare, e.g. wificonfig.ogg")
     args = parser.parse_args()
 
     try:
-        generate_header(args.language, args.output, args.assets_dir)
+        generate_header(args.language, args.output, args.assets_dir, args.sound)
         print(f"Successfully generated language config file: {args.output}")
     except Exception as e:
         print(f"Error: {e}")

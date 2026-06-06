@@ -1,9 +1,4 @@
-/*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
-#include "default.h"
+#include "inefa.h"
 
 using namespace uitk;
 using namespace uitk::lvgl_cpp;
@@ -16,7 +11,7 @@ static const Vector2i _mouth_min_offset = Vector2i(-16, -16);
 static const Vector2i _mouth_max_offset = Vector2i(16, 16);
 static const Vector2i _mouth_canvas_size = Vector2i(76, 56);
 
-DefaultMouth::DefaultMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor)
+InefaMouth::InefaMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t secondaryColor)
 {
     (void)primaryColor;
 
@@ -67,7 +62,7 @@ DefaultMouth::DefaultMouth(lv_obj_t* parent, lv_color_t primaryColor, lv_color_t
     setRotation(0);
 }
 
-DefaultMouth::~DefaultMouth()
+InefaMouth::~InefaMouth()
 {
     _mouth_tooth_right.reset();
     _mouth_tooth_mid.reset();
@@ -77,7 +72,7 @@ DefaultMouth::~DefaultMouth()
     _container.reset();
 }
 
-void DefaultMouth::setPosition(const Vector2i& position)
+void InefaMouth::setPosition(const Vector2i& position)
 {
     Element::setPosition(position);
 
@@ -87,7 +82,7 @@ void DefaultMouth::setPosition(const Vector2i& position)
     _container->setPos(pos_x, pos_y);
 }
 
-void DefaultMouth::setWeight(int weight)
+void InefaMouth::setWeight(int weight)
 {
     Feature::setWeight(weight);
 
@@ -146,7 +141,7 @@ void DefaultMouth::setWeight(int weight)
     _mouth->setRadius(radius);
 }
 
-void DefaultMouth::setEmotion(const Emotion& emotion)
+void InefaMouth::setEmotion(const Emotion& emotion)
 {
     if (getIgnoreEmotion()) {
         return;
@@ -157,7 +152,7 @@ void DefaultMouth::setEmotion(const Emotion& emotion)
     setRotation(0);
 }
 
-void DefaultMouth::setRotation(int rotation)
+void InefaMouth::setRotation(int rotation)
 {
     Element::setRotation(rotation);
 
@@ -165,7 +160,7 @@ void DefaultMouth::setRotation(int rotation)
     _container->setRotation(rotation);
 }
 
-void DefaultMouth::setVisible(bool visible)
+void InefaMouth::setVisible(bool visible)
 {
     Element::setVisible(visible);
 

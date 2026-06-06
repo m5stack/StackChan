@@ -41,6 +41,12 @@ void Application::HandleClockTickEvent()
 {
     clock_ticks_++;
     Board::GetInstance().GetDisplay()->UpdateStatusBar();
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    if (remote_wake_state_ == RemoteWakeMonitorState::kRetryPending &&
+        GetDeviceState() == kDeviceStateIdle && clock_ticks_ >= remote_wake_retry_due_tick_) {
+        Schedule([this]() { ContinueRemoteWakeMonitoring(); });
+    }
+#endif
     if (clock_ticks_ % 10 == 0) {
         SystemInfo::PrintHeapStats();
     }

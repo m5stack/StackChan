@@ -42,89 +42,14 @@ config CUSTOM_ASSETS_FILE
         The custom assets file to flash. It must be a local file relative to
         the project directory or an absolute local path.
 
-choice
-    prompt "Default Language"
-    default LANGUAGE_ZH_CN
+config LANGUAGE
+    string "Default Language"
+    default "en-US"
     help
-        Select device display language
-
-    config LANGUAGE_ZH_CN
-        bool "Chinese"
-    config LANGUAGE_ZH_TW
-        bool "Chinese Traditional"
-    config LANGUAGE_EN_US
-        bool "English"
-    config LANGUAGE_JA_JP
-        bool "Japanese"
-    config LANGUAGE_KO_KR
-        bool "Korean"
-    config LANGUAGE_VI_VN
-        bool "Vietnamese"
-    config LANGUAGE_TH_TH
-        bool "Thai"
-    config LANGUAGE_DE_DE
-        bool "German"
-    config LANGUAGE_FR_FR
-        bool "French"
-    config LANGUAGE_ES_ES
-        bool "Spanish"
-    config LANGUAGE_IT_IT
-        bool "Italian"
-    config LANGUAGE_RU_RU
-        bool "Russian"
-    config LANGUAGE_AR_SA
-        bool "Arabic"
-    config LANGUAGE_HI_IN
-        bool "Hindi"
-    config LANGUAGE_PT_PT
-        bool "Portuguese"
-    config LANGUAGE_PL_PL
-        bool "Polish"
-    config LANGUAGE_CS_CZ
-        bool "Czech"
-    config LANGUAGE_FI_FI
-        bool "Finnish"
-    config LANGUAGE_TR_TR
-        bool "Turkish"
-    config LANGUAGE_ID_ID
-        bool "Indonesian"
-    config LANGUAGE_UK_UA
-        bool "Ukrainian"
-    config LANGUAGE_RO_RO
-        bool "Romanian"
-    config LANGUAGE_BG_BG
-        bool "Bulgarian"
-    config LANGUAGE_CA_ES
-        bool "Catalan"
-    config LANGUAGE_DA_DK
-        bool "Danish"
-    config LANGUAGE_EL_GR
-        bool "Greek"
-    config LANGUAGE_FA_IR
-        bool "Persian"
-    config LANGUAGE_FIL_PH
-        bool "Filipino"
-    config LANGUAGE_HE_IL
-        bool "Hebrew"
-    config LANGUAGE_HR_HR
-        bool "Croatian"
-    config LANGUAGE_HU_HU
-        bool "Hungarian"
-    config LANGUAGE_MS_MY
-        bool "Malay"
-    config LANGUAGE_NB_NO
-        bool "Norwegian"
-    config LANGUAGE_NL_NL
-        bool "Dutch"
-    config LANGUAGE_SK_SK
-        bool "Slovak"
-    config LANGUAGE_SL_SI
-        bool "Slovenian"
-    config LANGUAGE_SV_SE
-        bool "Swedish"
-    config LANGUAGE_SR_RS
-        bool "Serbian"
-endchoice
+        Device display and voice prompt language, matching a locale directory
+        under main_assets/locales, for example en-US, zh-CN, or ja-JP.
+        The firmware currently generates and embeds one language at build time,
+        with en-US string/audio fallbacks for missing localized assets.
 
 choice BOARD_TYPE
     prompt "Board Type"
@@ -700,10 +625,29 @@ choice WAKE_WORD_TYPE
             Support AEC if available, requires ESP32 S3 and PSRAM
 
     config USE_CUSTOM_WAKE_WORD
-        bool "Multinet model (Custom Wake Word)"
+        bool "Multinet model with AFE (Custom Wake Word)"
         depends on (IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32P4) && SPIRAM
         help
-            Requires ESP32 S3 and PSRAM
+            Custom wake phrase using MultiNet with AFE preprocessing (AEC + noise
+            suppression). Requires ESP32 S3 or P4 with PSRAM.
+
+            The CUSTOM_WAKE_WORD fields below are the default configuration. The
+            build embeds them into the assets partition as multinet_model.commands
+            in index.json. If the flashed assets already contain a
+            multinet_model.commands section (e.g. from custom assets), that takes
+            precedence at runtime. The Kconfig values are used as a fallback when
+            no commands are found in the assets.
+
+            The "command" field format depends on the flashed MultiNet model:
+              English (MultiNet5 EN):  ESP-SR phoneme strings, e.g. "HH AY S T AE K CH AE N"
+              Chinese (MultiNet5 CN):  pinyin separated by spaces, e.g. "ni hao xiao zhi"
+
+    config USE_REMOTE_WAKE_WORD
+        bool "Remote wake word over voice protocol"
+        help
+            Stream idle microphone audio to the voice server and let the server
+            report wake-word detection. This mode disables local wake-word
+            engines through this choice.
 
 endchoice
 
@@ -712,14 +656,16 @@ config CUSTOM_WAKE_WORD
     default "xiao tu dou"
     depends on USE_CUSTOM_WAKE_WORD
     help
-        Custom Wake Word, use pinyin for Chinese, separated by spaces
+        Wake phrase for the MultiNet model.
+        For Chinese models: pinyin separated by spaces (e.g. "ni hao xiao zhi").
+        For English MultiNet5: ESP-SR phoneme string (e.g. "HH AY S T AE K CH AE N").
 
 config CUSTOM_WAKE_WORD_DISPLAY
     string "Custom Wake Word Display"
     default "小土豆"
     depends on USE_CUSTOM_WAKE_WORD
     help
-        Greeting sent to the server after wake word detection
+        Text sent to the server after wake word detection.
 
 config CUSTOM_WAKE_WORD_THRESHOLD
     int "Custom Wake Word Threshold (%)"
@@ -727,7 +673,7 @@ config CUSTOM_WAKE_WORD_THRESHOLD
     range 1 99
     depends on USE_CUSTOM_WAKE_WORD
     help
-        Custom Wake Word Threshold, range 1-99, the smaller the more sensitive, default 20
+        Detection sensitivity. Lower = more sensitive. Default 20.
 
 config SEND_WAKE_WORD_DATA
     bool "Send Wake Word Data"

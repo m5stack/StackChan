@@ -47,6 +47,17 @@ enum ListenStopReason {
     kListenStopAutoTimeout,
 };
 
+enum class RemoteWakeMonitorState {
+    kDisabled,
+    kDisconnected,
+    kConnecting,
+    kMonitoring,
+    kRetryPending,
+};
+
+static constexpr uint32_t kRemoteWakeInitialRetryDelayTicks = 5;
+static constexpr uint32_t kRemoteWakeMaxRetryDelayTicks = 30;
+
 class Application {
 public:
     static Application& GetInstance()
@@ -111,7 +122,10 @@ private:
     bool aborted_ = false;
     bool local_assets_loaded_ = false;
     bool play_popup_on_listening_ = false;
-    int clock_ticks_ = 0;
+    RemoteWakeMonitorState remote_wake_state_ = RemoteWakeMonitorState::kDisabled;
+    uint32_t remote_wake_retry_delay_ticks_ = 0;
+    uint32_t remote_wake_retry_due_tick_ = 0;
+    uint32_t clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
     void HandleStateChangedEvent();
@@ -129,6 +143,9 @@ private:
     void HandleClockTickEvent();
     void ContinueOpenAudioChannel(ListeningMode mode);
     void ContinueWakeWordInvoke(const std::string& wake_word);
+    void StartRemoteWakeMonitoring();
+    void StopRemoteWakeMonitoring();
+    void ContinueRemoteWakeMonitoring();
     void ActivationTask();
     void LoadLocalAssets();
     void CheckNewVersion();
@@ -142,6 +159,7 @@ private:
     bool HandleIncomingUiAlert(const cJSON* root);
     bool HandleIncomingSystemReboot(const cJSON* root);
     bool HandleIncomingMcp(const cJSON* root);
+    bool HandleIncomingListenDetect(const cJSON* root);
     bool HandleIncomingUiCustom(const cJSON* root, Display* display);
     void StartAutoListenTimeout();
     void StopAutoListenTimeout();

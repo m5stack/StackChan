@@ -242,33 +242,51 @@ def process_emoji_collection(emoji_collection_dir, assets_dir):
     return emoji_list
 
 
-def process_extra_files(extra_files_dir, assets_dir):
-    """Process default_assets_extra_files parameter"""
-    if not extra_files_dir:
+def copy_extra_file(src_file, assets_dir, extra_files_list, seen_names):
+    if not os.path.isfile(src_file):
+        raise FileNotFoundError(f"Extra file not found: {src_file}")
+
+    file = os.path.basename(src_file)
+    if file.startswith('.'):
+        return
+
+    if file in seen_names:
+        print(f"Warning: Skipping duplicate extra asset name: {file}")
+        return
+
+    dst_file = os.path.join(assets_dir, file)
+    if copy_file(src_file, dst_file):
+        extra_files_list.append(file)
+        seen_names.add(file)
+
+
+def process_extra_files(extra_files, assets_dir, *, missing_is_error=False):
+    """Process explicit extra asset files and compatibility directories."""
+    if not extra_files:
         return []
-    
-    if not os.path.exists(extra_files_dir):
-        print(f"Warning: Extra files directory not found: {extra_files_dir}")
-        return []
-    
+
     extra_files_list = []
-    
-    # Copy each file from input directory to build/assets directory
-    for root, dirs, files in os.walk(extra_files_dir):
-        for file in files:
-            # Skip hidden files and directories
-            if file.startswith('.'):
-                continue
-                
-            # Copy file
-            src_file = os.path.join(root, file)
-            dst_file = os.path.join(assets_dir, file)
-            if copy_file(src_file, dst_file):
-                extra_files_list.append(file)
-    
+    seen_names = set()
+
+    for extra_path in extra_files:
+        if not extra_path:
+            continue
+
+        if os.path.isdir(extra_path):
+            for root, dirs, files in os.walk(extra_path):
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                for file in files:
+                    copy_extra_file(os.path.join(root, file), assets_dir, extra_files_list, seen_names)
+        elif os.path.isfile(extra_path):
+            copy_extra_file(extra_path, assets_dir, extra_files_list, seen_names)
+        elif missing_is_error:
+            raise FileNotFoundError(f"Extra asset path not found: {extra_path}")
+        else:
+            print(f"Warning: Extra asset path not found: {extra_path}")
+
     if extra_files_list:
-        print(f"Processed {len(extra_files_list)} extra files from: {extra_files_dir}")
-    
+        print(f"Processed {len(extra_files_list)} extra files")
+
     return extra_files_list
 
 
@@ -548,55 +566,37 @@ def read_wake_word_type_from_sdkconfig(sdkconfig_path):
 
 
 def read_custom_wake_word_from_sdkconfig(sdkconfig_path):
-    """
-    Read custom wake word configuration from sdkconfig
-    Returns a dict with custom wake word info or None if not configured
-    """
+    """Read CUSTOM_WAKE_WORD/DISPLAY/THRESHOLD from sdkconfig."""
     if not os.path.exists(sdkconfig_path):
-        print(f"Warning: sdkconfig file not found: {sdkconfig_path}")
         return None
-        
+
     config_values = {}
     with io.open(sdkconfig_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip("\n")
             if line.startswith('#') or '=' not in line:
                 continue
-                
-            # Check for custom wake word configuration
             if 'CONFIG_USE_CUSTOM_WAKE_WORD=y' in line:
                 config_values['use_custom_wake_word'] = True
-            elif 'CONFIG_CUSTOM_WAKE_WORD=' in line and not line.startswith('#'):
-                # Extract string value (remove quotes)
-                value = line.split('=', 1)[1].strip('"')
-                config_values['wake_word'] = value
-            elif 'CONFIG_CUSTOM_WAKE_WORD_DISPLAY=' in line and not line.startswith('#'):
-                # Extract string value (remove quotes)
-                value = line.split('=', 1)[1].strip('"')
-                config_values['display'] = value
-            elif 'CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=' in line and not line.startswith('#'):
-                # Extract numeric value
-                value = line.split('=', 1)[1]
+            elif 'CONFIG_CUSTOM_WAKE_WORD=' in line:
+                config_values['wake_word'] = line.split('=', 1)[1].strip('"')
+            elif 'CONFIG_CUSTOM_WAKE_WORD_DISPLAY=' in line:
+                config_values['display'] = line.split('=', 1)[1].strip('"')
+            elif 'CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=' in line:
                 try:
-                    config_values['threshold'] = int(value)
+                    config_values['threshold'] = int(line.split('=', 1)[1])
                 except ValueError:
-                    try:
-                        config_values['threshold'] = float(value)
-                    except ValueError:
-                        print(f"Warning: Invalid threshold value: {value}")
-                        config_values['threshold'] = 20  # default (will be converted to 0.2)
-    
-    # Return config only if custom wake word is enabled and required fields are present
-    if (config_values.get('use_custom_wake_word', False) and 
-        'wake_word' in config_values and 
-        'display' in config_values and 
-        'threshold' in config_values):
+                    config_values['threshold'] = 20
+
+    if (config_values.get('use_custom_wake_word') and
+            'wake_word' in config_values and
+            'display' in config_values and
+            'threshold' in config_values):
         return {
             'wake_word': config_values['wake_word'],
             'display': config_values['display'],
-            'threshold': config_values['threshold'] / 100.0  # Convert to decimal (20 -> 0.2)
+            'threshold': config_values['threshold'] / 100.0,
         }
-    
     return None
 
 
@@ -726,7 +726,7 @@ def build_assets_integrated(wakenet_model_paths, multinet_model_paths, text_font
         srmodels = process_sr_models(wakenet_model_paths, multinet_model_paths, temp_build_dir, assets_dir) if (wakenet_model_paths or multinet_model_paths) else None
         text_font = process_text_font(text_font_path, assets_dir) if text_font_path else None
         emoji_collection = process_emoji_collection(emoji_collection_path, assets_dir) if emoji_collection_path else None
-        extra_files = process_extra_files(extra_files_path, assets_dir) if extra_files_path else None
+        extra_files = process_extra_files(extra_files_path, assets_dir, missing_is_error=True) if extra_files_path else None
         
         # Generate index.json
         generate_index_json(assets_dir, srmodels, text_font, emoji_collection, extra_files, multinet_model_info)
@@ -774,7 +774,8 @@ def main():
     parser.add_argument('--output', required=True, help='Output path for assets.bin')
     parser.add_argument('--esp_sr_model_path', help='Path to ESP-SR model directory')
     parser.add_argument('--stackchan_fonts_path', help='Path to stackchan_fonts component directory')
-    parser.add_argument('--extra_files', help='Path to extra files directory to be included in assets')
+    parser.add_argument('--extra_files', help='Compatibility path to an extra files directory to be included in assets')
+    parser.add_argument('--extra_file', action='append', default=[], help='Exact extra file to include in assets')
     
     args = parser.parse_args()
     
@@ -837,21 +838,20 @@ def main():
     # Get emoji collection path if needed
     emoji_collection_path = get_emoji_collection_path(args.emoji_collection, args.stackchan_fonts_path)
     
-    # Get extra files path if provided
-    extra_files_path = args.extra_files
+    # Get extra files if provided
+    extra_files = list(args.extra_file)
+    if args.extra_files:
+        extra_files.append(args.extra_files)
     
-    # Read custom wake word configuration
-    custom_wake_word_config = read_custom_wake_word_from_sdkconfig(args.sdkconfig)
+    # Read custom wake word configuration from sdkconfig
     multinet_model_info = None
-    
+    custom_wake_word_config = read_custom_wake_word_from_sdkconfig(args.sdkconfig)
+
     if custom_wake_word_config and multinet_model_paths:
-        # Determine language from multinet models
         language = get_language_from_multinet_models(multinet_model_names)
-        
-        # Build multinet_model info structure
         multinet_model_info = {
             "language": language,
-            "duration": 3000,  # Default duration in ms
+            "duration": 3000,
             "threshold": custom_wake_word_config['threshold'],
             "commands": [
                 {
@@ -866,7 +866,7 @@ def main():
         print(f"  wake word threshold: {custom_wake_word_config['threshold']}")
     
     # Check if we have anything to build
-    if not wakenet_model_paths and not multinet_model_paths and not text_font_path and not emoji_collection_path and not extra_files_path and not multinet_model_info:
+    if not wakenet_model_paths and not multinet_model_paths and not text_font_path and not emoji_collection_path and not extra_files and not multinet_model_info:
         print("Warning: No assets to build (no SR models, text font, emoji collection, extra files, or custom wake word)")
         # Create an empty assets.bin file
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
@@ -876,8 +876,8 @@ def main():
         return
     
     # Build the assets
-    success = build_assets_integrated(wakenet_model_paths, multinet_model_paths, text_font_path, emoji_collection_path, 
-                                     extra_files_path, args.output, multinet_model_info)
+    success = build_assets_integrated(wakenet_model_paths, multinet_model_paths, text_font_path, emoji_collection_path,
+                                     extra_files, args.output, multinet_model_info)
     
     if not success:
         sys.exit(1)

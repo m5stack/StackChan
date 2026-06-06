@@ -6,7 +6,12 @@
 #pragma once
 #include "elements/key_elements.h"
 #include "decorator.h"
+#include <lvgl.h>
 #include <memory>
+
+namespace smooth_ui_toolkit::lvgl_cpp {
+class Container;
+}
 
 namespace stackchan::avatar {
 
@@ -16,6 +21,9 @@ namespace stackchan::avatar {
  */
 class Avatar {
 public:
+    virtual void init(lv_obj_t* parent, const lv_font_t* font = &lv_font_montserrat_16) = 0;
+    virtual smooth_ui_toolkit::lvgl_cpp::Container* getPanel() const = 0;
+
     /**
      * @brief Update avatar, trigger all elements, decorators and modifiers to update
      *

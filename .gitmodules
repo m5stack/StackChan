@@ -1,0 +1,15 @@
+[submodule "firmware/components/mooncake"]
+	path = firmware/components/mooncake
+	url = https://github.com/Forairaaaaa/mooncake.git
+[submodule "firmware/components/mooncake_log"]
+	path = firmware/components/mooncake_log
+	url = https://github.com/Forairaaaaa/mooncake_log.git
+[submodule "firmware/components/smooth_ui_toolkit"]
+	path = firmware/components/smooth_ui_toolkit
+	url = https://github.com/Forairaaaaa/smooth_ui_toolkit.git
+[submodule "firmware/components/ArduinoJson"]
+	path = firmware/components/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson.git
+[submodule "firmware/components/esp-now"]
+	path = firmware/components/esp-now
+	url = https://github.com/espressif/esp-now.git

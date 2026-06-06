@@ -16,6 +16,7 @@ static std::string _tag = "Setup-AIAgent";
 
 namespace {
 static const std::array<const char*, 4> _idle_motion_level_labels = {{"Off", "Low", "Medium", "High"}};
+static const std::array<const char*, 2> _avatar_skin_values        = {{"default", "ineffa"}};
 constexpr auto kCheckedIndicatorSelector = static_cast<lv_style_selector_t>(
     static_cast<uint32_t>(LV_PART_INDICATOR) | static_cast<uint32_t>(LV_STATE_CHECKED));
 
@@ -152,7 +153,8 @@ AIAgentGeneralWorker::AIAgentGeneralWorker()
 {
     mclog::info("AIAgentGeneralWorker start");
 
-    _config = GetHAL().getAiAgentConfig();
+    _config        = GetHAL().getAiAgentConfig();
+    _avatar_config = GetHAL().getAvatarConfig();
 
     for (uint8_t level = 0; level < _idle_motion_level_labels.size(); ++level) {
         _idle_motion_levels.push_back(level);
@@ -236,9 +238,52 @@ AIAgentGeneralWorker::AIAgentGeneralWorker()
         _switch_start_ai_on_boot->addState(LV_STATE_CHECKED);
     }
 
+    _panel_avatar_skin = std::make_unique<Container>(_panel->get());
+    _panel_avatar_skin->setSize(296, 162);
+    _panel_avatar_skin->align(LV_ALIGN_TOP_MID, 0, 336);
+    _panel_avatar_skin->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_avatar_skin->setBorderWidth(0);
+    _panel_avatar_skin->setRadius(18);
+    _panel_avatar_skin->setPadding(0, 0, 0, 0);
+    _panel_avatar_skin->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_avatar_skin_title = std::make_unique<Label>(_panel_avatar_skin->get());
+    _label_avatar_skin_title->setText("Avatar face skin:");
+    _label_avatar_skin_title->setTextFont(&lv_font_montserrat_16);
+    _label_avatar_skin_title->setTextColor(lv_color_hex(0x26206A));
+    _label_avatar_skin_title->setWidth(260);
+    _label_avatar_skin_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_avatar_skin_title->align(LV_ALIGN_TOP_MID, 0, 14);
+
+    _roller_avatar_skin = std::make_unique<Roller>(_panel_avatar_skin->get());
+    _roller_avatar_skin->setSize(180, 66);
+    _roller_avatar_skin->setOptions("M5 Default\nIneffa");
+    _roller_avatar_skin->align(LV_ALIGN_TOP_MID, 0, 42);
+    _roller_avatar_skin->setTextFont(&lv_font_montserrat_16);
+    _roller_avatar_skin->setTextColor(lv_color_hex(0x26206A));
+    _roller_avatar_skin->setBgColor(lv_color_hex(0xB8D3FD));
+    _roller_avatar_skin->setBgColor(lv_color_hex(0x615B9E), LV_PART_SELECTED);
+    _roller_avatar_skin->setRadius(12);
+    _roller_avatar_skin->setShadowWidth(0);
+    _roller_avatar_skin->setBorderWidth(0);
+    for (size_t i = 0; i < _avatar_skin_values.size(); ++i) {
+        if (_avatar_config.skin == _avatar_skin_values[i]) {
+            _roller_avatar_skin->setSelected(i, LV_ANIM_OFF);
+            break;
+        }
+    }
+
+    _label_avatar_skin_note = std::make_unique<Label>(_panel_avatar_skin->get());
+    _label_avatar_skin_note->setText("Restart required");
+    _label_avatar_skin_note->setTextFont(&lv_font_montserrat_16);
+    _label_avatar_skin_note->setTextColor(lv_color_hex(0x615B9E));
+    _label_avatar_skin_note->setWidth(260);
+    _label_avatar_skin_note->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_avatar_skin_note->align(LV_ALIGN_TOP_MID, 0, 122);
+
     _btn_confirm = std::make_unique<Button>(_panel->get());
     apply_button_common_style(*_btn_confirm);
-    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 326);
+    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 520);
     _btn_confirm->setSize(290, 50);
     _btn_confirm->label().setText("Confirm");
     _btn_confirm->onClick().connect([this]() { _confirm_flag = true; });
@@ -257,9 +302,15 @@ void AIAgentGeneralWorker::update()
     if (_confirm_flag) {
         _confirm_flag = false;
         _config.startAiAgentOnBoot = _switch_start_ai_on_boot->getValue();
+        uint16_t selected_skin      = _roller_avatar_skin->getSelected();
+        if (selected_skin < _avatar_skin_values.size()) {
+            _avatar_config.skin = _avatar_skin_values[selected_skin];
+        }
         GetHAL().setAiAgentConfig(_config);
+        GetHAL().setAvatarConfig(_avatar_config);
         mclog::tagInfo(_tag, "AI agent config updated: idleRandomMovementLevel={} ({})", _config.idleRandomMovementLevel,
                        _idle_motion_level_labels[_config.idleRandomMovementLevel]);
+        mclog::tagInfo(_tag, "avatar skin config updated: {} (restart required)", _avatar_config.skin);
         _is_done = true;
     }
 }

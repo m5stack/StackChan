@@ -45,8 +45,8 @@ public:
         if (_event_swipe) {
             _event_swipe = false;
             handle_swipe(stackchan);
-            // 只要在摸，就推迟恢复时间
-            _is_waiting_restore = false;
+            _is_waiting_restore = true;
+            _restore_tick       = now + _restore_delay_ms;
         }
 
         // 处理“手松开”事件
@@ -113,25 +113,13 @@ private:
             return;
         }
 
-        int action = Random::getInstance().getInt(0, 2);
         int speed  = Random::getInstance().getInt(300, 500);
 
         int32_t target_yaw   = _prev_yaw;
         int32_t target_pitch = _prev_pitch;
 
-        switch (action) {
-            case 0:  // 抬头
-                target_pitch += Random::getInstance().getInt(150, 250);
-                target_yaw += Random::getInstance().getInt(-50, 50);
-                break;
-            case 1:  // 歪头
-                target_pitch -= Random::getInstance().getInt(0, 50);
-                target_yaw += (Random::getInstance().getInt(0, 1) == 0 ? 150 : -150);
-                break;
-            case 2:  // 大幅度开心
-                target_pitch += Random::getInstance().getInt(250, 400);
-                break;
-        }
+        target_pitch += Random::getInstance().getInt(180, 300);
+        target_yaw += Random::getInstance().getInt(-25, 25);
 
         // 自然范围限制
         target_pitch = uitk::clamp(target_pitch, 0, 540);

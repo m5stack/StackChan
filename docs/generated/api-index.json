@@ -733,6 +733,17 @@
             "type": "object"
           },
           "features": {
+            "properties": {
+              "aec": {
+                "type": "boolean"
+              },
+              "mcp": {
+                "type": "boolean"
+              },
+              "remote_wake": {
+                "type": "boolean"
+              }
+            },
             "type": "object"
           },
           "transport": {
@@ -809,7 +820,8 @@
             "enum": [
               "auto",
               "manual",
-              "realtime"
+              "realtime",
+              "remote_wake"
             ],
             "type": "string"
           },
@@ -852,7 +864,7 @@
       "summary": "Device stops the current listening window."
     },
     {
-      "direction": "device_to_server",
+      "direction": "bidirectional",
       "name": "listen.detect",
       "schema": {
         "properties": {
@@ -868,13 +880,12 @@
           }
         },
         "required": [
-          "session_id",
           "type",
           "text"
         ],
         "type": "object"
       },
-      "summary": "Device reports the detected wake phrase for the current session."
+      "summary": "A peer reports the detected wake phrase for the current session."
     },
     {
       "direction": "server_to_device",

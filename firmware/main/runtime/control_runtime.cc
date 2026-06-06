@@ -112,6 +112,8 @@ void Application::WakeWordInvoke(const std::string& wake_word)
         return;
     }
 
+    StopRemoteWakeMonitoring();
+
     const DeviceState state = GetDeviceState();
     if (state == kDeviceStateIdle) {
         audio_system_.EncodeWakeWord();

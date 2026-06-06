@@ -4,5 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #pragma once
-#include "skins/default/default.h"
+#include "avatar_factory.h"
 #include "decorators/decorators.h"
+#include "skins/default/default.h"
+#include "skins/inefa/inefa.h"

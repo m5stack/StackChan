@@ -342,14 +342,19 @@ private:
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel_general;
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel_startup;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_avatar_skin;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_title;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_value;
     std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_idle_motion;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_startup_title;
     std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_start_ai_on_boot;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_avatar_skin_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_avatar_skin_note;
+    std::unique_ptr<uitk::lvgl_cpp::Roller> _roller_avatar_skin;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
 
     AiAgentConfig_t _config;
+    AvatarConfig_t _avatar_config;
     std::vector<uint8_t> _idle_motion_levels;
     int32_t _pending_idle_motion_index = -1;
     bool _confirm_flag                 = false;

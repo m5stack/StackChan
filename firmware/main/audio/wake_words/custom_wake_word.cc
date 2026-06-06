@@ -125,10 +125,6 @@ bool CustomWakeWord::LoadModels(srmodel_list_t* models_list)
     if (models_ == nullptr) {
         models_ = esp_srmodel_init("model");
         owns_models_ = true;
-#ifdef CONFIG_CUSTOM_WAKE_WORD
-        threshold_ = CONFIG_CUSTOM_WAKE_WORD_THRESHOLD / 100.0f;
-        commands_.push_back({1, CONFIG_CUSTOM_WAKE_WORD, CONFIG_CUSTOM_WAKE_WORD_DISPLAY, "wake"});
-#endif
     } else if (!LoadAssetConfig()) {
         return false;
     }
@@ -220,17 +216,43 @@ bool CustomWakeWord::CreateMultinet()
         return false;
     }
     multinet_->set_det_threshold(model_data_, threshold_);
+    ESP_LOGI(kTag, "Using model=%s language=%s duration=%dms threshold=%.2f chunk_samples=%d input_rate=%d input_channels=%d",
+             model_name_,
+             language_.c_str(),
+             duration_ms_,
+             static_cast<double>(threshold_),
+             multinet_->get_samp_chunksize(model_data_),
+             codec_->input_sample_rate(),
+             codec_->input_channels());
     return true;
 }
 
 bool CustomWakeWord::ConfigureCommands()
 {
     esp_mn_commands_clear();
+#if CONFIG_SR_MN_EN_MULTINET5_SINGLE_RECOGNITION_QUANT8
+    ESP_LOGI(kTag, "Registering MultiNet commands using phoneme mode");
+#else
+    ESP_LOGI(kTag, "Registering MultiNet commands using literal command mode");
+#endif
     for (const Command& command : commands_) {
-        if (esp_mn_commands_add(command.id, command.phrase.c_str()) != ESP_OK) {
-            ESP_LOGE(kTag, "Failed to add wake-word command: %s", command.phrase.c_str());
+#if CONFIG_SR_MN_EN_MULTINET5_SINGLE_RECOGNITION_QUANT8
+        const esp_err_t add_result =
+            esp_mn_commands_phoneme_add(command.id, command.display_text.c_str(), command.phrase.c_str());
+#else
+        const esp_err_t add_result = esp_mn_commands_add(command.id, command.phrase.c_str());
+#endif
+        if (add_result != ESP_OK) {
+            ESP_LOGE(kTag, "Failed to add wake-word command: text=%s phrase=%s",
+                     command.display_text.c_str(),
+                     command.phrase.c_str());
             return false;
         }
+        ESP_LOGI(kTag, "Configured command id=%d text=%s phrase=%s action=%s",
+                 command.id,
+                 command.display_text.c_str(),
+                 command.phrase.c_str(),
+                 command.action.c_str());
     }
 
     esp_mn_error_t* result = esp_mn_commands_update();
@@ -244,7 +266,6 @@ bool CustomWakeWord::ConfigureCommands()
 void CustomWakeWord::AppendInput(const std::vector<int16_t>& data)
 {
     if (codec_->input_channels() == 2) {
-        input_buffer_.reserve(input_buffer_.size() + data.size() / 2);
         for (size_t i = 0; i < data.size(); i += 2) {
             input_buffer_.push_back(data[i]);
         }
@@ -270,7 +291,9 @@ void CustomWakeWord::ProcessBufferedInput()
             multinet_->clean(model_data_);
         }
 
-        input_buffer_.erase(input_buffer_.begin(), input_buffer_.begin() + chunk_samples);
+        for (int i = 0; i < chunk_samples; ++i) {
+            input_buffer_.pop_front();
+        }
     }
 }
 

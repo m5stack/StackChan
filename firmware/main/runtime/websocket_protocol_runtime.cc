@@ -398,6 +398,9 @@ std::string WebsocketProtocol::GetHelloMessage()
 #if CONFIG_USE_SERVER_AEC
     cJSON_AddBoolToObject(features, "aec", true);
 #endif
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    cJSON_AddBoolToObject(features, "remote_wake", true);
+#endif
     cJSON_AddBoolToObject(features, "mcp", true);
     cJSON_AddItemToObject(root, "features", features);
     cJSON_AddStringToObject(root, "transport", "websocket");

@@ -23,7 +23,7 @@ void Application::HandleIncomingProtocolJson(const cJSON* root, Display* display
         HandleIncomingTtsStop(root, display) || HandleIncomingSttTranscript(root, display) ||
         HandleIncomingUiEmotion(root, display) || HandleIncomingUiAlert(root) ||
         HandleIncomingSystemReboot(root) || HandleIncomingMcp(root) ||
-        HandleIncomingUiCustom(root, display)) {
+        HandleIncomingListenDetect(root) || HandleIncomingUiCustom(root, display)) {
         return;
     }
 
@@ -124,6 +124,31 @@ bool Application::HandleIncomingMcp(const cJSON* root)
         McpServer::GetInstance().ParseMessage(payload);
     }
     return true;
+}
+
+bool Application::HandleIncomingListenDetect(const cJSON* root)
+{
+#if CONFIG_USE_REMOTE_WAKE_WORD
+    const cJSON* type = cJSON_GetObjectItem(root, "type");
+    if (!cJSON_IsString(type) || std::strcmp(type->valuestring, "listen.detect") != 0) {
+        return false;
+    }
+
+    const cJSON* text = cJSON_GetObjectItem(root, "text");
+    const char* wake_word = cJSON_IsString(text) ? text->valuestring : "remote";
+    ESP_LOGI(TAG, "Remote wake detected: %s", wake_word);
+    Schedule([this, wake_word = std::string(wake_word)]() {
+        if (GetDeviceState() != kDeviceStateIdle) {
+            return;
+        }
+        StopRemoteWakeMonitoring();
+        WakeWordInvoke(wake_word);
+    });
+    return true;
+#else
+    (void)root;
+    return false;
+#endif
 }
 
 bool Application::HandleIncomingSystemReboot(const cJSON* root)

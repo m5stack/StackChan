@@ -238,6 +238,33 @@ void Hal::setAiAgentConfig(AiAgentConfig_t config)
     _ai_agent_config_cached = true;
 }
 
+AvatarConfig_t Hal::getAvatarConfig()
+{
+    if (_avatar_config_cached) {
+        return _avatar_config_cache;
+    }
+
+    hal_bridge::AvatarConfig_t bridge_config = hal_bridge::get_avatar_config();
+    withSdCard([&]() {
+        hal_bridge::apply_avatar_config_sd_overrides(bridge_config);
+    });
+
+    _avatar_config_cache = AvatarConfig_t{
+        .skin = bridge_config.skin,
+    };
+    _avatar_config_cached = true;
+    return _avatar_config_cache;
+}
+
+void Hal::setAvatarConfig(AvatarConfig_t config)
+{
+    hal_bridge::set_avatar_config({
+        .skin = config.skin,
+    });
+    _avatar_config_cache  = config;
+    _avatar_config_cached = true;
+}
+
 uint8_t Hal::getBatteryLevel()
 {
     return hal_bridge::board_get_battery_level();

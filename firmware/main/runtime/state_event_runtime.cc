@@ -28,15 +28,22 @@ void Application::HandleStateChangedEvent()
             display->SetStatus(Lang::Strings::STANDBY);
             display->ClearChatMessages();
             display->SetEmotion("neutral");
+#if CONFIG_USE_REMOTE_WAKE_WORD
+            audio_system_.EnableWakeWordDetection(false);
+            StartRemoteWakeMonitoring();
+#else
             audio_system_.EnableVoiceProcessing(false);
             audio_system_.EnableWakeWordDetection(true);
+#endif
             break;
         case kDeviceStateConnecting:
+            StopRemoteWakeMonitoring();
             display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
+            StopRemoteWakeMonitoring();
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             if (HasDebugEventSubscribers()) {
@@ -80,6 +87,7 @@ void Application::HandleStateChangedEvent()
             }
             break;
         case kDeviceStateSpeaking:
+            StopRemoteWakeMonitoring();
             StopAutoListenTimeout();
             display->SetStatus(Lang::Strings::SPEAKING);
             if (listening_mode_ != kListeningModeRealtime) {
@@ -89,11 +97,13 @@ void Application::HandleStateChangedEvent()
             audio_system_.ResetDecoder();
             break;
         case kDeviceStateWifiConfiguring:
+            StopRemoteWakeMonitoring();
             StopAutoListenTimeout();
             audio_system_.EnableVoiceProcessing(false);
             audio_system_.EnableWakeWordDetection(false);
             break;
         default:
+            StopRemoteWakeMonitoring();
             StopAutoListenTimeout();
             break;
     }
@@ -115,6 +125,8 @@ void Application::HandleNetworkConnectedEvent()
                 vTaskDelete(nullptr);
             }, "activation", 4096 * 2, this, 2, &activation_task_handle_);
         }
+    } else if (state == kDeviceStateIdle) {
+        StartRemoteWakeMonitoring();
     }
 
     Board::GetInstance().GetDisplay()->UpdateStatusBar(true);
@@ -123,8 +135,10 @@ void Application::HandleNetworkConnectedEvent()
 void Application::HandleNetworkDisconnectedEvent()
 {
     const DeviceState state = GetDeviceState();
+    StopRemoteWakeMonitoring();
     if (protocol_ != nullptr &&
-        (state == kDeviceStateConnecting || state == kDeviceStateListening || state == kDeviceStateSpeaking)) {
+        (state == kDeviceStateIdle || state == kDeviceStateConnecting || state == kDeviceStateListening ||
+         state == kDeviceStateSpeaking)) {
         ESP_LOGI(TAG, "Closing audio channel due to network disconnection");
         protocol_->CloseAudioChannel();
     }

@@ -40,7 +40,8 @@ enum AbortReason {
 enum ListeningMode {
     kListeningModeAutoStop,
     kListeningModeManualStop,
-    kListeningModeRealtime
+    kListeningModeRealtime,
+    kListeningModeRemoteWake
 };
 
 class Protocol {

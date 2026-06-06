@@ -120,7 +120,9 @@ void Protocol::SendStartListening(ListeningMode mode)
     }
     AddSessionId(root, session_id_);
     cJSON_AddStringToObject(root, "type", "listen.start");
-    if (mode == kListeningModeRealtime) {
+    if (mode == kListeningModeRemoteWake) {
+        cJSON_AddStringToObject(root, "mode", "remote_wake");
+    } else if (mode == kListeningModeRealtime) {
         cJSON_AddStringToObject(root, "mode", "realtime");
     } else if (mode == kListeningModeAutoStop) {
         cJSON_AddStringToObject(root, "mode", "auto");

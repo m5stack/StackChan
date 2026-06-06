@@ -23,12 +23,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Fetch firmware dependencies
-        run: |
-          source /opt/esp/idf/export.sh
-          cd firmware
-          python fetch_repos.py
+        with:
+          submodules: recursive
 
       - name: Build firmware
         run: |

@@ -8,6 +8,7 @@
 #include <settings.h>
 #include <websocket_protocol.h>
 
+#include <algorithm>
 #include <esp_log.h>
 
 #define TAG "Application"
@@ -71,6 +72,21 @@ void Application::InitializeProtocol()
     protocol_ = std::make_unique<WebsocketProtocol>();
     protocol_->OnConnected([this]() { DismissAlert(); });
     protocol_->OnNetworkError([this](const std::string& message) {
+        if (remote_wake_state_ == RemoteWakeMonitorState::kConnecting && GetDeviceState() == kDeviceStateIdle) {
+            Schedule([this]() {
+                if (remote_wake_state_ != RemoteWakeMonitorState::kConnecting) {
+                    return;
+                }
+                audio_system_.EnableVoiceProcessing(false);
+                Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+                remote_wake_retry_delay_ticks_ = remote_wake_retry_delay_ticks_ == 0
+                    ? kRemoteWakeInitialRetryDelayTicks
+                    : std::min(remote_wake_retry_delay_ticks_ * 2, kRemoteWakeMaxRetryDelayTicks);
+                remote_wake_retry_due_tick_ = clock_ticks_ + remote_wake_retry_delay_ticks_;
+                remote_wake_state_ = RemoteWakeMonitorState::kRetryPending;
+            });
+            return;
+        }
         last_error_message_ = message;
         xEventGroupSetBits(event_group_, MAIN_EVENT_ERROR);
     });
@@ -89,9 +105,14 @@ void Application::InitializeProtocol()
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
         Schedule([this]() {
+            StopRemoteWakeMonitoring();
             auto* current_display = Board::GetInstance().GetDisplay();
             current_display->SetChatMessage("system", "");
+            const bool was_idle = GetDeviceState() == kDeviceStateIdle;
             SetDeviceState(kDeviceStateIdle);
+            if (was_idle) {
+                StartRemoteWakeMonitoring();
+            }
         });
     });
     protocol_->OnIncomingJson([this, display](const cJSON* root) { HandleIncomingProtocolJson(root, display); });
