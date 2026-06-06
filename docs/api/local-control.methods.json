@@ -70,15 +70,20 @@
       "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
     },
     {
-      "name": "settings/write_sd",
-      "summary": "Validate and write the SD-card settings JSON file.",
+      "name": "settings/sync_to_sd",
+      "summary": "Sync settings to SDCard.",
       "stability": "stable",
       "auth": {"required": true, "principals": ["dashboard", "admin"]},
       "params_schema": {
         "type": "object",
-        "required": ["settings_json"],
+        "required": ["settings_json", "sync_to_sd"],
         "properties": {
-          "settings_json": {"type": "string"}
+          "settings_json": {"type": "string"},
+          "sync_to_sd": {
+            "type": "boolean",
+            "const": true,
+            "description": "Explicit opt-in. Sync settings to SDCard is disabled unless this is true."
+          }
         }
       },
       "result_schema": {
@@ -186,6 +191,32 @@
         "type": "object",
         "required": ["requested"],
         "properties": {"requested": {"type": "boolean"}}
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "debug/subscribe_events",
+      "summary": "Subscribe this authenticated local-control WebSocket session to debug event notifications.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["subscribed"],
+        "properties": {"subscribed": {"type": "boolean", "const": true}}
+      },
+      "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
+    },
+    {
+      "name": "debug/unsubscribe_events",
+      "summary": "Unsubscribe this authenticated local-control WebSocket session from debug event notifications.",
+      "stability": "experimental",
+      "auth": {"required": true, "principals": ["dashboard", "admin"]},
+      "params_schema": {"type": "object", "properties": {}},
+      "result_schema": {
+        "type": "object",
+        "required": ["subscribed"],
+        "properties": {"subscribed": {"type": "boolean", "const": false}}
       },
       "handler": "firmware/main/hal/board/local_control_websocket_server.cc"
     }

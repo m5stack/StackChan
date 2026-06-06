@@ -16,18 +16,20 @@ static std::string _tag = "Setup-AIAgent";
 
 namespace {
 static const std::array<const char*, 4> _idle_motion_level_labels = {{"Off", "Low", "Medium", "High"}};
+constexpr auto kCheckedIndicatorSelector = static_cast<lv_style_selector_t>(
+    static_cast<uint32_t>(LV_PART_INDICATOR) | static_cast<uint32_t>(LV_STATE_CHECKED));
 
 }  // namespace
 
-XiaozhiPowerSavingWorker::XiaozhiPowerSavingWorker()
+AIAgentPowerSavingWorker::AIAgentPowerSavingWorker()
 {
-    mclog::info("XiaozhiPowerSavingWorker start");
+    mclog::info("AIAgentPowerSavingWorker start");
 
     for (uint32_t seconds = 0; seconds <= 3600; seconds += 300) {
         _idle_shutdown_levels.push_back(seconds);
     }
 
-    _config = GetHAL().getXiaozhiConfig();
+    _config = GetHAL().getAiAgentConfig();
 
     int current_index = static_cast<int>(_idle_shutdown_levels.size()) - 1;
     for (size_t i = 0; i < _idle_shutdown_levels.size(); ++i) {
@@ -101,7 +103,7 @@ XiaozhiPowerSavingWorker::XiaozhiPowerSavingWorker()
     _switch_charging->setSize(64, 36);
     _switch_charging->align(LV_ALIGN_TOP_MID, 0, 66);
     _switch_charging->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
-    _switch_charging->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    _switch_charging->setBgColor(lv_color_hex(0x615B9E), kCheckedIndicatorSelector);
     _switch_charging->setBgColor(lv_color_hex(0xFFFFFF), LV_PART_KNOB);
     if (_config.allowShutdownWhenCharging) {
         _switch_charging->addState(LV_STATE_CHECKED);
@@ -117,7 +119,7 @@ XiaozhiPowerSavingWorker::XiaozhiPowerSavingWorker()
     update_idle_label();
 }
 
-void XiaozhiPowerSavingWorker::update()
+void AIAgentPowerSavingWorker::update()
 {
     if (_pending_idle_index != -1) {
         _config.idleShutdownTimeSeconds = _idle_shutdown_levels[_pending_idle_index];
@@ -128,14 +130,14 @@ void XiaozhiPowerSavingWorker::update()
     if (_confirm_flag) {
         _confirm_flag                     = false;
         _config.allowShutdownWhenCharging = _switch_charging->getValue();
-        GetHAL().setXiaozhiConfig(_config);
-        mclog::tagInfo(_tag, "xiaozhi config updated: idleShutdownTimeSeconds={}, allowShutdownWhenCharging={}",
+        GetHAL().setAiAgentConfig(_config);
+        mclog::tagInfo(_tag, "AI agent config updated: idleShutdownTimeSeconds={}, allowShutdownWhenCharging={}",
                        _config.idleShutdownTimeSeconds, _config.allowShutdownWhenCharging);
         _is_done = true;
     }
 }
 
-void XiaozhiPowerSavingWorker::update_idle_label()
+void AIAgentPowerSavingWorker::update_idle_label()
 {
     if (_config.idleShutdownTimeSeconds == 0) {
         _label_idle_value->setText("Off");
@@ -146,11 +148,11 @@ void XiaozhiPowerSavingWorker::update_idle_label()
     _label_idle_value->setText(fmt::format("{} min", total_minutes));
 }
 
-XiaozhiGeneralWorker::XiaozhiGeneralWorker()
+AIAgentGeneralWorker::AIAgentGeneralWorker()
 {
-    mclog::info("XiaozhiGeneralWorker start");
+    mclog::info("AIAgentGeneralWorker start");
 
-    _config = GetHAL().getXiaozhiConfig();
+    _config = GetHAL().getAiAgentConfig();
 
     for (uint8_t level = 0; level < _idle_motion_level_labels.size(); ++level) {
         _idle_motion_levels.push_back(level);
@@ -228,7 +230,7 @@ XiaozhiGeneralWorker::XiaozhiGeneralWorker()
     _switch_start_ai_on_boot->setSize(64, 36);
     _switch_start_ai_on_boot->align(LV_ALIGN_TOP_MID, 0, 66);
     _switch_start_ai_on_boot->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
-    _switch_start_ai_on_boot->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    _switch_start_ai_on_boot->setBgColor(lv_color_hex(0x615B9E), kCheckedIndicatorSelector);
     _switch_start_ai_on_boot->setBgColor(lv_color_hex(0xFFFFFF), LV_PART_KNOB);
     if (_config.startAiAgentOnBoot) {
         _switch_start_ai_on_boot->addState(LV_STATE_CHECKED);
@@ -244,7 +246,7 @@ XiaozhiGeneralWorker::XiaozhiGeneralWorker()
     update_idle_motion_label();
 }
 
-void XiaozhiGeneralWorker::update()
+void AIAgentGeneralWorker::update()
 {
     if (_pending_idle_motion_index != -1) {
         _config.idleRandomMovementLevel = _idle_motion_levels[_pending_idle_motion_index];
@@ -255,14 +257,14 @@ void XiaozhiGeneralWorker::update()
     if (_confirm_flag) {
         _confirm_flag = false;
         _config.startAiAgentOnBoot = _switch_start_ai_on_boot->getValue();
-        GetHAL().setXiaozhiConfig(_config);
-        mclog::tagInfo(_tag, "xiaozhi config updated: idleRandomMovementLevel={} ({})", _config.idleRandomMovementLevel,
+        GetHAL().setAiAgentConfig(_config);
+        mclog::tagInfo(_tag, "AI agent config updated: idleRandomMovementLevel={} ({})", _config.idleRandomMovementLevel,
                        _idle_motion_level_labels[_config.idleRandomMovementLevel]);
         _is_done = true;
     }
 }
 
-void XiaozhiGeneralWorker::update_idle_motion_label()
+void AIAgentGeneralWorker::update_idle_motion_label()
 {
     _label_idle_motion_value->setText(_idle_motion_level_labels[_config.idleRandomMovementLevel]);
 }

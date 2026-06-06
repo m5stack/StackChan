@@ -5,6 +5,7 @@
 #include <display.h>
 #include <ota.h>
 
+#include <cJSON.h>
 #include <esp_log.h>
 
 #define TAG "Application"
@@ -53,12 +54,19 @@ void Application::ToggleChatState()
 
 void Application::StartListening()
 {
+    if (HasDebugEventSubscribers()) {
+        cJSON* fields = cJSON_CreateObject();
+        if (fields != nullptr) {
+            cJSON_AddStringToObject(fields, "mode", "manual");
+            PublishDebugEvent("listen_start_requested", fields);
+        }
+    }
     xEventGroupSetBits(event_group_, MAIN_EVENT_START_LISTENING);
 }
 
 void Application::StopListening()
 {
-    xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING);
+    RequestStopListening(kListenStopManualRequest);
 }
 
 void Application::SetListeningMode(ListeningMode mode)
@@ -70,6 +78,20 @@ void Application::SetListeningMode(ListeningMode mode)
 ListeningMode Application::GetDefaultListeningMode() const
 {
     return aec_mode_ == kAecOff ? kListeningModeAutoStop : kListeningModeRealtime;
+}
+
+void Application::RequestStopListening(ListenStopReason reason)
+{
+    pending_listen_stop_reason_.store(reason);
+    if (HasDebugEventSubscribers()) {
+        cJSON* fields = cJSON_CreateObject();
+        if (fields != nullptr) {
+            cJSON_AddStringToObject(fields, "reason",
+                                    reason == kListenStopAutoTimeout ? "auto_timeout" : "manual_request");
+            PublishDebugEvent("listen_stop_requested", fields);
+        }
+    }
+    xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING);
 }
 
 void Application::Reboot()
@@ -178,6 +200,13 @@ void Application::RegisterMcpBroadcastCallback(std::function<void(const std::str
     mcp_broadcast_callback_ = std::move(callback);
 }
 
+void Application::RegisterDebugEventCallback(std::function<bool()> has_subscribers,
+                                             std::function<void(const char*, cJSON*)> callback)
+{
+    has_debug_event_subscribers_callback_ = std::move(has_subscribers);
+    debug_event_callback_                 = std::move(callback);
+}
+
 void Application::SetAecMode(AecMode mode)
 {
     aec_mode_ = mode;
@@ -218,4 +247,20 @@ void Application::ResetProtocol()
         protocol_.reset();
         InitializeProtocol();
     });
+}
+
+bool Application::HasDebugEventSubscribers() const
+{
+    return has_debug_event_subscribers_callback_ != nullptr && has_debug_event_subscribers_callback_();
+}
+
+void Application::PublishDebugEvent(const char* type, cJSON* fields)
+{
+    if (debug_event_callback_ == nullptr || !HasDebugEventSubscribers()) {
+        if (fields != nullptr) {
+            cJSON_Delete(fields);
+        }
+        return;
+    }
+    debug_event_callback_(type, fields);
 }

@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <string>
+#include <vector>
 
 class LocalControlWebSocketServer {
 public:
@@ -18,10 +20,13 @@ public:
     bool IsRunning() const;
     size_t GetClientCount() const;
     void SetToken(std::string token);
+    bool HasDebugEventSubscribers() const;
+    void PublishDebugEvent(const char* event_type, cJSON* fields);
 
 private:
     struct ClientState {
         bool authenticated = false;
+        bool debug_events_subscribed = false;
         std::string principal;
         std::string challenge_id;
         std::string nonce;
@@ -30,6 +35,7 @@ private:
     };
 
     httpd_handle_t server_handle_ = nullptr;
+    mutable std::mutex clients_mutex_;
     std::map<int, ClientState> clients_;
     std::string token_;
 
@@ -47,6 +53,7 @@ private:
     void RemoveClient(httpd_req_t* req);
     void SendText(httpd_req_t* req, const char* text);
     void SendText(int sock_fd, const std::string& text);
+    std::vector<int> CopyDebugSubscriberSockets() const;
 };
 
 #endif  // LOCAL_CONTROL_WEBSOCKET_SERVER_H

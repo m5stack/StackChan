@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "title": "StackChan Local Control Debug Events",
+  "events": [
+    {
+      "name": "state_transition",
+      "summary": "Device state changed.",
+      "schema": {
+        "type": "object",
+        "required": ["old_state", "new_state"],
+        "properties": {
+          "old_state": {"type": "string"},
+          "new_state": {"type": "string"}
+        }
+      },
+      "example": {
+        "old_state": "idle",
+        "new_state": "connecting"
+      }
+    },
+    {
+      "name": "wake_word_detected",
+      "summary": "Wake word engine detected a phrase and queued wake handling.",
+      "schema": {
+        "type": "object",
+        "required": ["wake_word", "state"],
+        "properties": {
+          "wake_word": {"type": "string"},
+          "state": {"type": "string"}
+        }
+      },
+      "example": {
+        "wake_word": "hi stackchan",
+        "state": "idle"
+      }
+    },
+    {
+      "name": "listen_start_requested",
+      "summary": "An explicit local listen request was queued.",
+      "schema": {
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+          "mode": {"type": "string", "const": "manual"}
+        }
+      },
+      "example": {
+        "mode": "manual"
+      }
+    },
+    {
+      "name": "listen_enter",
+      "summary": "The device entered listening state.",
+      "schema": {
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+          "mode": {"type": "string", "enum": ["auto", "manual", "realtime"]}
+        }
+      },
+      "example": {
+        "mode": "auto"
+      }
+    },
+    {
+      "name": "listen_stop_requested",
+      "summary": "A listen stop request was queued.",
+      "schema": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": {"type": "string", "enum": ["manual_request", "auto_timeout"]}
+        }
+      },
+      "example": {
+        "reason": "auto_timeout"
+      }
+    },
+    {
+      "name": "listen_stop_handled",
+      "summary": "The listening state handler processed a stop request.",
+      "schema": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": {"type": "string", "enum": ["manual_request", "auto_timeout"]}
+        }
+      },
+      "example": {
+        "reason": "manual_request"
+      }
+    }
+  ]
+}

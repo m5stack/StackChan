@@ -28,7 +28,6 @@ dependencies:
     version: ~0.3.3
     rules:
     - if: target not in [esp32]
-  78/xiaozhi-fonts: ~1.6.0
   espressif/led_strip: ~3.0.2
   espressif/esp_codec_dev: ~1.5.4
   espressif/esp-sr: ~2.3.0
@@ -55,14 +54,8 @@ dependencies:
   lvgl/lvgl: ~9.4.0
   esp_lvgl_port: ~2.7.0
   espressif/esp_io_expander_tca95xx_16bit: ^2.0.0
-  espressif2022/image_player: ^1.1.1
-  # espressif2022/esp_emote_expression: ^0.1.0
   espressif/adc_mic: ^0.2.1
   espressif/esp_mmap_assets: '>=1.2'
-  txp666/otto-emoji-gif-component:
-    version: ^1.1.1
-    rules:
-    - if: target in [esp32s3]
   espressif/adc_battery_estimation: ^0.2.0
   espressif/esp_new_jpeg: ^0.6.1
 

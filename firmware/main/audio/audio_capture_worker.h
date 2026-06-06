@@ -13,7 +13,6 @@
 
 class AudioBus;
 class AudioCodec;
-class AudioDebugger;
 class AudioPowerController;
 class AudioTestController;
 class VoiceProcessorController;
@@ -60,7 +59,6 @@ private:
     std::atomic_bool wake_word_enabled_ = false;
     std::atomic_bool voice_processing_enabled_ = false;
     std::atomic_bool warmup_requested_ = false;
-    std::unique_ptr<AudioDebugger> audio_debugger_;
 
     void Run() override;
     bool CaptureTestingFrame();

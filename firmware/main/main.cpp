@@ -27,7 +27,7 @@ extern "C" void app_main(void)
     ui_hal::on_get_tick([]() { return GetHAL().millis(); });
 
     const bool skip_mooncake =
-        GetHAL().getXiaozhiConfig().startAiAgentOnBoot && GetHAL().getWarmRebootTarget() < 0;
+        GetHAL().getAiAgentConfig().startAiAgentOnBoot && GetHAL().getWarmRebootTarget() < 0;
 
     if (!skip_mooncake) {
         // Install apps
@@ -47,7 +47,7 @@ extern "C" void app_main(void)
 
             GetMooncake().update();
 
-            if (GetHAL().isXiaozhiStartRequested()) {
+            if (GetHAL().isAiAgentStartRequested()) {
                 break;
             }
         }
@@ -57,6 +57,6 @@ extern "C" void app_main(void)
         DestroyMooncake();
     }
 
-    // Start xiaozhi, never returns
-    GetHAL().startXiaozhi();
+    // Start the AI agent runtime, never returns.
+    GetHAL().startAiAgent();
 }

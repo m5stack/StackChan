@@ -32,8 +32,8 @@ void Hal::init()
     }
     ESP_ERROR_CHECK(ret);
 
-    xiaozhi_board_init();
-    xiaozhi_mcp_init();
+    ai_agent_board_init();
+    ai_agent_mcp_init();
     head_touch_init();
     io_expander_init();
     rtc_init();
@@ -128,18 +128,18 @@ void Hal::updateHeapStatusLog()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                   Xiaozhi                                  */
+/*                                  AI Agent                                  */
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
 
-void Hal::xiaozhi_board_init()
+void Hal::ai_agent_board_init()
 {
-    mclog::tagInfo(_tag, "xiaozhi board init");
+    mclog::tagInfo(_tag, "ai agent board init");
 
-    hal_bridge::xiaozhi_board_init();
+    hal_bridge::ai_agent_board_init();
 }
 
 static void _stackchan_update_task(void* param)
@@ -153,18 +153,18 @@ static void _stackchan_update_task(void* param)
 
         LvglLockGuard lock;
 
-        if (!hal_bridge::is_xiaozhi_idle()) {
+        if (!hal_bridge::is_ai_agent_idle()) {
             vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         GetStackChan().update();
 
-        if (!hal_bridge::is_xiaozhi_ready()) {
+        if (!hal_bridge::is_ai_agent_ready()) {
             continue;
         }
 
         if (!is_setup_done) {
-            // Setup when xiaozhi ready
+            // Setup when AI agent runtime is ready
             GetHAL().startSntp();
             view::create_home_indicator([]() { GetHAL().requestWarmReboot(0); }, 0x81DBBD, 0x134233);
             view::create_status_bar(0x81DBBD, 0x134233);
@@ -176,9 +176,9 @@ static void _stackchan_update_task(void* param)
     }
 }
 
-void Hal::startXiaozhi()
+void Hal::startAiAgent()
 {
-    mclog::tagInfo(_tag, "start xiaozhi");
+    mclog::tagInfo(_tag, "start ai agent");
 
     auto& motion = GetStackChan().motion();
     motion.setAutoAngleSyncEnabled(true);
@@ -199,43 +199,43 @@ void Hal::startXiaozhi()
     // Start stackchan update task
     xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 3, NULL, 1);
 
-    hal_bridge::start_xiaozhi_app();
+    hal_bridge::start_ai_agent_app();
 }
 
-XiaozhiConfig_t Hal::getXiaozhiConfig()
+AiAgentConfig_t Hal::getAiAgentConfig()
 {
-    if (_xiaozhi_config_cached) {
-        return _xiaozhi_config_cache;
+    if (_ai_agent_config_cached) {
+        return _ai_agent_config_cache;
     }
 
-    hal_bridge::XiaozhiConfig_t bridge_config;
-    if (!hal_bridge::get_boot_xiaozhi_config(bridge_config)) {
-        bridge_config = hal_bridge::get_xiaozhi_config();
+    hal_bridge::AiAgentConfig_t bridge_config;
+    if (!hal_bridge::get_boot_ai_agent_config(bridge_config)) {
+        bridge_config = hal_bridge::get_ai_agent_config();
         withSdCard([&]() {
-            hal_bridge::apply_xiaozhi_config_sd_overrides(bridge_config);
+            hal_bridge::apply_ai_agent_config_sd_overrides(bridge_config);
         });
     }
 
-    _xiaozhi_config_cache = XiaozhiConfig_t{
+    _ai_agent_config_cache = AiAgentConfig_t{
         .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
         .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
         .idleRandomMovementLevel   = bridge_config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = bridge_config.startAiAgentOnBoot,
     };
-    _xiaozhi_config_cached = true;
-    return _xiaozhi_config_cache;
+    _ai_agent_config_cached = true;
+    return _ai_agent_config_cache;
 }
 
-void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
+void Hal::setAiAgentConfig(AiAgentConfig_t config)
 {
-    hal_bridge::set_xiaozhi_config({
+    hal_bridge::set_ai_agent_config({
         .idleShutdownTimeSeconds   = config.idleShutdownTimeSeconds,
         .allowShutdownWhenCharging = config.allowShutdownWhenCharging,
         .idleRandomMovementLevel   = config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = config.startAiAgentOnBoot,
     });
-    _xiaozhi_config_cache  = config;
-    _xiaozhi_config_cached = true;
+    _ai_agent_config_cache  = config;
+    _ai_agent_config_cached = true;
 }
 
 uint8_t Hal::getBatteryLevel()

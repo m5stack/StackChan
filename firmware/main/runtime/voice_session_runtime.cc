@@ -3,6 +3,7 @@
 #include <assets/lang_config.h>
 #include <board.h>
 
+#include <cJSON.h>
 #include <esp_log.h>
 
 #define TAG "Application"
@@ -81,6 +82,7 @@ void Application::HandleStartListeningEvent()
 void Application::HandleStopListeningEvent()
 {
     const DeviceState state = GetDeviceState();
+    const ListenStopReason reason = pending_listen_stop_reason_.exchange(kListenStopManualRequest);
 
     if (state == kDeviceStateAudioTesting) {
         audio_system_.EnableAudioTesting(false);
@@ -90,6 +92,14 @@ void Application::HandleStopListeningEvent()
     if (state == kDeviceStateListening) {
         if (protocol_ != nullptr) {
             protocol_->SendStopListening();
+        }
+        if (HasDebugEventSubscribers()) {
+            cJSON* fields = cJSON_CreateObject();
+            if (fields != nullptr) {
+                cJSON_AddStringToObject(fields, "reason",
+                                        reason == kListenStopAutoTimeout ? "auto_timeout" : "manual_request");
+                PublishDebugEvent("listen_stop_handled", fields);
+            }
         }
         SetDeviceState(kDeviceStateIdle);
     }
@@ -104,6 +114,14 @@ void Application::HandleWakeWordDetectedEvent()
     const DeviceState state = GetDeviceState();
     const auto wake_word = audio_system_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), static_cast<int>(state));
+    if (HasDebugEventSubscribers()) {
+        cJSON* fields = cJSON_CreateObject();
+        if (fields != nullptr) {
+            cJSON_AddStringToObject(fields, "wake_word", wake_word.c_str());
+            cJSON_AddStringToObject(fields, "state", DeviceStateMachine::GetStateName(state));
+            PublishDebugEvent("wake_word_detected", fields);
+        }
+    }
 
     if (state == kDeviceStateIdle) {
         audio_system_.EncodeWakeWord();

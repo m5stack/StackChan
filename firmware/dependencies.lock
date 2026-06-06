@@ -58,7 +58,7 @@ dependencies:
       type: service
     version: 0.3.4
   78/uart-uhci:
-    component_hash: 200eb10923cb750dddbee5504a36d7b5eaac611afbf52fb9066dc7130159f696
+    component_hash: d33e4cd9f634a561bfddcad79be6fa30f0ee279a9e4d1a2df91eabccbca5d362
     dependencies:
     - name: idf
       require: private
@@ -66,17 +66,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.2.1
-  78/xiaozhi-fonts:
-    component_hash: 19ee829a7439702e18084a313b7b86017d3b8d17a094684575edc76bb6d11023
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.3'
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    version: 1.6.0
+    version: 0.2.2
   espressif/adc_battery_estimation:
     component_hash: b915167c87ed5a84b13d680bd011c2ed9a15121f1e247c6903141b9f138f3606
     dependencies:
@@ -152,7 +142,7 @@ dependencies:
       type: service
     version: 0.5.3
   espressif/dl_fft:
-    component_hash: 7dadbd644c0d7ba4733cc3726ec4cff6edf27b043725e1115861dec1609a3d28
+    component_hash: ced3cf28cc70452b7859c06f4e5059215167254a2047e34c893d6f501ccd6ea2
     dependencies:
     - name: idf
       require: private
@@ -160,7 +150,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.3.1
+    version: 0.4.0
   espressif/esp-dsp:
     component_hash: 42dce32d46ac93dc11f60d368e29a830e9661c7345d794b8a45c343479cae636
     dependencies:
@@ -246,7 +236,7 @@ dependencies:
     - esp32c61
     version: 1.5.2
   espressif/esp_codec_dev:
-    component_hash: 0d9e9bc288156eb55f79338d312e1ebf8c9dfbd5e7d13ef0f20ccb031b4e15cf
+    component_hash: 896c67360ae1f8dedaf8a53dfe48c015317fa455f061a5165307892296990028
     dependencies:
     - name: idf
       require: private
@@ -254,7 +244,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.5.4
+    version: 1.5.10
   espressif/esp_image_effects:
     component_hash: a35037db02862d3cef6f72c25f422ae62da6e6c88219ce03c9ea24e0315ceaaa
     dependencies:
@@ -762,20 +752,6 @@ dependencies:
     - esp32h4
     - linux
     version: 2.3.1
-  espressif2022/image_player:
-    component_hash: 0e42ed1c9665debd15f2f3e7e56519100e75e446410962226cb5e5402da3fa43
-    dependencies:
-    - name: espressif/cmake_utilities
-      registry_url: https://components.espressif.com
-      require: private
-      version: 0.*
-    - name: idf
-      require: private
-      version: '>=5.0'
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    version: 1.1.1
   idf:
     source:
       type: idf
@@ -794,17 +770,6 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.0.0
-  txp666/otto-emoji-gif-component:
-    component_hash: 8da812ae44707af319a20e164e8b544199fe401436167c206e684594e0a38c5d
-    dependencies:
-    - name: lvgl/lvgl
-      registry_url: https://components.espressif.com
-      require: private
-      version: '>=9.0'
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    version: 1.1.1
   waveshare/custom_io_expander_ch32v003:
     component_hash: fefced27c762ed97a3523c9d90d66050deea7eeb7e9eae6328e4ab1a71125d26
     dependencies:
@@ -866,7 +831,6 @@ direct_dependencies:
 - 78/esp-wifi-connect
 - 78/esp_lcd_nv3023
 - 78/uart-eth-modem
-- 78/xiaozhi-fonts
 - espressif/adc_battery_estimation
 - espressif/adc_mic
 - espressif/bmi270_sensor
@@ -901,15 +865,13 @@ direct_dependencies:
 - espressif/iot_usbh_rndis
 - espressif/knob
 - espressif/led_strip
-- espressif2022/image_player
 - idf
 - lvgl/lvgl
 - tny-robotics/sh1106-esp-idf
-- txp666/otto-emoji-gif-component
 - waveshare/custom_io_expander_ch32v003
 - waveshare/esp_lcd_sh8601
 - waveshare/esp_lcd_touch_cst9217
 - wvirgil123/sscma_client
-manifest_hash: 350e17991f1a3226438480b027525b7cde67c34ed4ec6c5847cdfcb22e18dc4a
+manifest_hash: eceb35d92347fc6272ebc98b3d8918c906aecacd5e35bbea8ae1b33078030eab
 target: esp32s3
 version: 2.0.0

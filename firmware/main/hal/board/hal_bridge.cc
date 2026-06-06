@@ -28,11 +28,11 @@
 #include <vector>
 #include <sys/stat.h>
 
-static constexpr std::string_view _xiaozhi_config_nvs_ns                           = "xiaozhi";
-static constexpr std::string_view _xiaozhi_config_idle_shutdown_time_key           = "idle_sec";
-static constexpr std::string_view _xiaozhi_config_allow_shutdown_when_charging_key = "ext_pwr";
-static constexpr std::string_view _xiaozhi_config_idle_random_movement_key         = "idle_lv";
-static constexpr std::string_view _xiaozhi_config_start_ai_agent_on_boot_key       = "boot_ai";
+static constexpr std::string_view _ai_agent_config_nvs_ns                           = "agent";
+static constexpr std::string_view _ai_agent_config_idle_shutdown_time_key           = "idle_sec";
+static constexpr std::string_view _ai_agent_config_allow_shutdown_when_charging_key = "ext_pwr";
+static constexpr std::string_view _ai_agent_config_idle_random_movement_key         = "idle_lv";
+static constexpr std::string_view _ai_agent_config_start_on_boot_key                = "boot_ai";
 static constexpr std::string_view _local_control_config_nvs_ns                    = "local_ctrl";
 static constexpr std::string_view _local_control_config_token_key                  = "token";
 
@@ -40,8 +40,8 @@ static constexpr const char* _sdcard_settings_dir      = SDCARD_MOUNT_POINT "/st
 static constexpr const char* _sdcard_settings_tmp_path = SDCARD_MOUNT_POINT "/stackchan/settings.tmp";
 
 static const char* _tag = "HAL_BRIDGE";
-static bool _boot_xiaozhi_config_loaded = false;
-static hal_bridge::XiaozhiConfig_t _boot_xiaozhi_config;
+static bool _boot_ai_agent_config_loaded = false;
+static hal_bridge::AiAgentConfig_t _boot_ai_agent_config;
 
 static bool read_sd_settings_file(std::string& contents)
 {
@@ -75,12 +75,31 @@ static bool read_sd_settings_file(std::string& contents)
     return true;
 }
 
-static cJSON* get_xiaozhi_override_object(cJSON* root)
+static bool sdcard_mount_available(std::string* error_message)
 {
-    cJSON* xiaozhi = cJSON_GetObjectItem(root, "xiaozhi");
-    if (cJSON_IsObject(xiaozhi)) {
-        return xiaozhi;
+    struct stat mount_stat = {};
+    if (stat(SDCARD_MOUNT_POINT, &mount_stat) != 0) {
+        if (error_message != nullptr) {
+            *error_message = std::string("SD card is not mounted at ") + SDCARD_MOUNT_POINT + ": " + strerror(errno);
+        }
+        return false;
     }
+    if (!S_ISDIR(mount_stat.st_mode)) {
+        if (error_message != nullptr) {
+            *error_message = std::string("SD card mount point is not a directory: ") + SDCARD_MOUNT_POINT;
+        }
+        return false;
+    }
+    return true;
+}
+
+static cJSON* get_ai_agent_override_object(cJSON* root)
+{
+    cJSON* agent = cJSON_GetObjectItem(root, "agent");
+    if (cJSON_IsObject(agent)) {
+        return agent;
+    }
+
     return root;
 }
 
@@ -163,32 +182,32 @@ static bool validate_json_uint32(cJSON* object, const char* primary_key, const c
     return true;
 }
 
-static bool has_xiaozhi_settings_keys(cJSON* object)
+static bool has_ai_agent_settings_keys(cJSON* object)
 {
-    return has_json_key(object, "idleShutdownTimeSeconds") || has_json_key(object, _xiaozhi_config_idle_shutdown_time_key.data()) ||
+    return has_json_key(object, "idleShutdownTimeSeconds") || has_json_key(object, _ai_agent_config_idle_shutdown_time_key.data()) ||
            has_json_key(object, "allowShutdownWhenCharging") ||
-           has_json_key(object, _xiaozhi_config_allow_shutdown_when_charging_key.data()) ||
+           has_json_key(object, _ai_agent_config_allow_shutdown_when_charging_key.data()) ||
            has_json_key(object, "idleRandomMovementLevel") ||
-           has_json_key(object, _xiaozhi_config_idle_random_movement_key.data()) ||
+           has_json_key(object, _ai_agent_config_idle_random_movement_key.data()) ||
            has_json_key(object, "startAiAgentOnBoot") ||
-           has_json_key(object, _xiaozhi_config_start_ai_agent_on_boot_key.data());
+           has_json_key(object, _ai_agent_config_start_on_boot_key.data());
 }
 
-static bool validate_xiaozhi_settings_object(cJSON* object, std::string& error)
+static bool validate_ai_agent_settings_object(cJSON* object, std::string& error)
 {
-    if (!validate_json_uint32(object, "idleShutdownTimeSeconds", _xiaozhi_config_idle_shutdown_time_key.data(), 0,
+    if (!validate_json_uint32(object, "idleShutdownTimeSeconds", _ai_agent_config_idle_shutdown_time_key.data(), 0,
                               86400, error)) {
         return false;
     }
     if (!validate_json_bool(object, "allowShutdownWhenCharging",
-                            _xiaozhi_config_allow_shutdown_when_charging_key.data(), error)) {
+                            _ai_agent_config_allow_shutdown_when_charging_key.data(), error)) {
         return false;
     }
-    if (!validate_json_uint32(object, "idleRandomMovementLevel", _xiaozhi_config_idle_random_movement_key.data(), 0,
+    if (!validate_json_uint32(object, "idleRandomMovementLevel", _ai_agent_config_idle_random_movement_key.data(), 0,
                               3, error)) {
         return false;
     }
-    if (!validate_json_bool(object, "startAiAgentOnBoot", _xiaozhi_config_start_ai_agent_on_boot_key.data(), error)) {
+    if (!validate_json_bool(object, "startAiAgentOnBoot", _ai_agent_config_start_on_boot_key.data(), error)) {
         return false;
     }
     return true;
@@ -242,6 +261,16 @@ static bool validate_local_control_settings_object(cJSON* object, std::string& e
     return validate_control_token(token->valuestring, error);
 }
 
+static bool validate_sync_settings_object(cJSON* object, std::string& error)
+{
+    cJSON* sync_to_sd = cJSON_GetObjectItem(object, "syncToSd");
+    if (sync_to_sd != nullptr && !cJSON_IsBool(sync_to_sd)) {
+        error = "settings.syncToSd must be boolean";
+        return false;
+    }
+    return true;
+}
+
 static bool validate_settings_root(cJSON* root, std::string& error)
 {
     if (!cJSON_IsObject(root)) {
@@ -249,16 +278,17 @@ static bool validate_settings_root(cJSON* root, std::string& error)
         return false;
     }
 
-    cJSON* xiaozhi = cJSON_GetObjectItem(root, "xiaozhi");
-    if (xiaozhi != nullptr) {
-        if (!cJSON_IsObject(xiaozhi)) {
-            error = "xiaozhi must be a JSON object";
+    cJSON* agent = cJSON_GetObjectItem(root, "agent");
+    cJSON* agent_object = agent;
+    if (agent_object != nullptr) {
+        if (!cJSON_IsObject(agent_object)) {
+            error = "agent must be a JSON object";
             return false;
         }
-        if (!validate_xiaozhi_settings_object(xiaozhi, error)) {
+        if (!validate_ai_agent_settings_object(agent_object, error)) {
             return false;
         }
-    } else if (has_xiaozhi_settings_keys(root) && !validate_xiaozhi_settings_object(root, error)) {
+    } else if (has_ai_agent_settings_keys(root) && !validate_ai_agent_settings_object(root, error)) {
         return false;
     }
 
@@ -273,6 +303,46 @@ static bool validate_settings_root(cJSON* root, std::string& error)
         }
     }
 
+    cJSON* settings = cJSON_GetObjectItem(root, "settings");
+    if (settings != nullptr) {
+        if (!cJSON_IsObject(settings)) {
+            error = "settings must be a JSON object";
+            return false;
+        }
+        if (!validate_sync_settings_object(settings, error)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool set_settings_sync_to_sd(cJSON* root, bool enabled, std::string* error_message)
+{
+    cJSON* settings = cJSON_GetObjectItem(root, "settings");
+    if (settings == nullptr) {
+        settings = cJSON_CreateObject();
+        if (settings == nullptr) {
+            if (error_message != nullptr) {
+                *error_message = "failed to allocate settings object";
+            }
+            return false;
+        }
+        cJSON_AddItemToObject(root, "settings", settings);
+    } else if (!cJSON_IsObject(settings)) {
+        if (error_message != nullptr) {
+            *error_message = "settings must be a JSON object";
+        }
+        return false;
+    }
+
+    cJSON_DeleteItemFromObject(settings, "syncToSd");
+    if (cJSON_AddBoolToObject(settings, "syncToSd", enabled) == nullptr) {
+        if (error_message != nullptr) {
+            *error_message = "failed to add settings.syncToSd";
+        }
+        return false;
+    }
     return true;
 }
 
@@ -314,16 +384,16 @@ TouchPoint_t get_touch_point()
     return _data.touchPoint;
 }
 
-bool is_xiaozhi_mode()
+bool is_agent_mode()
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    return _data.isXiaozhiMode;
+    return _data.isAgentMode;
 }
 
-void set_xiaozhi_mode(bool mode)
+void set_agent_mode(bool mode)
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    _data.isXiaozhiMode = mode;
+    _data.isAgentMode = mode;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -359,15 +429,14 @@ void display_wait_idle()
 /*                                 Application                                */
 /* -------------------------------------------------------------------------- */
 
-void xiaozhi_board_init()
+void ai_agent_board_init()
 {
-    // Init board
-    auto& board = Board::GetInstance();
+    Board::GetInstance();
 }
 
-void start_xiaozhi_app()
+void start_ai_agent_app()
 {
-    set_xiaozhi_mode(true);
+    set_agent_mode(true);
 
     // Initialize and run the application
     auto& app = Application::GetInstance();
@@ -375,33 +444,33 @@ void start_xiaozhi_app()
     app.Run();  // This function runs the main event loop and never returns
 }
 
-XiaozhiConfig_t get_xiaozhi_config()
+AiAgentConfig_t get_ai_agent_config()
 {
-    XiaozhiConfig_t config;
+    AiAgentConfig_t config;
 
-    Settings settings(_xiaozhi_config_nvs_ns.data(), false);
-    config.idleShutdownTimeSeconds = settings.GetInt(_xiaozhi_config_idle_shutdown_time_key.data(),
+    Settings settings(_ai_agent_config_nvs_ns.data(), false);
+    config.idleShutdownTimeSeconds = settings.GetInt(_ai_agent_config_idle_shutdown_time_key.data(),
                                                      static_cast<int>(config.idleShutdownTimeSeconds));
     config.allowShutdownWhenCharging =
-        settings.GetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
+        settings.GetBool(_ai_agent_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
     config.idleRandomMovementLevel =
-        settings.GetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
+        settings.GetInt(_ai_agent_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
     config.startAiAgentOnBoot =
-        settings.GetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);
+        settings.GetBool(_ai_agent_config_start_on_boot_key.data(), config.startAiAgentOnBoot);
 
     return config;
 }
 
-void set_xiaozhi_config(const XiaozhiConfig_t& config)
+void set_ai_agent_config(const AiAgentConfig_t& config)
 {
-    Settings settings(_xiaozhi_config_nvs_ns.data(), true);
-    settings.SetInt(_xiaozhi_config_idle_shutdown_time_key.data(), config.idleShutdownTimeSeconds);
-    settings.SetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
-    settings.SetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
-    settings.SetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);
+    Settings settings(_ai_agent_config_nvs_ns.data(), true);
+    settings.SetInt(_ai_agent_config_idle_shutdown_time_key.data(), config.idleShutdownTimeSeconds);
+    settings.SetBool(_ai_agent_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
+    settings.SetInt(_ai_agent_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
+    settings.SetBool(_ai_agent_config_start_on_boot_key.data(), config.startAiAgentOnBoot);
 }
 
-bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config)
+bool apply_ai_agent_config_sd_overrides(AiAgentConfig_t& config)
 {
     std::string settings_json;
     if (!read_sd_settings_file(settings_json)) {
@@ -420,19 +489,19 @@ bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config)
         return false;
     }
 
-    cJSON* xiaozhi = get_xiaozhi_override_object(root);
+    cJSON* agent = get_ai_agent_override_object(root);
     config.idleShutdownTimeSeconds =
-        get_json_uint32(xiaozhi, "idleShutdownTimeSeconds", _xiaozhi_config_idle_shutdown_time_key.data(),
+        get_json_uint32(agent, "idleShutdownTimeSeconds", _ai_agent_config_idle_shutdown_time_key.data(),
                         config.idleShutdownTimeSeconds, 0, 86400);
     config.allowShutdownWhenCharging =
-        get_json_bool(xiaozhi, "allowShutdownWhenCharging", _xiaozhi_config_allow_shutdown_when_charging_key.data(),
+        get_json_bool(agent, "allowShutdownWhenCharging", _ai_agent_config_allow_shutdown_when_charging_key.data(),
                       config.allowShutdownWhenCharging);
     config.idleRandomMovementLevel =
-        static_cast<uint8_t>(get_json_uint32(xiaozhi, "idleRandomMovementLevel",
-                                             _xiaozhi_config_idle_random_movement_key.data(),
+        static_cast<uint8_t>(get_json_uint32(agent, "idleRandomMovementLevel",
+                                             _ai_agent_config_idle_random_movement_key.data(),
                                              config.idleRandomMovementLevel, 0, 3));
     config.startAiAgentOnBoot =
-        get_json_bool(xiaozhi, "startAiAgentOnBoot", _xiaozhi_config_start_ai_agent_on_boot_key.data(),
+        get_json_bool(agent, "startAiAgentOnBoot", _ai_agent_config_start_on_boot_key.data(),
                       config.startAiAgentOnBoot);
 
     cJSON_Delete(root);
@@ -440,19 +509,19 @@ bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config)
     return true;
 }
 
-void set_boot_xiaozhi_config(const XiaozhiConfig_t& config)
+void set_boot_ai_agent_config(const AiAgentConfig_t& config)
 {
-    _boot_xiaozhi_config        = config;
-    _boot_xiaozhi_config_loaded = true;
+    _boot_ai_agent_config        = config;
+    _boot_ai_agent_config_loaded = true;
 }
 
-bool get_boot_xiaozhi_config(XiaozhiConfig_t& config)
+bool get_boot_ai_agent_config(AiAgentConfig_t& config)
 {
-    if (!_boot_xiaozhi_config_loaded) {
+    if (!_boot_ai_agent_config_loaded) {
         return false;
     }
 
-    config = _boot_xiaozhi_config;
+    config = _boot_ai_agent_config;
     return true;
 }
 
@@ -505,7 +574,8 @@ bool read_sd_settings(std::string& contents)
     return read_sd_settings_file(contents);
 }
 
-bool validate_settings_json(const std::string& contents, std::string* normalized_json, std::string* error_message)
+static bool validate_and_normalize_settings_json(const std::string& contents, std::string* normalized_json,
+                                                 std::string* error_message, bool force_sync_to_sd)
 {
     if (contents.empty()) {
         if (error_message != nullptr) {
@@ -532,6 +602,11 @@ bool validate_settings_json(const std::string& contents, std::string* normalized
         return false;
     }
 
+    if (force_sync_to_sd && !set_settings_sync_to_sd(root, true, error_message)) {
+        cJSON_Delete(root);
+        return false;
+    }
+
     if (normalized_json != nullptr) {
         char* printed = cJSON_Print(root);
         if (printed == nullptr) {
@@ -549,13 +624,23 @@ bool validate_settings_json(const std::string& contents, std::string* normalized
     return true;
 }
 
-bool write_sd_settings(const std::string& contents, std::string* normalized_json, std::string* error_message)
+bool validate_settings_json(const std::string& contents, std::string* normalized_json, std::string* error_message)
+{
+    return validate_and_normalize_settings_json(contents, normalized_json, error_message, false);
+}
+
+bool write_sd_settings(const std::string& contents, bool sync_to_sd, std::string* normalized_json,
+                       std::string* error_message)
 {
     std::string normalized;
-    if (!validate_settings_json(contents, &normalized, error_message)) {
+    if (!validate_and_normalize_settings_json(contents, &normalized, error_message, sync_to_sd)) {
         return false;
     }
     normalized.push_back('\n');
+
+    if (!sdcard_mount_available(error_message)) {
+        return false;
+    }
 
     if (mkdir(_sdcard_settings_dir, 0775) != 0 && errno != EEXIST) {
         if (error_message != nullptr) {
@@ -599,19 +684,19 @@ bool write_sd_settings(const std::string& contents, std::string* normalized_json
 
 std::string get_effective_settings_json()
 {
-    XiaozhiConfig_t xiaozhi_config = get_xiaozhi_config();
-    apply_xiaozhi_config_sd_overrides(xiaozhi_config);
+    AiAgentConfig_t agent_config = get_ai_agent_config();
+    apply_ai_agent_config_sd_overrides(agent_config);
 
     std::string local_control_token = get_local_control_token();
     apply_local_control_sd_overrides(local_control_token);
 
-    cJSON* root    = cJSON_CreateObject();
-    cJSON* xiaozhi = cJSON_CreateObject();
-    cJSON_AddNumberToObject(xiaozhi, "idleShutdownTimeSeconds", xiaozhi_config.idleShutdownTimeSeconds);
-    cJSON_AddBoolToObject(xiaozhi, "allowShutdownWhenCharging", xiaozhi_config.allowShutdownWhenCharging);
-    cJSON_AddNumberToObject(xiaozhi, "idleRandomMovementLevel", xiaozhi_config.idleRandomMovementLevel);
-    cJSON_AddBoolToObject(xiaozhi, "startAiAgentOnBoot", xiaozhi_config.startAiAgentOnBoot);
-    cJSON_AddItemToObject(root, "xiaozhi", xiaozhi);
+    cJSON* root  = cJSON_CreateObject();
+    cJSON* agent = cJSON_CreateObject();
+    cJSON_AddNumberToObject(agent, "idleShutdownTimeSeconds", agent_config.idleShutdownTimeSeconds);
+    cJSON_AddBoolToObject(agent, "allowShutdownWhenCharging", agent_config.allowShutdownWhenCharging);
+    cJSON_AddNumberToObject(agent, "idleRandomMovementLevel", agent_config.idleRandomMovementLevel);
+    cJSON_AddBoolToObject(agent, "startAiAgentOnBoot", agent_config.startAiAgentOnBoot);
+    cJSON_AddItemToObject(root, "agent", agent);
 
     cJSON* local_control = cJSON_CreateObject();
     cJSON_AddStringToObject(local_control, "token", local_control_token.c_str());

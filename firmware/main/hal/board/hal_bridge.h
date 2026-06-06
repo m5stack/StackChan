@@ -21,11 +21,11 @@ struct TouchPoint_t {
 
 struct Data_t {
     TouchPoint_t touchPoint;
-    bool isXiaozhiMode              = false;
-    bool isXiaozhiModeToggleEnabled = false;
+    bool isAgentMode              = false;
+    bool isAgentModeToggleEnabled = false;
 };
 
-struct XiaozhiConfig_t {
+struct AiAgentConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
     bool allowShutdownWhenCharging   = false;
     uint8_t idleRandomMovementLevel  = 2;
@@ -39,30 +39,31 @@ Data_t& get_data();
 void set_touch_point(int num, int x, int y);
 TouchPoint_t get_touch_point();
 
-bool is_xiaozhi_mode();
-void set_xiaozhi_mode(bool mode);
-void toggle_xiaozhi_chat_state();
+bool is_agent_mode();
+void set_agent_mode(bool mode);
+void toggle_ai_agent_chat_state();
 
 void disply_lvgl_lock();
 void disply_lvgl_unlock();
 void display_wait_idle();
 lv_disp_t* display_get_lvgl_display();
 
-void xiaozhi_board_init();
-void start_xiaozhi_app();
-bool is_xiaozhi_ready();
-bool is_xiaozhi_idle();
-XiaozhiConfig_t get_xiaozhi_config();
-void set_xiaozhi_config(const XiaozhiConfig_t& config);
-bool apply_xiaozhi_config_sd_overrides(XiaozhiConfig_t& config);
-void set_boot_xiaozhi_config(const XiaozhiConfig_t& config);
-bool get_boot_xiaozhi_config(XiaozhiConfig_t& config);
+void ai_agent_board_init();
+void start_ai_agent_app();
+bool is_ai_agent_ready();
+bool is_ai_agent_idle();
+AiAgentConfig_t get_ai_agent_config();
+void set_ai_agent_config(const AiAgentConfig_t& config);
+bool apply_ai_agent_config_sd_overrides(AiAgentConfig_t& config);
+void set_boot_ai_agent_config(const AiAgentConfig_t& config);
+bool get_boot_ai_agent_config(AiAgentConfig_t& config);
 std::string get_local_control_token();
 void set_local_control_token(const std::string& token);
 bool apply_local_control_sd_overrides(std::string& token);
 bool read_sd_settings(std::string& contents);
 bool validate_settings_json(const std::string& contents, std::string* normalized_json, std::string* error_message);
-bool write_sd_settings(const std::string& contents, std::string* normalized_json, std::string* error_message);
+bool write_sd_settings(const std::string& contents, bool sync_to_sd, std::string* normalized_json,
+                       std::string* error_message);
 std::string get_effective_settings_json();
 
 i2c_master_bus_handle_t board_get_i2c_bus();

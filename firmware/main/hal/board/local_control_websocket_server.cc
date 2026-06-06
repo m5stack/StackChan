@@ -140,12 +140,16 @@ static bool IsLocalControlMethod(const char* method_name)
     if (method_name == nullptr) {
         return false;
     }
-    return std::strcmp(method_name, "settings/get") == 0 || std::strcmp(method_name, "settings/write_sd") == 0 ||
-           std::strcmp(method_name, "local_control/set_token") == 0 || std::strcmp(method_name, "voice/get_config") == 0 ||
-           std::strcmp(method_name, "voice.get_config") == 0 || std::strcmp(method_name, "voice/set_config") == 0 ||
-           std::strcmp(method_name, "voice.set_config") == 0 ||
-           std::strcmp(method_name, "voice/start_listening") == 0 || std::strcmp(method_name, "voice.start_listening") == 0 ||
-           std::strcmp(method_name, "voice/stop_listening") == 0 || std::strcmp(method_name, "voice.stop_listening") == 0;
+    return std::strcmp(method_name, "settings/get") == 0 || std::strcmp(method_name, "settings/sync_to_sd") == 0 ||
+           std::strcmp(method_name, "local_control/set_token") == 0 ||
+           std::strcmp(method_name, "voice/get_config") == 0 || std::strcmp(method_name, "voice.get_config") == 0 ||
+           std::strcmp(method_name, "voice/set_config") == 0 || std::strcmp(method_name, "voice.set_config") == 0 ||
+           std::strcmp(method_name, "voice/start_listening") == 0 ||
+           std::strcmp(method_name, "voice.start_listening") == 0 ||
+           std::strcmp(method_name, "voice/stop_listening") == 0 ||
+           std::strcmp(method_name, "voice.stop_listening") == 0 ||
+           std::strcmp(method_name, "debug/subscribe_events") == 0 ||
+           std::strcmp(method_name, "debug/unsubscribe_events") == 0;
 }
 
 static std::string PrintAndDelete(cJSON* json)
@@ -345,6 +349,7 @@ void LocalControlWebSocketServer::Stop()
 
     httpd_stop(server_handle_);
     server_handle_ = nullptr;
+    std::lock_guard<std::mutex> lock(clients_mutex_);
     clients_.clear();
     ESP_LOGI(TAG, "WebSocket server stopped");
 }
@@ -356,6 +361,7 @@ bool LocalControlWebSocketServer::IsRunning() const
 
 size_t LocalControlWebSocketServer::GetClientCount() const
 {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
     return clients_.size();
 }
 
@@ -365,6 +371,80 @@ void LocalControlWebSocketServer::SetToken(std::string token)
         token = STACKCHAN_CONTROL_WS_TOKEN;
     }
     token_ = std::move(token);
+}
+
+bool LocalControlWebSocketServer::HasDebugEventSubscribers() const
+{
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    for (const auto& [sock_fd, client] : clients_) {
+        (void)sock_fd;
+        if (client.authenticated && client.debug_events_subscribed) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<int> LocalControlWebSocketServer::CopyDebugSubscriberSockets() const
+{
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    std::vector<int> sockets;
+    sockets.reserve(clients_.size());
+    for (const auto& [sock_fd, client] : clients_) {
+        if (client.authenticated && client.debug_events_subscribed) {
+            sockets.push_back(sock_fd);
+        }
+    }
+    return sockets;
+}
+
+void LocalControlWebSocketServer::PublishDebugEvent(const char* event_type, cJSON* fields)
+{
+    if (event_type == nullptr) {
+        if (fields != nullptr) {
+            cJSON_Delete(fields);
+        }
+        return;
+    }
+
+    auto sockets = CopyDebugSubscriberSockets();
+    if (sockets.empty()) {
+        if (fields != nullptr) {
+            cJSON_Delete(fields);
+        }
+        return;
+    }
+
+    cJSON* params = cJSON_CreateObject();
+    if (params == nullptr) {
+        if (fields != nullptr) {
+            cJSON_Delete(fields);
+        }
+        return;
+    }
+    cJSON* event_fields = fields != nullptr ? fields : cJSON_CreateObject();
+    if (event_fields == nullptr) {
+        cJSON_Delete(params);
+        return;
+    }
+
+    cJSON_AddNumberToObject(params, "ts_ms", esp_timer_get_time() / 1000);
+    cJSON_AddStringToObject(params, "type", event_type);
+    cJSON_AddItemToObject(params, "fields", event_fields);
+
+    cJSON* message = cJSON_CreateObject();
+    if (message == nullptr) {
+        cJSON_Delete(params);
+        return;
+    }
+    cJSON_AddStringToObject(message, "jsonrpc", "2.0");
+    cJSON_AddStringToObject(message, "method", "debug/event");
+    cJSON_AddItemToObject(message, "params", params);
+    const std::string payload = PrintAndDelete(message);
+
+    for (int sock_fd : sockets) {
+        SendText(sock_fd, payload);
+    }
 }
 
 esp_err_t LocalControlWebSocketServer::WsHandler(httpd_req_t* req)
@@ -506,6 +586,7 @@ bool LocalControlWebSocketServer::HandleAuthJsonRpc(httpd_req_t* req, const cJSO
     const cJSON* params     = cJSON_GetObjectItem(payload, "params");
 
     if (std::strcmp(method_name, "local_control/auth_begin") == 0) {
+        std::lock_guard<std::mutex> lock(clients_mutex_);
         auto client = clients_.find(sock_fd);
         if (client == clients_.end()) {
             SendText(req, JsonRpcError(payload, -32000, "unknown WebSocket client").c_str());
@@ -538,6 +619,7 @@ bool LocalControlWebSocketServer::HandleAuthJsonRpc(httpd_req_t* req, const cJSO
     }
 
     if (std::strcmp(method_name, "local_control/auth_verify") == 0) {
+        std::lock_guard<std::mutex> lock(clients_mutex_);
         auto client = clients_.find(sock_fd);
         if (client == clients_.end()) {
             SendText(req, JsonRpcError(payload, -32000, "unknown WebSocket client").c_str());
@@ -599,6 +681,7 @@ bool LocalControlWebSocketServer::HandleAuthJsonRpc(httpd_req_t* req, const cJSO
 
 bool LocalControlWebSocketServer::IsClientSessionAuthorized(int sock_fd, const cJSON* root, const cJSON* payload) const
 {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
     const auto client = clients_.find(sock_fd);
     if (client == clients_.end() || !client->second.authenticated || client->second.session_token.empty()) {
         return false;
@@ -632,9 +715,18 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
         return false;
     }
 
-    const int sock_fd       = httpd_req_to_sockfd(req);
-    const auto client       = clients_.find(sock_fd);
-    if (client == clients_.end() || !IsPrincipalAllowedLocalMethod(client->second.principal, method_name)) {
+    const int sock_fd = httpd_req_to_sockfd(req);
+    std::string principal;
+    {
+        std::lock_guard<std::mutex> lock(clients_mutex_);
+        const auto client = clients_.find(sock_fd);
+        if (client == clients_.end()) {
+            SendText(req, JsonRpcError(payload, -32003, "principal is not allowed to call local method").c_str());
+            return true;
+        }
+        principal = client->second.principal;
+    }
+    if (!IsPrincipalAllowedLocalMethod(principal, method_name)) {
         SendText(req, JsonRpcError(payload, -32003, "principal is not allowed to call local method").c_str());
         return true;
     }
@@ -706,21 +798,27 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
         return true;
     }
 
-    if (std::strcmp(method_name, "settings/write_sd") == 0) {
+    if (std::strcmp(method_name, "settings/sync_to_sd") == 0) {
         const cJSON* settings_json = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "settings_json") : nullptr;
         if (!cJSON_IsString(settings_json)) {
             SendText(req, JsonRpcError(payload, -32602, "settings_json string is required").c_str());
+            return true;
+        }
+        const cJSON* sync_to_sd = cJSON_IsObject(params) ? cJSON_GetObjectItem(params, "sync_to_sd") : nullptr;
+        if (!cJSON_IsTrue(sync_to_sd)) {
+            SendText(req, JsonRpcError(payload, -32602,
+                                       "Sync settings to SDCard is disabled; pass sync_to_sd=true").c_str());
             return true;
         }
 
         std::string normalized_json;
         std::string error_message;
         const bool written = GetHAL().withSdCard([&]() {
-            return hal_bridge::write_sd_settings(settings_json->valuestring, &normalized_json, &error_message);
+            return hal_bridge::write_sd_settings(settings_json->valuestring, true, &normalized_json, &error_message);
         });
 
         if (!written) {
-            const std::string message = "invalid settings: " + error_message;
+            const std::string message = error_message.empty() ? "settings write failed" : error_message;
             SendText(req, JsonRpcError(payload, -32602, message.c_str()).c_str());
             return true;
         }
@@ -762,12 +860,37 @@ bool LocalControlWebSocketServer::HandleLocalJsonRpc(httpd_req_t* req, const cJS
         return true;
     }
 
+    if (std::strcmp(method_name, "debug/subscribe_events") == 0) {
+        {
+            std::lock_guard<std::mutex> lock(clients_mutex_);
+            clients_[sock_fd].debug_events_subscribed = true;
+        }
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "subscribed", true);
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
+    if (std::strcmp(method_name, "debug/unsubscribe_events") == 0) {
+        {
+            std::lock_guard<std::mutex> lock(clients_mutex_);
+            clients_[sock_fd].debug_events_subscribed = false;
+        }
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "subscribed", false);
+        SendText(req, JsonRpcResult(payload, result).c_str());
+        return true;
+    }
+
     return false;
 }
 
 void LocalControlWebSocketServer::AddClient(httpd_req_t* req)
 {
     const int sock_fd = httpd_req_to_sockfd(req);
+    std::lock_guard<std::mutex> lock(clients_mutex_);
     clients_[sock_fd] = ClientState{};
     ESP_LOGI(TAG, "client connected: %d (total: %zu)", sock_fd, clients_.size());
 }
@@ -775,6 +898,7 @@ void LocalControlWebSocketServer::AddClient(httpd_req_t* req)
 void LocalControlWebSocketServer::RemoveClient(httpd_req_t* req)
 {
     const int sock_fd = httpd_req_to_sockfd(req);
+    std::lock_guard<std::mutex> lock(clients_mutex_);
     clients_.erase(sock_fd);
     ESP_LOGI(TAG, "client disconnected: %d (total: %zu)", sock_fd, clients_.size());
 }

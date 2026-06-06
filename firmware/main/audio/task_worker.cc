@@ -1,5 +1,15 @@
 #include "task_worker.h"
 
+#include <cstdlib>
+
+#include <esp_log.h>
+
+namespace {
+
+constexpr char kTag[] = "TaskWorker";
+
+}  // namespace
+
 TaskWorker::TaskWorker()
 {
     lifecycle_events_ = xEventGroupCreate();
@@ -8,7 +18,10 @@ TaskWorker::TaskWorker()
 TaskWorker::~TaskWorker()
 {
     RequestStop();
-    WaitStopped(pdMS_TO_TICKS(1000));
+    if (!WaitStopped(pdMS_TO_TICKS(1000))) {
+        ESP_LOGE(kTag, "Worker failed to stop before destruction");
+        std::abort();
+    }
     if (lifecycle_events_ != nullptr) {
         vEventGroupDelete(lifecycle_events_);
     }

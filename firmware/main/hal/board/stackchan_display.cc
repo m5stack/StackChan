@@ -26,14 +26,12 @@ using namespace stackchan::avatar;
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
-LV_FONT_DECLARE(font_awesome_30_4);
 
 // Have to register themes, so the asset apply can update the text font
 void StackChanAvatarDisplay::InitializeLcdThemes()
 {
     auto text_font       = std::make_shared<LvglBuiltInFont>(&BUILTIN_TEXT_FONT);
     auto icon_font       = std::make_shared<LvglBuiltInFont>(&BUILTIN_ICON_FONT);
-    auto large_icon_font = std::make_shared<LvglBuiltInFont>(&font_awesome_30_4);
 
     // light theme
     auto light_theme = new LvglTheme("light");
@@ -48,7 +46,6 @@ void StackChanAvatarDisplay::InitializeLcdThemes()
     light_theme->set_low_battery_color(lv_color_hex(0x000000));       // rgb(0, 0, 0)
     light_theme->set_text_font(text_font);
     light_theme->set_icon_font(icon_font);
-    light_theme->set_large_icon_font(large_icon_font);
 
     // dark theme
     auto dark_theme = new LvglTheme("dark");
@@ -63,7 +60,6 @@ void StackChanAvatarDisplay::InitializeLcdThemes()
     dark_theme->set_low_battery_color(lv_color_hex(0xFF0000));       // rgb(255, 0, 0)
     dark_theme->set_text_font(text_font);
     dark_theme->set_icon_font(icon_font);
-    dark_theme->set_large_icon_font(large_icon_font);
 
     auto& theme_manager = LvglThemeManager::GetInstance();
     theme_manager.RegisterTheme("light", light_theme);
@@ -192,7 +188,7 @@ StackChanAvatarDisplay::StackChanAvatarDisplay(esp_lcd_panel_io_handle_t panel_i
         Unlock();
     }
 
-    // Robot will be created later in SetupXiaoZhiUI()
+    // Robot will be created later during UI setup.
 }
 
 StackChanAvatarDisplay::~StackChanAvatarDisplay()
@@ -256,7 +252,7 @@ void StackChanAvatarDisplay::SetupUI()
         return;
     }
 
-    auto config = GetHAL().getXiaozhiConfig();
+    auto config = GetHAL().getAiAgentConfig();
 
     DisplayLockGuard lock(this);
 
@@ -265,8 +261,8 @@ void StackChanAvatarDisplay::SetupUI()
     auto avatar = std::make_unique<DefaultAvatar>();
     avatar->init(lv_screen_active());
     avatar->getPanel()->onClick().connect([]() {
-        if (hal_bridge::is_xiaozhi_ready()) {
-            hal_bridge::toggle_xiaozhi_chat_state();
+        if (hal_bridge::is_ai_agent_ready()) {
+            hal_bridge::toggle_ai_agent_chat_state();
         }
     });
 
@@ -469,15 +465,15 @@ void StackChanAvatarDisplay::SetTheme(Theme* theme)
 }
 
 #include <hal/board/hal_bridge.h>
-static bool _is_xiaozhi_ready = false;
-static bool _is_xiaozhi_idle  = false;
-bool hal_bridge::is_xiaozhi_ready()
+static bool _is_ai_agent_ready = false;
+static bool _is_ai_agent_idle  = false;
+bool hal_bridge::is_ai_agent_ready()
 {
-    return _is_xiaozhi_ready;
+    return _is_ai_agent_ready;
 }
-bool hal_bridge::is_xiaozhi_idle()
+bool hal_bridge::is_ai_agent_idle()
 {
-    return _is_xiaozhi_idle;
+    return _is_ai_agent_idle;
 }
 
 void StackChanAvatarDisplay::SetStatus(const char* status)
@@ -491,12 +487,9 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
     }
 
     auto& avatar = stackchan.avatar();
-    auto& motion = stackchan.motion();
-
     DisplayLockGuard lock(this);
 
-    bool is_idle      = false;
-    bool is_listening = false;
+    bool is_idle = false;
 
     if (strcmp(status, Lang::Strings::LISTENING) == 0) {
         if (speaking_modifier_id_ >= 0) {
@@ -510,7 +503,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         GetHAL().refreshRgb();
 
     } else if (strcmp(status, Lang::Strings::STANDBY) == 0) {
-        _is_xiaozhi_ready = true;
+        _is_ai_agent_ready = true;
 
         if (speaking_modifier_id_ >= 0) {
             // Stop speaking
@@ -545,7 +538,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
             idle_expression_modifier_id_ = stackchan.addModifier(std::make_unique<IdleExpressionModifier>());
         }
 
-        _is_xiaozhi_idle = true;
+        _is_ai_agent_idle = true;
     } else {
         // Stop idle motion
         ESP_LOGW(TAG, "Stop idle motion");
@@ -562,7 +555,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         //     motion.yawServo().moveWithSpeed(0, 350);
         // }
 
-        _is_xiaozhi_idle = false;
+        _is_ai_agent_idle = false;
     }
 
     // Clear sleep state

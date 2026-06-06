@@ -6,7 +6,6 @@
 #include "audio_codec.h"
 #include "audio_power_controller.h"
 #include "audio_test_controller.h"
-#include "processors/audio_debugger.h"
 #include "voice_processor_controller.h"
 #include "wake_word_controller.h"
 
@@ -142,13 +141,6 @@ bool AudioCaptureWorker::ReadAudioData(std::vector<int16_t>& data, int sample_ra
     }
 
     power_.TouchInput();
-
-#if CONFIG_USE_AUDIO_DEBUGGER
-    if (audio_debugger_ == nullptr) {
-        audio_debugger_ = std::make_unique<AudioDebugger>();
-    }
-    audio_debugger_->Feed(data);
-#endif
 
     return true;
 }

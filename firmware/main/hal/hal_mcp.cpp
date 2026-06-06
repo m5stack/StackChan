@@ -13,11 +13,10 @@ using namespace stackchan;
 
 static const std::string_view _tag = "HAL-MCP";
 
-void Hal::xiaozhi_mcp_init()
+void Hal::ai_agent_mcp_init()
 {
     mclog::tagInfo(_tag, "init");
 
-    // https://github.com/78/xiaozhi-esp32/blob/main/docs/mcp-usage.md
     auto& mcp_server = McpServer::GetInstance();
 
     // System Prompt：

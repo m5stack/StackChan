@@ -18,12 +18,14 @@ Principals:
 - `local_control/auth_begin`: Start the local-control HMAC challenge.
 - `local_control/auth_verify`: Complete local-control authentication and receive a session token.
 - `settings/get`: Read SD settings and effective merged settings.
-- `settings/write_sd`: Validate and write the SD-card settings JSON file.
+- `settings/sync_to_sd`: Sync settings to SDCard.
 - `local_control/set_token`: Validate and persist the local-control token to NVS.
 - `voice/get_config` (voice.get_config): Read the persisted voice WebSocket transport configuration.
 - `voice/set_config` (voice.set_config): Persist the voice WebSocket endpoint and shared token to NVS.
 - `voice/start_listening` (voice.start_listening): Request listening through the voice application path.
 - `voice/stop_listening` (voice.stop_listening): Request listening stop through the voice application path.
+- `debug/subscribe_events`: Subscribe this authenticated local-control WebSocket session to debug event notifications.
+- `debug/unsubscribe_events`: Unsubscribe this authenticated local-control WebSocket session from debug event notifications.
 
 ## local_control/auth_begin
 
@@ -187,9 +189,9 @@ Result schema:
 }
 ```
 
-## settings/write_sd
+## settings/sync_to_sd
 
-Validate and write the SD-card settings JSON file.
+Sync settings to SDCard.
 
 - Stability: `stable`
 - Auth: `dashboard, admin`
@@ -202,10 +204,16 @@ Params schema:
   "properties": {
     "settings_json": {
       "type": "string"
+    },
+    "sync_to_sd": {
+      "const": true,
+      "description": "Explicit opt-in. Sync settings to SDCard is disabled unless this is true.",
+      "type": "boolean"
     }
   },
   "required": [
-    "settings_json"
+    "settings_json",
+    "sync_to_sd"
   ],
   "type": "object"
 }
@@ -457,6 +465,74 @@ Result schema:
   },
   "required": [
     "requested"
+  ],
+  "type": "object"
+}
+```
+
+## debug/subscribe_events
+
+Subscribe this authenticated local-control WebSocket session to debug event notifications.
+
+- Stability: `experimental`
+- Auth: `dashboard, admin`
+- Handler: `firmware/main/hal/board/local_control_websocket_server.cc`
+
+Params schema:
+
+```json
+{
+  "properties": {},
+  "type": "object"
+}
+```
+
+Result schema:
+
+```json
+{
+  "properties": {
+    "subscribed": {
+      "const": true,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "subscribed"
+  ],
+  "type": "object"
+}
+```
+
+## debug/unsubscribe_events
+
+Unsubscribe this authenticated local-control WebSocket session from debug event notifications.
+
+- Stability: `experimental`
+- Auth: `dashboard, admin`
+- Handler: `firmware/main/hal/board/local_control_websocket_server.cc`
+
+Params schema:
+
+```json
+{
+  "properties": {},
+  "type": "object"
+}
+```
+
+Result schema:
+
+```json
+{
+  "properties": {
+    "subscribed": {
+      "const": false,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "subscribed"
   ],
   "type": "object"
 }

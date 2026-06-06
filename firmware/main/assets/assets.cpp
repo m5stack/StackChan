@@ -17,7 +17,6 @@ namespace assets {
 static bool has_suffix(std::string_view str, std::string_view suffix)
 {
     return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-    return false;
 }
 
 lv_image_dsc_t get_image(std::string_view name)
@@ -29,8 +28,7 @@ lv_image_dsc_t get_image(std::string_view name)
     void* data_ptr   = nullptr;
     size_t data_size = 0;
 
-    // Attempt to access singleton from xiaozhi-esp32/main/assets.h
-    // Since we include <assets.h>, we expect class Assets to be available.
+    // Access the generated assets singleton exposed through <assets.h>.
     if (!Assets::GetInstance().GetAssetData(key, data_ptr, data_size)) {
         mclog::tagError(_tag, "get image asset {} failed: not found", name);
         return dsc;
@@ -46,8 +44,7 @@ lv_image_dsc_t get_image(std::string_view name)
         } else {
             mclog::tagError(_tag, "bin asset {} size too small", name);
         }
-    } else if (has_suffix(name, ".png") || has_suffix(name, ".jpg") || has_suffix(name, ".jpeg") ||
-               has_suffix(name, ".gif")) {
+    } else if (has_suffix(name, ".png") || has_suffix(name, ".jpg") || has_suffix(name, ".jpeg")) {
         // Encoded standard image
         dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
         dsc.header.cf    = LV_COLOR_FORMAT_RAW_ALPHA;

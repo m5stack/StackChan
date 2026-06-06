@@ -6,7 +6,8 @@
 #include <esp_random.h>
 
 #include "assets/lang_config.h"
-#include "display/display.h"
+#include "display.h"
+#include "firmware_identity.h"
 #include "settings.h"
 #include "system_info.h"
 
@@ -132,7 +133,7 @@ Camera* Board::GetCamera()
 
 Led* Board::GetLed()
 {
-    static NoLed led;
+    static NullLed led;
     return &led;
 }
 
@@ -167,6 +168,7 @@ std::string Board::GetSystemInfoJson()
     if (application != nullptr) {
         AddString(application.get(), "name", app_desc->project_name);
         AddString(application.get(), "version", app_desc->version);
+        AddString(application.get(), "fork", firmware_identity::kFork);
         AddString(application.get(), "compile_time",
                   std::string(app_desc->date) + "T" + std::string(app_desc->time) + "Z");
         AddString(application.get(), "idf_version", app_desc->idf_ver);

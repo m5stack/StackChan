@@ -2,17 +2,14 @@
 
 #include <chrono>
 #include <string>
+#include <utility>
 
 #include <esp_log.h>
 #include <esp_pm.h>
 #include <esp_timer.h>
 
 #include "emoji_collection.h"
-
-#ifndef CONFIG_USE_EMOTE_MESSAGE_STYLE
-#define HAVE_LVGL 1
 #include <lvgl.h>
-#endif
 
 class Theme {
 public:
@@ -40,6 +37,7 @@ public:
     virtual Theme* GetTheme() { return current_theme_; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
+    virtual void SetHideSubtitle(bool hide);
     virtual void SetupUI()
     {
         setup_ui_called_ = true;
@@ -50,6 +48,8 @@ public:
     bool IsSetupUICalled() const { return setup_ui_called_; }
 
 protected:
+    void PersistThemeSelection(const Theme* theme);
+
     int width_ = 0;
     int height_ = 0;
     bool setup_ui_called_ = false;

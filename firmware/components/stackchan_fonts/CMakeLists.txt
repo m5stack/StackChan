@@ -1,0 +1,31 @@
+set(STACKCHAN_ASSET_ARCHIVE "${PROJECT_DIR}/main/assets/assets.tar.gz")
+set(STACKCHAN_EXTRACTED_ASSET_DIR "${CMAKE_BINARY_DIR}/stackchan_assets")
+set(STACKCHAN_FONT_ASSET_DIR "${STACKCHAN_EXTRACTED_ASSET_DIR}/stackchan_fonts")
+
+if(NOT EXISTS "${STACKCHAN_ASSET_ARCHIVE}")
+    message(FATAL_ERROR "Missing StackChan asset archive: ${STACKCHAN_ASSET_ARCHIVE}")
+endif()
+
+file(MAKE_DIRECTORY "${STACKCHAN_EXTRACTED_ASSET_DIR}")
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E tar xzf "${STACKCHAN_ASSET_ARCHIVE}"
+    WORKING_DIRECTORY "${STACKCHAN_EXTRACTED_ASSET_DIR}"
+    RESULT_VARIABLE STACKCHAN_ASSET_EXTRACT_RESULT
+)
+if(NOT STACKCHAN_ASSET_EXTRACT_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to extract StackChan asset archive: ${STACKCHAN_ASSET_ARCHIVE}")
+endif()
+
+set(STACKCHAN_FONT_SOURCES
+    "${STACKCHAN_FONT_ASSET_DIR}/src/cbin_font.c"
+    "${STACKCHAN_FONT_ASSET_DIR}/src/font_awesome_20_4.c"
+    "${STACKCHAN_FONT_ASSET_DIR}/src/font_puhui_basic_20_4.c"
+)
+
+idf_component_register(
+    SRCS ${STACKCHAN_FONT_SOURCES}
+    INCLUDE_DIRS "include"
+    PRIV_REQUIRES "lvgl"
+)
+
+target_compile_definitions(${COMPONENT_LIB} PUBLIC LV_LVGL_H_INCLUDE_SIMPLE)

@@ -100,8 +100,7 @@ void Protocol::SendWakeWordDetected(const std::string& wake_word)
         return;
     }
     AddSessionId(root, session_id_);
-    cJSON_AddStringToObject(root, "type", "listen");
-    cJSON_AddStringToObject(root, "state", "detect");
+    cJSON_AddStringToObject(root, "type", "listen.detect");
     cJSON_AddStringToObject(root, "text", wake_word.c_str());
     const std::string message = PrintJson(root);
     cJSON_Delete(root);
@@ -120,8 +119,7 @@ void Protocol::SendStartListening(ListeningMode mode)
         return;
     }
     AddSessionId(root, session_id_);
-    cJSON_AddStringToObject(root, "type", "listen");
-    cJSON_AddStringToObject(root, "state", "start");
+    cJSON_AddStringToObject(root, "type", "listen.start");
     if (mode == kListeningModeRealtime) {
         cJSON_AddStringToObject(root, "mode", "realtime");
     } else if (mode == kListeningModeAutoStop) {
@@ -146,8 +144,7 @@ void Protocol::SendStopListening()
         return;
     }
     AddSessionId(root, session_id_);
-    cJSON_AddStringToObject(root, "type", "listen");
-    cJSON_AddStringToObject(root, "state", "stop");
+    cJSON_AddStringToObject(root, "type", "listen.stop");
     const std::string message = PrintJson(root);
     cJSON_Delete(root);
     if (message.empty()) {
@@ -174,7 +171,7 @@ void Protocol::SendMcpMessage(const std::string& payload)
     }
 
     AddSessionId(root, session_id_);
-    cJSON_AddStringToObject(root, "type", "mcp");
+    cJSON_AddStringToObject(root, "type", "mcp.message");
     cJSON_AddItemToObject(root, "payload", payload_json);
     const std::string message = PrintJson(root);
     cJSON_Delete(root);

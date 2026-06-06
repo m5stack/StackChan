@@ -21,9 +21,13 @@ public:
     void EnableDeviceAec(bool enable) override;
 
 private:
+    void ResetFrameState();
+    void AppendMonoSamples(const std::vector<int16_t>& data);
+    void EmitCompleteFrames();
+
     AudioCodec* codec_ = nullptr;
     int frame_samples_ = 0;
-    std::vector<int16_t> output_buffer_;
+    std::vector<int16_t> pending_samples_;
     std::function<void(std::vector<int16_t>&& data)> output_callback_;
     std::function<void(bool speaking)> vad_state_change_callback_;
     std::atomic<bool> is_running_ = false;

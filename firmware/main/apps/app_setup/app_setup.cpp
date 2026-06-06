@@ -10,6 +10,7 @@
 #include <assets/assets.h>
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
+#include <firmware_identity.h>
 
 using namespace mooncake;
 using namespace view;
@@ -76,13 +77,13 @@ void AppSetup::onOpen()
               [&]() {
                   _destroy_menu    = true;
                   _need_warm_reset = true;
-                  _worker          = std::make_unique<XiaozhiGeneralWorker>();
+                  _worker          = std::make_unique<AIAgentGeneralWorker>();
               }},
              {"Power Saving",
               [&]() {
                   _destroy_menu    = true;
                   _need_warm_reset = true;
-                  _worker          = std::make_unique<XiaozhiPowerSavingWorker>();
+                  _worker          = std::make_unique<AIAgentPowerSavingWorker>();
               }}},
         },
         {
@@ -124,6 +125,7 @@ void AppSetup::onOpen()
                          _worker       = std::make_unique<FwVersionWorker>();
                      }
                  }},
+                {fmt::format("Fork:  {}", firmware_identity::kFork), []() {}},
                 {"Check for Updates",
                  [&]() {
                      _destroy_menu    = true;

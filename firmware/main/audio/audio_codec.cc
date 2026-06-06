@@ -1,5 +1,7 @@
 #include "audio_codec.h"
 
+#include <algorithm>
+
 #include <esp_log.h>
 
 #include "settings.h"
@@ -7,35 +9,54 @@
 namespace {
 
 constexpr char kTag[] = "AudioCodec";
-constexpr int kMinimumRestoredVolume = 10;
+constexpr char kSettingsNamespace[] = "audio";
+constexpr char kOutputVolumeKey[] = "output_volume";
+constexpr int kMinimumStartupVolume = 10;
+constexpr int kMaximumOutputVolume = 100;
+constexpr float kMinimumInputGain = 0.0f;
+
+int NormalizeVolumeForRuntime(int volume)
+{
+    return std::clamp(volume, 0, kMaximumOutputVolume);
+}
+
+int NormalizeVolumeForStartup(int volume)
+{
+    return volume <= 0 ? kMinimumStartupVolume : NormalizeVolumeForRuntime(volume);
+}
 
 }  // namespace
 
 void AudioCodec::Start()
 {
-    Settings settings("audio", false);
-    output_volume_ = settings.GetInt("output_volume", output_volume_);
-    if (output_volume_ <= 0) {
-        ESP_LOGW(kTag, "Output volume %d is invalid, restoring to %d", output_volume_, kMinimumRestoredVolume);
-        output_volume_ = kMinimumRestoredVolume;
-    }
-
-    ESP_LOGI(kTag, "Audio codec started");
+    Settings settings(kSettingsNamespace, false);
+    const int persisted_volume = settings.GetInt(kOutputVolumeKey, output_volume_);
+    output_volume_ = NormalizeVolumeForStartup(persisted_volume);
+    ESP_LOGI(kTag, "Audio codec ready with output volume %d", output_volume_);
 }
 
 void AudioCodec::SetOutputVolume(int volume)
 {
-    output_volume_ = volume;
-    ESP_LOGI(kTag, "Set output volume to %d", output_volume_);
+    const int normalized_volume = NormalizeVolumeForRuntime(volume);
+    if (normalized_volume == output_volume_) {
+        return;
+    }
 
-    Settings settings("audio", true);
-    settings.SetInt("output_volume", output_volume_);
+    output_volume_ = normalized_volume;
+    Settings settings(kSettingsNamespace, true);
+    settings.SetInt(kOutputVolumeKey, output_volume_);
+    ESP_LOGI(kTag, "Output volume set to %d", output_volume_);
 }
 
 void AudioCodec::SetInputGain(float gain)
 {
-    input_gain_ = gain;
-    ESP_LOGI(kTag, "Set input gain to %.1f", input_gain_);
+    const float normalized_gain = std::max(gain, kMinimumInputGain);
+    if (normalized_gain == input_gain_) {
+        return;
+    }
+
+    input_gain_ = normalized_gain;
+    ESP_LOGI(kTag, "Input gain set to %.1f", input_gain_);
 }
 
 void AudioCodec::EnableInput(bool enable)
@@ -45,7 +66,7 @@ void AudioCodec::EnableInput(bool enable)
     }
 
     input_enabled_ = enable;
-    ESP_LOGI(kTag, "Set input enable to %s", enable ? "true" : "false");
+    ESP_LOGI(kTag, "Input path %s", input_enabled_ ? "enabled" : "disabled");
 }
 
 void AudioCodec::EnableOutput(bool enable)
@@ -55,15 +76,21 @@ void AudioCodec::EnableOutput(bool enable)
     }
 
     output_enabled_ = enable;
-    ESP_LOGI(kTag, "Set output enable to %s", enable ? "true" : "false");
+    ESP_LOGI(kTag, "Output path %s", output_enabled_ ? "enabled" : "disabled");
 }
 
 void AudioCodec::OutputData(std::vector<int16_t>& data)
 {
-    Write(data.data(), data.size());
+    if (data.empty()) {
+        return;
+    }
+    Write(data.data(), static_cast<int>(data.size()));
 }
 
 bool AudioCodec::InputData(std::vector<int16_t>& data)
 {
-    return Read(data.data(), data.size()) > 0;
+    if (data.empty()) {
+        return false;
+    }
+    return Read(data.data(), static_cast<int>(data.size())) > 0;
 }

@@ -115,7 +115,7 @@ struct UserAccountInfo_t {
  * @brief
  *
  */
-struct XiaozhiConfig_t {
+struct AiAgentConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
     bool allowShutdownWhenCharging   = false;
     uint8_t idleRandomMovementLevel  = 2;
@@ -235,18 +235,18 @@ public:
         return std::forward<Fn>(fn)();
     }
 
-    /* --------------------------------- Xiaozhi -------------------------------- */
-    void requestXiaozhiStart()
+    /* -------------------------------- AI Agent ------------------------------- */
+    void requestAiAgentStart()
     {
-        _xiaozhi_start_requested = true;
+        _ai_agent_start_requested = true;
     }
-    bool isXiaozhiStartRequested()
+    bool isAiAgentStartRequested()
     {
-        return _xiaozhi_start_requested;
+        return _ai_agent_start_requested;
     }
-    void startXiaozhi();
-    XiaozhiConfig_t getXiaozhiConfig();
-    void setXiaozhiConfig(XiaozhiConfig_t config);
+    void startAiAgent();
+    AiAgentConfig_t getAiAgentConfig();
+    void setAiAgentConfig(AiAgentConfig_t config);
 
     /* ----------------------------------- BLE ---------------------------------- */
     uitk::Signal<const char*> onBleMotionData;
@@ -335,13 +335,13 @@ public:
     void clearupMicTest();
 
 private:
-    bool _xiaozhi_start_requested = false;
-    bool _xiaozhi_config_cached   = false;
-    XiaozhiConfig_t _xiaozhi_config_cache;
+    bool _ai_agent_start_requested = false;
+    bool _ai_agent_config_cached   = false;
+    AiAgentConfig_t _ai_agent_config_cache;
 
-    void xiaozhi_board_init();
+    void ai_agent_board_init();
     void lvgl_init();
-    void xiaozhi_mcp_init();
+    void ai_agent_mcp_init();
     void ble_init(bool useAltUuid);
     void servo_init();
     void head_touch_init();

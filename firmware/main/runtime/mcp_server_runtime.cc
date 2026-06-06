@@ -5,15 +5,14 @@
 #include <audio_codec.h>
 #include <board.h>
 #include <display.h>
+#include <firmware_identity.h>
 #include <settings.h>
 #include <system_info.h>
 
 #include <esp_app_desc.h>
 #include <esp_log.h>
 
-#ifdef HAVE_LVGL
 #include <lvgl_theme.h>
-#endif
 
 #include <algorithm>
 #include <cstring>
@@ -76,6 +75,7 @@ std::string BuildInitializeResult()
     cJSON_AddItemToObject(result, "serverInfo", server_info);
     cJSON_AddStringToObject(server_info, "name", BOARD_NAME);
     cJSON_AddStringToObject(server_info, "version", app_desc->version);
+    cJSON_AddStringToObject(server_info, "fork", firmware_identity::kFork);
 
     const std::string payload = PrintJson(result);
     cJSON_Delete(result);
@@ -119,7 +119,6 @@ void McpServer::AddCommonTools()
                 });
     }
 
-#ifdef HAVE_LVGL
     if (Display* display = board.GetDisplay(); display != nullptr && display->GetTheme() != nullptr) {
         AddTool("self.screen.set_theme", "Set the screen theme. Supported values depend on the firmware theme set.",
                 PropertyList({Property("theme", kPropertyTypeString)}),
@@ -134,7 +133,6 @@ void McpServer::AddCommonTools()
                     return true;
                 });
     }
-#endif
 
     if (Camera* camera = board.GetCamera(); camera != nullptr) {
         AddTool("self.camera.take_photo",

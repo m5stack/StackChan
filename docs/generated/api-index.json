@@ -1,12 +1,126 @@
 {
   "generated": {
+    "local_control_events_markdown": "docs/generated/local-control-events.md",
+    "local_control_events_metadata": "docs/api/local-control.events.json",
     "local_control_markdown": "docs/generated/local-control-websocket.md",
-    "mcp_tools_fixture": "docs/api/fixtures/tools-list.stackchan.json",
-    "mcp_tools_markdown": "docs/generated/mcp-tools.md",
     "source_metadata": "docs/api/local-control.methods.json",
     "voice_messages_metadata": "docs/api/voice-websocket.messages.json",
     "voice_websocket_markdown": "docs/generated/voice-websocket.md"
   },
+  "local_control_events": [
+    {
+      "name": "state_transition",
+      "schema": {
+        "properties": {
+          "new_state": {
+            "type": "string"
+          },
+          "old_state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "old_state",
+          "new_state"
+        ],
+        "type": "object"
+      },
+      "summary": "Device state changed."
+    },
+    {
+      "name": "wake_word_detected",
+      "schema": {
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "wake_word": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "wake_word",
+          "state"
+        ],
+        "type": "object"
+      },
+      "summary": "Wake word engine detected a phrase and queued wake handling."
+    },
+    {
+      "name": "listen_start_requested",
+      "schema": {
+        "properties": {
+          "mode": {
+            "const": "manual",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
+      "summary": "An explicit local listen request was queued."
+    },
+    {
+      "name": "listen_enter",
+      "schema": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "auto",
+              "manual",
+              "realtime"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
+      "summary": "The device entered listening state."
+    },
+    {
+      "name": "listen_stop_requested",
+      "schema": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "manual_request",
+              "auto_timeout"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "summary": "A listen stop request was queued."
+    },
+    {
+      "name": "listen_stop_handled",
+      "schema": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "manual_request",
+              "auto_timeout"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "summary": "The listening state handler processed a stop request."
+    }
+  ],
   "local_control_methods": [
     {
       "aliases": [],
@@ -155,15 +269,21 @@
         ],
         "required": true
       },
-      "name": "settings/write_sd",
+      "name": "settings/sync_to_sd",
       "params_schema": {
         "properties": {
           "settings_json": {
             "type": "string"
+          },
+          "sync_to_sd": {
+            "const": true,
+            "description": "Explicit opt-in. Sync settings to SDCard is disabled unless this is true.",
+            "type": "boolean"
           }
         },
         "required": [
-          "settings_json"
+          "settings_json",
+          "sync_to_sd"
         ],
         "type": "object"
       },
@@ -388,186 +508,62 @@
         "type": "object"
       },
       "stability": "experimental"
-    }
-  ],
-  "mcp_tools": [
+    },
     {
-      "description": "Provides the real-time information of the device, including the current status of the audio speaker, screen, battery, network, etc.\nUse this tool for: \n1. Answering questions about current condition (e.g. what is the current volume of the audio speaker?)\n2. As the first step to control the device (e.g. turn up / down the volume of the audio speaker, etc.)",
-      "inputSchema": {
+      "aliases": [],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "debug/subscribe_events",
+      "params_schema": {
         "properties": {},
         "type": "object"
       },
-      "name": "self.get_device_status"
-    },
-    {
-      "description": "Set the volume of the audio speaker. If the current volume is unknown, you must call `self.get_device_status` tool first and then call this tool.",
-      "inputSchema": {
+      "result_schema": {
         "properties": {
-          "volume": {
-            "maximum": 100,
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "required": [
-          "volume"
-        ],
-        "type": "object"
-      },
-      "name": "self.audio_speaker.set_volume"
-    },
-    {
-      "description": "Set the brightness of the screen.",
-      "inputSchema": {
-        "properties": {
-          "brightness": {
-            "maximum": 100,
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "required": [
-          "brightness"
-        ],
-        "type": "object"
-      },
-      "name": "self.screen.set_brightness"
-    },
-    {
-      "description": "Set the theme of the screen. The theme can be `light` or `dark`.",
-      "inputSchema": {
-        "properties": {
-          "theme": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "theme"
-        ],
-        "type": "object"
-      },
-      "name": "self.screen.set_theme"
-    },
-    {
-      "description": "Always remember you have a camera. If the user asks you to see something, use this tool to take a photo and then explain it.\nArgs:\n  `question`: The question that you want to ask about the photo.\nReturn:\n  A JSON object that provides the photo information.",
-      "inputSchema": {
-        "properties": {
-          "question": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "question"
-        ],
-        "type": "object"
-      },
-      "name": "self.camera.take_photo"
-    },
-    {
-      "description": "Returns current yaw/pitch in degrees. Neutral position is {yaw:0, pitch:0}.",
-      "inputSchema": {
-        "properties": {},
-        "type": "object"
-      },
-      "name": "self.robot.get_head_angles"
-    },
-    {
-      "description": "Adjust head position. GUIDELINES: 1. For natural interaction, stay within +/- 45 degrees. 2. Only use values > 70 if the user explicitly asks to look far away/behind. 3. Max ranges: Yaw(-128 to 128, -128 as your left), Pitch(0 to 90, 90 as your up). Speed(100-1000, 150 is natural).",
-      "inputSchema": {
-        "properties": {
-          "pitch": {
-            "default": -9999,
-            "maximum": 90,
-            "minimum": -9999,
-            "type": "integer"
-          },
-          "speed": {
-            "default": 150,
-            "maximum": 1000,
-            "minimum": 100,
-            "type": "integer"
-          },
-          "yaw": {
-            "default": -9999,
-            "maximum": 128,
-            "minimum": -9999,
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "name": "self.robot.set_head_angles"
-    },
-    {
-      "description": "Set the color of the robot's INTERNAL onboard LED. This is NOT for room lights. Values: 0-168 (safe range). Red=168,0,0; Green=0,168,0; Blue=0,0,168; White=100,100,100; Off=0,0,0.",
-      "inputSchema": {
-        "properties": {
-          "blue": {
-            "default": 0,
-            "maximum": 168,
-            "minimum": 0,
-            "type": "integer"
-          },
-          "green": {
-            "default": 0,
-            "maximum": 168,
-            "minimum": 0,
-            "type": "integer"
-          },
-          "red": {
-            "default": 0,
-            "maximum": 168,
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "name": "self.robot.set_led_color"
-    },
-    {
-      "description": "Create a reminder. Duration is in seconds. Message is what to say when time is up. Set repeat to true to repeat the reminder.",
-      "inputSchema": {
-        "properties": {
-          "duration_seconds": {
-            "default": 60,
-            "maximum": 86400,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "message": {
-            "default": "Time's up!",
-            "type": "string"
-          },
-          "repeat": {
-            "default": false,
+          "subscribed": {
+            "const": true,
             "type": "boolean"
           }
         },
+        "required": [
+          "subscribed"
+        ],
         "type": "object"
       },
-      "name": "self.robot.create_reminder"
+      "stability": "experimental"
     },
     {
-      "description": "Get list of active reminders.",
-      "inputSchema": {
+      "aliases": [],
+      "auth": {
+        "principals": [
+          "dashboard",
+          "admin"
+        ],
+        "required": true
+      },
+      "name": "debug/unsubscribe_events",
+      "params_schema": {
         "properties": {},
         "type": "object"
       },
-      "name": "self.robot.get_reminders"
-    },
-    {
-      "description": "Stop a reminder by ID.",
-      "inputSchema": {
+      "result_schema": {
         "properties": {
-          "id": {
-            "default": -1,
-            "type": "integer"
+          "subscribed": {
+            "const": false,
+            "type": "boolean"
           }
         },
+        "required": [
+          "subscribed"
+        ],
         "type": "object"
       },
-      "name": "self.robot.stop_reminder"
+      "stability": "experimental"
     }
   ],
   "version": 1,
@@ -806,7 +802,7 @@
     },
     {
       "direction": "device_to_server",
-      "name": "listen_start",
+      "name": "listen.start",
       "schema": {
         "properties": {
           "mode": {
@@ -820,19 +816,14 @@
           "session_id": {
             "type": "string"
           },
-          "state": {
-            "const": "start",
-            "type": "string"
-          },
           "type": {
-            "const": "listen",
+            "const": "listen.start",
             "type": "string"
           }
         },
         "required": [
           "session_id",
           "type",
-          "state",
           "mode"
         ],
         "type": "object"
@@ -841,25 +832,20 @@
     },
     {
       "direction": "device_to_server",
-      "name": "listen_stop",
+      "name": "listen.stop",
       "schema": {
         "properties": {
           "session_id": {
             "type": "string"
           },
-          "state": {
-            "const": "stop",
-            "type": "string"
-          },
           "type": {
-            "const": "listen",
+            "const": "listen.stop",
             "type": "string"
           }
         },
         "required": [
           "session_id",
-          "type",
-          "state"
+          "type"
         ],
         "type": "object"
       },
@@ -867,7 +853,196 @@
     },
     {
       "direction": "device_to_server",
-      "name": "mcp",
+      "name": "listen.detect",
+      "schema": {
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "const": "listen.detect",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "type",
+          "text"
+        ],
+        "type": "object"
+      },
+      "summary": "Device reports the detected wake phrase for the current session."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "tts.start",
+      "schema": {
+        "properties": {
+          "type": {
+            "const": "tts.start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "summary": "Server starts TTS playback on the device."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "tts.sentence",
+      "schema": {
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "const": "tts.sentence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "type": "object"
+      },
+      "summary": "Server streams one assistant sentence for subtitle display."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "tts.stop",
+      "schema": {
+        "properties": {
+          "type": {
+            "const": "tts.stop",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "summary": "Server ends TTS playback on the device."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "stt.transcript",
+      "schema": {
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "const": "stt.transcript",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "type": "object"
+      },
+      "summary": "Server sends the recognized user transcript for subtitle display."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "ui.emotion",
+      "schema": {
+        "properties": {
+          "emotion": {
+            "type": "string"
+          },
+          "type": {
+            "const": "ui.emotion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "emotion"
+        ],
+        "type": "object"
+      },
+      "summary": "Server requests a UI emotion change on the device display."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "ui.alert",
+      "schema": {
+        "properties": {
+          "emotion": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "type": {
+            "const": "ui.alert",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status",
+          "message",
+          "emotion"
+        ],
+        "type": "object"
+      },
+      "summary": "Server requests a UI alert banner, message, and emotion."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "ui.custom",
+      "schema": {
+        "properties": {
+          "payload": {
+            "type": "object"
+          },
+          "type": {
+            "const": "ui.custom",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "summary": "Server sends a custom UI payload for firmware-defined rendering."
+    },
+    {
+      "direction": "server_to_device",
+      "name": "system.reboot",
+      "schema": {
+        "properties": {
+          "type": {
+            "const": "system.reboot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "summary": "Server requests an immediate device reboot."
+    },
+    {
+      "direction": "bidirectional",
+      "name": "mcp.message",
       "schema": {
         "properties": {
           "payload": {
@@ -877,7 +1052,7 @@
             "type": "string"
           },
           "type": {
-            "const": "mcp",
+            "const": "mcp.message",
             "type": "string"
           }
         },
@@ -888,7 +1063,7 @@
         ],
         "type": "object"
       },
-      "summary": "Transitional MCP envelope on the voice session."
+      "summary": "JSON-RPC MCP envelope carried over the voice session."
     }
   ]
 }

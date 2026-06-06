@@ -1,6 +1,5 @@
 #include "wifi_board.h"
 #include "cores3_audio_codec.h"
-#include "display/lcd_display.h"
 #include "stackchan_display.h"
 #include "application.h"
 #include "config.h"
@@ -85,8 +84,7 @@ public:
             uint8_t val = ReadReg(0x90);
             WriteReg(0x90, val & 0x7F);
         } else {
-            // 映射计算：将 1~100 映射到 寄存器值 20~28
-            // 公式：MinReg + (input * (MaxReg - MinReg) / MaxInput)
+            // Map brightness 1..100 onto DLDO1 voltage register values 20..28.
             // 20 + (brightness * 8 / 100)
             if (brightness > 100) {
                 brightness = 100;
@@ -253,7 +251,7 @@ private:
     LocalControlWebSocketServer* control_ws_server_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     PowerSaveTimer* power_save_timer_;
-    hal_bridge::XiaozhiConfig_t xiaozhi_config_;
+    hal_bridge::AiAgentConfig_t agent_config_;
     std::string local_control_token_ = STACKCHAN_CONTROL_WS_TOKEN;
     bool last_power_save_enabled_      = false;
     int64_t last_power_state_check_ms_ = 0;
@@ -283,7 +281,7 @@ private:
 
     bool ShouldEnablePowerSave(bool has_external_power, bool is_discharging) const
     {
-        return is_discharging || (has_external_power && xiaozhi_config_.allowShutdownWhenCharging);
+        return is_discharging || (has_external_power && agent_config_.allowShutdownWhenCharging);
     }
 
     void UpdatePowerSaveEnabled(bool has_external_power, bool is_discharging)
@@ -295,7 +293,7 @@ private:
 
         ESP_LOGI(TAG, "Power save timer %s: external_power=%d, discharging=%d, allowShutdownWhenCharging=%d",
                  should_enable_power_save ? "enabled" : "disabled", has_external_power, is_discharging,
-                 xiaozhi_config_.allowShutdownWhenCharging);
+                 agent_config_.allowShutdownWhenCharging);
         power_save_timer_->SetEnabled(should_enable_power_save);
         last_power_save_enabled_ = should_enable_power_save;
     }
@@ -319,6 +317,19 @@ private:
 
         if (control_ws_server_ == nullptr) {
             control_ws_server_ = new LocalControlWebSocketServer();
+            Application::GetInstance().RegisterDebugEventCallback(
+                [this]() {
+                    return control_ws_server_ != nullptr && control_ws_server_->HasDebugEventSubscribers();
+                },
+                [this](const char* event_type, cJSON* fields) {
+                    if (control_ws_server_ == nullptr) {
+                        if (fields != nullptr) {
+                            cJSON_Delete(fields);
+                        }
+                        return;
+                    }
+                    control_ws_server_->PublishDebugEvent(event_type, fields);
+                });
         }
         control_ws_server_->SetToken(local_control_token_);
 
@@ -346,21 +357,21 @@ private:
 
     void InitializePowerSaveTimer()
     {
-        xiaozhi_config_ = hal_bridge::get_xiaozhi_config();
+        agent_config_ = hal_bridge::get_ai_agent_config();
         // Boot-time SD settings load is allowed here because the card is mounted
         // before LCD init. Runtime /sdcard access must use GetHAL().withSdCard().
-        hal_bridge::apply_xiaozhi_config_sd_overrides(xiaozhi_config_);
-        hal_bridge::set_boot_xiaozhi_config(xiaozhi_config_);
+        hal_bridge::apply_ai_agent_config_sd_overrides(agent_config_);
+        hal_bridge::set_boot_ai_agent_config(agent_config_);
 
-        const int seconds_to_shutdown = xiaozhi_config_.idleShutdownTimeSeconds > 0
-                                            ? static_cast<int>(xiaozhi_config_.idleShutdownTimeSeconds)
+        const int seconds_to_shutdown = agent_config_.idleShutdownTimeSeconds > 0
+                                            ? static_cast<int>(agent_config_.idleShutdownTimeSeconds)
                                             : -1;
         const int seconds_to_sleep    = seconds_to_shutdown == -1
                                             ? kPowerSaveSleepDelaySeconds
                                             : std::min(kPowerSaveSleepDelaySeconds, seconds_to_shutdown);
 
         ESP_LOGI(TAG, "Init power save timer: sleep=%d s, shutdown=%d s, allow_shutdown_when_charging=%d",
-                 seconds_to_sleep, seconds_to_shutdown, xiaozhi_config_.allowShutdownWhenCharging);
+                 seconds_to_sleep, seconds_to_shutdown, agent_config_.allowShutdownWhenCharging);
 
         power_save_timer_ = new PowerSaveTimer(-1, seconds_to_sleep, seconds_to_shutdown);
         power_save_timer_->SetSleepEligibilityCallback([]() { return Application::GetInstance().CanEnterSleepMode(); });
@@ -450,7 +461,7 @@ private:
         ESP_LOGI(TAG, "Init FT6336");
         ft6336_ = new Ft6336(i2c_bus_, 0x38);
 
-        // 创建定时器，20ms 间隔
+        // Poll touch input at 20 ms intervals.
         esp_timer_create_args_t timer_args = {
             .callback =
                 [](void* arg) {
@@ -514,8 +525,6 @@ private:
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
 
-        // display_ = new StackChanLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
-        //                                    DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         display_ = new StackChanAvatarDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
                                               DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
@@ -782,7 +791,7 @@ uint8_t hal_bridge::board_get_speaker_volume()
     return volume;
 }
 
-void hal_bridge::toggle_xiaozhi_chat_state()
+void hal_bridge::toggle_ai_agent_chat_state()
 {
     auto& app = Application::GetInstance();
     if (app.GetDeviceState() == kDeviceStateStarting) {
