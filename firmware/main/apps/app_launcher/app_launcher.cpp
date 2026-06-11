@@ -12,6 +12,10 @@
 
 using namespace mooncake;
 
+namespace {
+constexpr int kAiAgentAppId = 1;
+}
+
 void AppLauncher::onLauncherCreate()
 {
     mclog::tagInfo(getAppInfo().name, "on create");
@@ -26,6 +30,13 @@ void AppLauncher::onLauncherOpen()
 
     LvglLockGuard lock;
 
+    if (GetHAL().getXiaozhiConfig().startAiAgentOnBoot) {
+        mclog::tagInfo(getAppInfo().name, "ai agent boot requested, open ai agent directly");
+        _direct_ai_agent_requested = true;
+        open_ai_agent_if_requested();
+        return;
+    }
+
     if (!_startup_checked && !GetHAL().isAppConfiged()) {
         mclog::tagInfo(getAppInfo().name, "app not configured, start startup worker");
         _startup_worker = std::make_unique<setup_workers::StartupWorker>();
@@ -37,6 +48,10 @@ void AppLauncher::onLauncherOpen()
 void AppLauncher::onLauncherRunning()
 {
     LvglLockGuard lock;
+
+    if (_direct_ai_agent_requested) {
+        return;
+    }
 
     if (_startup_worker) {
         _startup_worker->update();
@@ -75,6 +90,16 @@ void AppLauncher::create_launcher_view()
         mclog::tagInfo(getAppInfo().name, "handle open app, app id: {}", appID);
         openApp(appID);
     };
+}
+
+void AppLauncher::open_ai_agent_if_requested()
+{
+    if (!_direct_ai_agent_requested) {
+        return;
+    }
+
+    _direct_ai_agent_requested = false;
+    openApp(kAiAgentAppId);
 }
 
 void AppLauncher::screensaver_update()
