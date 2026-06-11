@@ -5,8 +5,15 @@
 #include <unistd.h>
 #include <errno.h>
 #include <esp_heap_caps.h>
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <vector>
 
 #include "esp_imgfx_color_convert.h"
 #include "esp_video_device.h"
@@ -15,6 +22,8 @@
 
 #include "board.h"
 #include "display.h"
+#include "../hal.h"
+#include "../../stackchan/stackchan.h"
 #include "stackchan_camera.h"
 #include "esp_jpeg_common.h"
 #include "jpg/image_to_jpeg.h"
@@ -851,6 +860,99 @@ bool StackChanCamera::Capture()
     return true;
 }
 
+bool StackChanCamera::SaveFrameToSdCard(const std::string& directory, std::string* saved_path)
+{
+    if (frame_.data == nullptr || frame_.len == 0) {
+        ESP_LOGE(TAG, "SaveFrameToSdCard: no frame captured");
+        return false;
+    }
+
+    auto ensure_directory = [](const std::string& path) -> bool {
+        if (path.empty()) {
+            return false;
+        }
+        std::string current;
+        current.reserve(path.size());
+        for (char ch : path) {
+            current.push_back(ch);
+            if (ch == '/' && current.size() > 1) {
+                (void)mkdir(current.c_str(), 0777);
+            }
+        }
+        if (mkdir(path.c_str(), 0777) != 0 && errno != EEXIST) {
+            return false;
+        }
+        return true;
+    };
+    if (!ensure_directory(directory)) {
+        ESP_LOGW(TAG, "SaveFrameToSdCard: create directory failed: %s", directory.c_str());
+        return false;
+    }
+
+    auto now = std::time(nullptr);
+    std::tm tm{};
+    localtime_r(&now, &tm);
+    char filename[64];
+    std::snprintf(filename, sizeof(filename), "photo_%04d%02d%02d_%02d%02d%02d.jpg", tm.tm_year + 1900,
+                  tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    std::string file_path = directory;
+    if (!file_path.empty() && file_path.back() != '/') {
+        file_path.push_back('/');
+    }
+    file_path += filename;
+
+    FILE* fp = std::fopen(file_path.c_str(), "wb");
+    if (!fp) {
+        ESP_LOGW(TAG, "SaveFrameToSdCard: fopen failed for %s", file_path.c_str());
+        return false;
+    }
+
+    const uint8_t* jpeg_data = frame_.data;
+    size_t jpeg_len          = frame_.len;
+    std::vector<uint8_t> encoded_jpeg;
+
+    if (frame_.format != V4L2_PIX_FMT_JPEG) {
+        uint16_t w             = frame_.width ? frame_.width : 320;
+        uint16_t h             = frame_.height ? frame_.height : 240;
+        v4l2_pix_fmt_t enc_fmt = frame_.format;
+
+        bool ok = image_to_jpeg_cb(
+            frame_.data, frame_.len, w, h, enc_fmt, 90,
+            [](void* arg, size_t index, const void* data, size_t len) -> size_t {
+                auto out = static_cast<std::vector<uint8_t>*>(arg);
+                if (data != nullptr && len > 0) {
+                    const auto* bytes = static_cast<const uint8_t*>(data);
+                    out->insert(out->end(), bytes, bytes + len);
+                }
+                return len;
+            },
+            &encoded_jpeg);
+
+        if (!ok || encoded_jpeg.empty()) {
+            ESP_LOGE(TAG, "SaveFrameToSdCard: failed to encode frame to JPEG");
+            std::fclose(fp);
+            return false;
+        }
+
+        jpeg_data = encoded_jpeg.data();
+        jpeg_len  = encoded_jpeg.size();
+    }
+
+    size_t written = std::fwrite(jpeg_data, 1, jpeg_len, fp);
+    std::fclose(fp);
+    if (written != jpeg_len) {
+        ESP_LOGW(TAG, "SaveFrameToSdCard: short write %u/%u", static_cast<unsigned>(written),
+                 static_cast<unsigned>(jpeg_len));
+        return false;
+    }
+
+    if (saved_path) {
+        *saved_path = file_path;
+    }
+    ESP_LOGI(TAG, "Saved photo to %s", file_path.c_str());
+    return true;
+}
+
 bool StackChanCamera::StreamCaptures()
 {
     if (encoder_thread_.joinable()) {
@@ -1030,6 +1132,15 @@ std::string StackChanCamera::Explain(const std::string& question)
         throw std::runtime_error("Image explain URL or token is not set");
     }
 
+    auto& motion = GetStackChan().motion();
+    const uint32_t settle_start_ms = GetHAL().millis();
+    while (motion.isMoving() && (GetHAL().millis() - settle_start_ms) < 1500) {
+        GetHAL().delay(20);
+    }
+    if (motion.isMoving()) {
+        ESP_LOGW(TAG, "Explain requested while motion is still moving");
+    }
+
     // 创建局部的 JPEG 队列, 40 entries is about to store 512 * 40 = 20480 bytes of JPEG data
     QueueHandle_t jpeg_queue = xQueueCreate(40, sizeof(JpegChunk));
     if (jpeg_queue == nullptr) {
@@ -1166,4 +1277,41 @@ std::string StackChanCamera::Explain(const std::string& question)
     ESP_LOGI(TAG, "Explain image size=%d bytes, compressed size=%d, remain stack size=%d, question=%s\n%s",
              (int)frame_.len, (int)total_sent, (int)remain_stack_size, question.c_str(), result.c_str());
     return result;
+}
+
+std::vector<std::string> StackChanCamera::ListSavedPhotos(const std::string& directory) const
+{
+    std::vector<std::string> photos;
+    DIR* dir = opendir(directory.c_str());
+    if (!dir) {
+        return photos;
+    }
+
+    struct dirent* entry = nullptr;
+    while ((entry = readdir(dir)) != nullptr) {
+        const char* name = entry->d_name;
+        if (std::strcmp(name, ".") == 0 || std::strcmp(name, "..") == 0) {
+            continue;
+        }
+        std::string file_name(name);
+        auto dot = file_name.find_last_of('.');
+        if (dot == std::string::npos) {
+            continue;
+        }
+        auto ext = file_name.substr(dot);
+        for (auto& c : ext) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (ext == ".jpg" || ext == ".jpeg") {
+            std::string full_path = directory;
+            if (!full_path.empty() && full_path.back() != '/') {
+                full_path.push_back('/');
+            }
+            full_path += file_name;
+            photos.push_back(std::move(full_path));
+        }
+    }
+    closedir(dir);
+    std::sort(photos.begin(), photos.end());
+    return photos;
 }

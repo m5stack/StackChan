@@ -5,6 +5,10 @@ cmake_minimum_required(VERSION 3.16)
 set(PROJECT_VER "1.4.1")
 add_definitions(-DFIRMWARE_VERSION=\"${PROJECT_VER}\")
 
+# ccache adds an extra launcher layer to already long ESP-IDF compile commands.
+# On Windows this can push some tool invocations over the CreateProcess limit.
+set(CCACHE_ENABLE 0 CACHE BOOL "Disable ccache for this build" FORCE)
+
 # Add this line to disable the specific warning
 add_compile_options(-Wno-missing-field-initializers)
 

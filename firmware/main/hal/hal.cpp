@@ -4,9 +4,21 @@
  * SPDX-License-Identifier: MIT
  */
 #include "hal.h"
+#include <application.h>
+#include <device_state.h>
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
+#include <cstdio>
+#include <cstring>
+#include <vector>
+
+#include <esp_vfs_fat.h>
+#include <driver/sdmmc_host.h>
+#include <sdmmc_cmd.h>
+#include <esp_audio_dec_default.h>
+#include <esp_audio_simple_dec_default.h>
+#include <board.h>
 
 static std::unique_ptr<Hal> _hal_instance;
 static const std::string_view _tag = "HAL";
@@ -199,6 +211,47 @@ void Hal::startXiaozhi()
     // Start stackchan update task
     xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 3, NULL, 1);
 
+    const auto xiaozhi_config = getXiaozhiConfig();
+    mclog::tagInfo(_tag, "xiaozhi boot config: startAiAgentOnBoot={}, conversationStopAfterSeconds={}",
+                   xiaozhi_config.startAiAgentOnBoot, xiaozhi_config.conversationStopAfterSeconds);
+    if (xiaozhi_config.startAiAgentOnBoot) {
+        xTaskCreate(
+            [](void* arg) {
+                const auto config = *static_cast<XiaozhiConfig_t*>(arg);
+                delete static_cast<XiaozhiConfig_t*>(arg);
+
+                mclog::tagInfo(_tag, "boot chat task started");
+                for (;;) {
+                    auto& app = Application::GetInstance();
+                    if (app.GetDeviceState() == kDeviceStateIdle) {
+                        mclog::tagInfo(_tag, "boot chat waiting finished: device idle");
+                        break;
+                    }
+                    mclog::tagInfo(_tag, "boot chat waiting for device idle, state={}", static_cast<int>(app.GetDeviceState()));
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                }
+
+                vTaskDelay(pdMS_TO_TICKS(500));
+                mclog::tagInfo(_tag, "boot chat starting listening");
+                Application::GetInstance().StartListening();
+                hal_bridge::set_xiaozhi_conversation_active(true);
+                mclog::tagInfo(_tag, "boot chat conversation active");
+
+                if (config.conversationStopAfterSeconds > 0) {
+                    mclog::tagInfo(_tag, "boot chat auto stop scheduled after {} s", config.conversationStopAfterSeconds);
+                    vTaskDelay(pdMS_TO_TICKS(config.conversationStopAfterSeconds * 1000));
+                    mclog::tagInfo(_tag, "boot chat auto stop stopping listening");
+                    Application::GetInstance().StopListening();
+                    hal_bridge::set_xiaozhi_conversation_active(false);
+                    mclog::tagInfo(_tag, "boot chat conversation inactive");
+                }
+                vTaskDelete(nullptr);
+            },
+            "boot_chat", 4096, new XiaozhiConfig_t(xiaozhi_config), 3, nullptr);
+    } else {
+        mclog::tagInfo(_tag, "boot chat disabled by config");
+    }
+
     hal_bridge::start_xiaozhi_app();
 }
 
@@ -207,6 +260,7 @@ XiaozhiConfig_t Hal::getXiaozhiConfig()
     auto bridge_config = hal_bridge::get_xiaozhi_config();
     return XiaozhiConfig_t{
         .idleShutdownTimeSeconds   = bridge_config.idleShutdownTimeSeconds,
+        .conversationStopAfterSeconds = bridge_config.conversationStopAfterSeconds,
         .allowShutdownWhenCharging = bridge_config.allowShutdownWhenCharging,
         .idleRandomMovementLevel   = bridge_config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = bridge_config.startAiAgentOnBoot,
@@ -217,6 +271,7 @@ void Hal::setXiaozhiConfig(XiaozhiConfig_t config)
 {
     hal_bridge::set_xiaozhi_config({
         .idleShutdownTimeSeconds   = config.idleShutdownTimeSeconds,
+        .conversationStopAfterSeconds = config.conversationStopAfterSeconds,
         .allowShutdownWhenCharging = config.allowShutdownWhenCharging,
         .idleRandomMovementLevel   = config.idleRandomMovementLevel,
         .startAiAgentOnBoot        = config.startAiAgentOnBoot,
@@ -273,6 +328,50 @@ void Hal::setSpeakerVolume(uint8_t volume, bool permanent)
 uint8_t Hal::getSpeakerVolume()
 {
     return hal_bridge::board_get_speaker_volume();
+}
+
+namespace {
+
+constexpr const char* kSdCardMountPoint = "/sdcard";
+
+bool ensureSdCardMounted()
+{
+    static bool mounted = false;
+    if (mounted) {
+        return true;
+    }
+
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {};
+    mount_config.format_if_mount_failed            = false;
+    mount_config.max_files                         = 4;
+    mount_config.allocation_unit_size              = 16 * 1024;
+
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    host.max_freq_khz  = SDMMC_FREQ_HIGHSPEED;
+
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
+    sdmmc_card_t* card = nullptr;
+    const esp_err_t ret = esp_vfs_fat_sdmmc_mount(kSdCardMountPoint, &host, &slot_config, &mount_config, &card);
+    if (ret != ESP_OK) {
+        mclog::tagError(_tag, "failed to mount SD card at {}: {}", kSdCardMountPoint, esp_err_to_name(ret));
+        return false;
+    }
+
+    mounted = true;
+    mclog::tagInfo(_tag, "SD card mounted at {}", kSdCardMountPoint);
+    return true;
+}
+
+}  // namespace
+
+bool Hal::playSdCardAudio(std::string_view path)
+{
+    if (!ensureSdCardMounted()) {
+        return false;
+    }
+    return Application::GetInstance().PlaySoundFile(std::string(path));
 }
 
 /* -------------------------------------------------------------------------- */

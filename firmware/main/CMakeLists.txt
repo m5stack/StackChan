@@ -17,6 +17,7 @@ file(GLOB_RECURSE STACK_CHAN_SOURCES
 )
 set(STACK_CHAN_INCLUDE_DIRS 
     "."
+    "hal/board"
 )
 list(APPEND STACK_CHAN_SOURCES main.cpp)
 

@@ -22,13 +22,15 @@ struct Data_t {
     TouchPoint_t touchPoint;
     bool isXiaozhiMode              = false;
     bool isXiaozhiModeToggleEnabled = false;
+    bool isConversationActive       = false;
 };
 
 struct XiaozhiConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
+    uint32_t conversationStopAfterSeconds = 300;
     bool allowShutdownWhenCharging   = false;
     uint8_t idleRandomMovementLevel  = 2;
-    bool startAiAgentOnBoot          = false;
+    bool startAiAgentOnBoot          = true;
 };
 
 void lock();
@@ -41,6 +43,8 @@ TouchPoint_t get_touch_point();
 bool is_xiaozhi_mode();
 void set_xiaozhi_mode(bool mode);
 void toggle_xiaozhi_chat_state();
+void set_xiaozhi_conversation_active(bool active);
+bool is_xiaozhi_conversation_active();
 
 void disply_lvgl_lock();
 void disply_lvgl_unlock();

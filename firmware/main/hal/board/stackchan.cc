@@ -256,7 +256,8 @@ private:
 
     void UpdatePowerSaveEnabled(bool has_external_power, bool is_discharging)
     {
-        const bool should_enable_power_save = ShouldEnablePowerSave(has_external_power, is_discharging);
+        const bool should_enable_power_save =
+            ShouldEnablePowerSave(has_external_power, is_discharging) && !hal_bridge::is_xiaozhi_conversation_active();
         if (should_enable_power_save == last_power_save_enabled_) {
             return;
         }
@@ -290,8 +291,10 @@ private:
                                             ? kPowerSaveSleepDelaySeconds
                                             : std::min(kPowerSaveSleepDelaySeconds, seconds_to_shutdown);
 
-        ESP_LOGI(TAG, "Init power save timer: sleep=%d s, shutdown=%d s, allow_shutdown_when_charging=%d",
-                 seconds_to_sleep, seconds_to_shutdown, xiaozhi_config_.allowShutdownWhenCharging);
+        ESP_LOGI(TAG,
+                 "Init power save timer: sleep=%d s, shutdown=%d s, conv_stop=%u s, allow_shutdown_when_charging=%d",
+                 seconds_to_sleep, seconds_to_shutdown, xiaozhi_config_.conversationStopAfterSeconds,
+                 xiaozhi_config_.allowShutdownWhenCharging);
 
         power_save_timer_ = new PowerSaveTimer(-1, seconds_to_sleep, seconds_to_shutdown);
         power_save_timer_->OnEnterSleepMode([this]() {
@@ -304,6 +307,27 @@ private:
         });
         power_save_timer_->OnShutdownRequest([this]() { pmic_->PowerOff(); });
         UpdatePowerSaveEnabled(pmic_->IsExternalPowerConnected(), pmic_->IsDischarging());
+    }
+
+    void StartConversationAutoStopTimer()
+    {
+        const uint32_t stop_after = xiaozhi_config_.conversationStopAfterSeconds;
+        if (stop_after == 0) {
+            return;
+        }
+
+        hal_bridge::set_xiaozhi_conversation_active(true);
+        power_save_timer_->SetEnabled(false);
+
+        xTaskCreate(
+            [](void* arg) {
+                const uint32_t stop_after_ms = reinterpret_cast<uint32_t>(arg) * 1000;
+                vTaskDelay(pdMS_TO_TICKS(stop_after_ms));
+                hal_bridge::toggle_xiaozhi_chat_state();
+                hal_bridge::set_xiaozhi_conversation_active(false);
+                vTaskDelete(nullptr);
+            },
+            "xiaozhi_chat_stop", 4096, reinterpret_cast<void*>(static_cast<uintptr_t>(stop_after)), 3, nullptr);
     }
 
     void InitializeI2c()

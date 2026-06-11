@@ -22,6 +22,7 @@ static const char* _tag = "HAL_BRIDGE";
 
 static constexpr std::string_view _xiaozhi_config_nvs_ns                           = "xiaozhi";
 static constexpr std::string_view _xiaozhi_config_idle_shutdown_time_key           = "idle_sec";
+static constexpr std::string_view _xiaozhi_config_conversation_stop_after_key       = "conv_stop_sec";
 static constexpr std::string_view _xiaozhi_config_allow_shutdown_when_charging_key = "ext_pwr";
 static constexpr std::string_view _xiaozhi_config_idle_random_movement_key         = "idle_lv";
 static constexpr std::string_view _xiaozhi_config_start_ai_agent_on_boot_key       = "boot_ai";
@@ -74,6 +75,18 @@ void set_xiaozhi_mode(bool mode)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     _data.isXiaozhiMode = mode;
+}
+
+void set_xiaozhi_conversation_active(bool active)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    _data.isConversationActive = active;
+}
+
+bool is_xiaozhi_conversation_active()
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _data.isConversationActive;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -132,6 +145,8 @@ XiaozhiConfig_t get_xiaozhi_config()
         settings.GetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
     config.startAiAgentOnBoot =
         settings.GetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);
+    config.conversationStopAfterSeconds =
+        settings.GetInt(_xiaozhi_config_conversation_stop_after_key.data(), config.conversationStopAfterSeconds);
 
     return config;
 }
@@ -140,6 +155,7 @@ void set_xiaozhi_config(const XiaozhiConfig_t& config)
 {
     Settings settings(_xiaozhi_config_nvs_ns.data(), true);
     settings.SetInt(_xiaozhi_config_idle_shutdown_time_key.data(), config.idleShutdownTimeSeconds);
+    settings.SetInt(_xiaozhi_config_conversation_stop_after_key.data(), config.conversationStopAfterSeconds);
     settings.SetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
     settings.SetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
     settings.SetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);

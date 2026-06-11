@@ -338,20 +338,27 @@ public:
 
 private:
     void update_idle_motion_label();
+    void update_conversation_label();
 
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel_general;
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel_startup;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_conversation;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_title;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_value;
     std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_idle_motion;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_startup_title;
     std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_start_ai_on_boot;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_conversation_title;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_conversation_value;
+    std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_conversation_stop;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
 
     XiaozhiConfig_t _config;
     std::vector<uint8_t> _idle_motion_levels;
+    std::vector<uint32_t> _conversation_stop_levels;
     int32_t _pending_idle_motion_index = -1;
+    int32_t _pending_conversation_index = -1;
     bool _confirm_flag                 = false;
 };
 
@@ -416,7 +423,8 @@ public:
 
     class PageAccount {
     public:
-        PageAccount(std::string_view username, std::string_view deviceName);
+        PageAccount(std::string_view username, std::string_view deviceName, std::string_view ownerName,
+                    std::string_view birthday);
 
         bool isUnbindClicked() const
         {
@@ -433,6 +441,8 @@ public:
         std::unique_ptr<uitk::lvgl_cpp::Label> _label_title;
         std::unique_ptr<PanelInfo> _panel_username;
         std::unique_ptr<PanelInfo> _panel_device_name;
+        std::unique_ptr<PanelInfo> _panel_owner_name;
+        std::unique_ptr<PanelInfo> _panel_birthday;
         std::unique_ptr<uitk::lvgl_cpp::Button> _btn_unbind;
         std::unique_ptr<uitk::lvgl_cpp::Button> _btn_quit;
 

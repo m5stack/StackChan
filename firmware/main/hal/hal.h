@@ -108,6 +108,8 @@ enum class WifiStatus {
 struct UserAccountInfo_t {
     std::string username;
     std::string deviceName;
+    std::string ownerName;
+    std::string birthday;
 };
 
 /**
@@ -116,9 +118,10 @@ struct UserAccountInfo_t {
  */
 struct XiaozhiConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
+    uint32_t conversationStopAfterSeconds = 300;
     bool allowShutdownWhenCharging   = false;
     uint8_t idleRandomMovementLevel  = 2;
-    bool startAiAgentOnBoot          = false;
+    bool startAiAgentOnBoot          = true;
 };
 
 /**
@@ -300,6 +303,7 @@ public:
     std::string startMicTest(std::function<void(MicTestStatus)> onStatusUpdate);
     void getMicWaveformFrame(std::vector<int16_t>& data);
     void clearupMicTest();
+    bool playSdCardAudio(std::string_view path);
 
 private:
     bool _xiaozhi_start_requested = false;

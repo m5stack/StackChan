@@ -41,7 +41,8 @@ AccountWorker::PanelInfo::PanelInfo(lv_obj_t* parent, int posY, std::string_view
     _label_info->setText(info);
 }
 
-AccountWorker::PageAccount::PageAccount(std::string_view username, std::string_view deviceName)
+AccountWorker::PageAccount::PageAccount(std::string_view username, std::string_view deviceName,
+                                       std::string_view ownerName, std::string_view birthday)
 {
     _panel = std::make_unique<Container>(lv_screen_active());
     _panel->setBgColor(lv_color_hex(0xF6F6F6));
@@ -58,13 +59,15 @@ AccountWorker::PageAccount::PageAccount(std::string_view username, std::string_v
     _label_title->align(LV_ALIGN_TOP_MID, 0, 12);
     _label_title->setText("ACCOUNT");
 
-    _panel_username    = std::make_unique<PanelInfo>(_panel->get(), 50, "M5Stack Account:", username);
-    _panel_device_name = std::make_unique<PanelInfo>(_panel->get(), 174, "Device Name:", deviceName);
+    _panel_username    = std::make_unique<PanelInfo>(_panel->get(), 20, "M5Stack Account:", username);
+    _panel_device_name = std::make_unique<PanelInfo>(_panel->get(), 104, "Device Name:", deviceName);
+    _panel_owner_name   = std::make_unique<PanelInfo>(_panel->get(), 188, "Owner:", ownerName);
+    _panel_birthday     = std::make_unique<PanelInfo>(_panel->get(), 272, "Birthday:", birthday);
 
     // Button
     _btn_unbind = std::make_unique<Button>(_panel->get());
     apply_button_common_style(*_btn_unbind);
-    _btn_unbind->align(LV_ALIGN_TOP_MID, 0, 303);
+    _btn_unbind->align(LV_ALIGN_TOP_MID, 0, 356);
     _btn_unbind->setSize(290, 48);
     _btn_unbind->setBgColor(lv_color_hex(0xFF8080));
     _btn_unbind->label().setText("Unbind and factory reset");
@@ -74,7 +77,7 @@ AccountWorker::PageAccount::PageAccount(std::string_view username, std::string_v
 
     _btn_quit = std::make_unique<Button>(_panel->get());
     apply_button_common_style(*_btn_quit);
-    _btn_quit->align(LV_ALIGN_TOP_MID, 0, 371);
+    _btn_quit->align(LV_ALIGN_TOP_MID, 0, 424);
     _btn_quit->setSize(290, 48);
     _btn_quit->label().setText("Back");
     _btn_quit->label().setTextFont(&lv_font_montserrat_20);
@@ -108,7 +111,7 @@ AccountWorker::AccountWorker()
     }
 
     auto info     = GetHAL().getUserAccountInfo();
-    _page_account = std::make_unique<PageAccount>(info.username, info.deviceName);
+    _page_account = std::make_unique<PageAccount>(info.username, info.deviceName, info.ownerName, info.birthday);
 }
 
 AccountWorker::~AccountWorker()

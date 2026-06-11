@@ -25,6 +25,7 @@
 #include <wifi_manager.h>
 #include "utils/jpeg_to_image/jpeg_decoder.h"
 #include "utils/secret_logic/secret_logic.h"
+#include "utils/conversation_log.h"
 
 static std::string _tag = "WS-Avatar";
 
@@ -298,6 +299,10 @@ public:
                             text_msg.content = doc["content"].as<std::string>();
                         }
 
+                        if (!text_msg.name.empty() || !text_msg.content.empty()) {
+                            conversation_log::append_message(text_msg.name.empty() ? "assistant" : text_msg.name,
+                                                              text_msg.content);
+                        }
                         GetHAL().onWsTextMessage.emit(text_msg);
                     }
                     break;

@@ -5,6 +5,8 @@
  */
 #include <smooth_ui_toolkit.hpp>
 #include <uitk/short_namespace.hpp>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <mooncake_log.h>
 #include <mooncake.h>
 #include <apps/apps.h>
@@ -25,6 +27,20 @@ extern "C" void app_main(void)
     // Setup ui hal
     ui_hal::on_delay([](uint32_t ms) { GetHAL().delay(ms); });
     ui_hal::on_get_tick([]() { return GetHAL().millis(); });
+
+    xTaskCreate(
+        [](void*) {
+            // Wait for startup to settle before playing the sample once.
+            GetHAL().delay(15000);
+            mclog::tagInfo("MAIN", "delayed SD audio playback: /sdcard/audio/Path_of_Light.mp3");
+            if (!GetHAL().playSdCardAudio("/sdcard/audio/Path_of_Light.mp3")) {
+                mclog::tagError("MAIN", "delayed SD audio playback failed");
+            } else {
+                mclog::tagInfo("MAIN", "delayed SD audio playback finished");
+            }
+            vTaskDelete(nullptr);
+        },
+        "delayed_sd_audio", 4096, nullptr, 1, nullptr);
 
     const bool skip_mooncake =
         GetHAL().getXiaozhiConfig().startAiAgentOnBoot && GetHAL().getWarmRebootTarget() < 0;

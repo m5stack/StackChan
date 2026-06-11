@@ -156,6 +156,10 @@ XiaozhiGeneralWorker::XiaozhiGeneralWorker()
         _idle_motion_levels.push_back(level);
     }
 
+    for (uint32_t seconds = 0; seconds <= 1800; seconds += 30) {
+        _conversation_stop_levels.push_back(seconds);
+    }
+
     int current_index = static_cast<int>(_idle_motion_levels.size()) - 1;
     for (size_t i = 0; i < _idle_motion_levels.size(); ++i) {
         if (_idle_motion_levels[i] >= _config.idleRandomMovementLevel) {
@@ -234,14 +238,55 @@ XiaozhiGeneralWorker::XiaozhiGeneralWorker()
         _switch_start_ai_on_boot->addState(LV_STATE_CHECKED);
     }
 
+    _panel_conversation = std::make_unique<Container>(_panel->get());
+    _panel_conversation->setSize(296, 148);
+    _panel_conversation->align(LV_ALIGN_TOP_MID, 0, 324);
+    _panel_conversation->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_conversation->setBorderWidth(0);
+    _panel_conversation->setRadius(18);
+    _panel_conversation->setPadding(0, 0, 0, 0);
+    _panel_conversation->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_conversation_title = std::make_unique<Label>(_panel_conversation->get());
+    _label_conversation_title->setText("Stop conversation after:");
+    _label_conversation_title->setTextFont(&lv_font_montserrat_16);
+    _label_conversation_title->setTextColor(lv_color_hex(0x26206A));
+    _label_conversation_title->setWidth(260);
+    _label_conversation_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_conversation_title->align(LV_ALIGN_TOP_MID, 0, 18);
+
+    _label_conversation_value = std::make_unique<Label>(_panel_conversation->get());
+    _label_conversation_value->setTextFont(&lv_font_montserrat_24);
+    _label_conversation_value->setTextColor(lv_color_hex(0x26206A));
+    _label_conversation_value->align(LV_ALIGN_TOP_MID, 0, 64);
+
+    _slider_conversation_stop = std::make_unique<Slider>(_panel_conversation->get());
+    _slider_conversation_stop->align(LV_ALIGN_TOP_MID, 0, 106);
+    _slider_conversation_stop->setRange(0, _conversation_stop_levels.size() - 1);
+    _slider_conversation_stop->setSize(250, 18);
+    _slider_conversation_stop->setBgColor(lv_color_hex(0x615B9E), LV_PART_KNOB);
+    _slider_conversation_stop->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR);
+    _slider_conversation_stop->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _slider_conversation_stop->setBgOpa(255);
+    int current_conv_index = 0;
+    for (size_t i = 0; i < _conversation_stop_levels.size(); ++i) {
+        if (_conversation_stop_levels[i] >= _config.conversationStopAfterSeconds) {
+            current_conv_index = static_cast<int>(i);
+            break;
+        }
+    }
+    _slider_conversation_stop->setValue(current_conv_index);
+    _slider_conversation_stop->onValueChanged().connect([this](int32_t value) { _pending_conversation_index = value; });
+
     _btn_confirm = std::make_unique<Button>(_panel->get());
     apply_button_common_style(*_btn_confirm);
-    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 326);
+    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 490);
     _btn_confirm->setSize(290, 50);
     _btn_confirm->label().setText("Confirm");
     _btn_confirm->onClick().connect([this]() { _confirm_flag = true; });
 
     update_idle_motion_label();
+    update_conversation_label();
 }
 
 void XiaozhiGeneralWorker::update()
@@ -252,12 +297,21 @@ void XiaozhiGeneralWorker::update()
         update_idle_motion_label();
     }
 
+    if (_pending_conversation_index != -1) {
+        _config.conversationStopAfterSeconds = _conversation_stop_levels[_pending_conversation_index];
+        _pending_conversation_index          = -1;
+        update_conversation_label();
+    }
+
     if (_confirm_flag) {
         _confirm_flag = false;
         _config.startAiAgentOnBoot = _switch_start_ai_on_boot->getValue();
         GetHAL().setXiaozhiConfig(_config);
-        mclog::tagInfo(_tag, "xiaozhi config updated: idleRandomMovementLevel={} ({})", _config.idleRandomMovementLevel,
-                       _idle_motion_level_labels[_config.idleRandomMovementLevel]);
+        mclog::tagInfo(_tag,
+                       "xiaozhi config updated: idleRandomMovementLevel={} ({}), conversationStopAfterSeconds={}, "
+                       "startAiAgentOnBoot={}",
+                       _config.idleRandomMovementLevel, _idle_motion_level_labels[_config.idleRandomMovementLevel],
+                       _config.conversationStopAfterSeconds, _config.startAiAgentOnBoot);
         _is_done = true;
     }
 }
@@ -265,4 +319,14 @@ void XiaozhiGeneralWorker::update()
 void XiaozhiGeneralWorker::update_idle_motion_label()
 {
     _label_idle_motion_value->setText(_idle_motion_level_labels[_config.idleRandomMovementLevel]);
+}
+
+void XiaozhiGeneralWorker::update_conversation_label()
+{
+    if (_config.conversationStopAfterSeconds == 0) {
+        _label_conversation_value->setText("Off");
+        return;
+    }
+    auto total_minutes = _config.conversationStopAfterSeconds / 60;
+    _label_conversation_value->setText(fmt::format("{} min", total_minutes));
 }

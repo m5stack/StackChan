@@ -3,6 +3,7 @@
 
 #ifndef CONFIG_IDF_TARGET_ESP32
 #include <lvgl.h>
+#include <string>
 #include <thread>
 #include <memory>
 #include <vector>
@@ -50,12 +51,14 @@ public:
 
     virtual void SetExplainUrl(const std::string& url, const std::string& token);
     virtual bool Capture() override;
+    bool SaveFrameToSdCard(const std::string& directory, std::string* saved_path = nullptr);
     bool StreamCaptures();
 
     // 翻转控制函数
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual std::string Explain(const std::string& question);
+    std::vector<std::string> ListSavedPhotos(const std::string& directory) const;
 
     const uint8_t* GetFrameData()
     {

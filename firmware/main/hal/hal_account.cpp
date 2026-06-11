@@ -16,6 +16,10 @@ static const std::string_view _tag = "HAL-Account";
 static const std::string_view _setting_ns              = "account";
 static const std::string_view _setting_username_key    = "username";
 static const std::string_view _setting_device_name_key = "device_name";
+static const std::string_view _setting_owner_name_key   = "owner_name";
+static const std::string_view _setting_birthday_key     = "birthday";
+static const std::string_view _default_owner_name       = "健斗";
+static const std::string_view _default_birthday         = "2026/05/23";
 
 static std::string get_user_account_info_url()
 {
@@ -161,6 +165,8 @@ UserAccountInfo_t Hal::getUserAccountInfo()
     Settings settings(_setting_ns.data(), false);
     info.username   = settings.GetString(_setting_username_key.data(), "Account Info");
     info.deviceName = settings.GetString(_setting_device_name_key.data(), "");
+    info.ownerName  = settings.GetString(_setting_owner_name_key.data(), _default_owner_name.data());
+    info.birthday   = settings.GetString(_setting_birthday_key.data(), _default_birthday.data());
     return info;
 }
 
@@ -181,6 +187,8 @@ bool Hal::updateAccountInfo(std::function<void(std::string_view)> onLog)
     Settings settings(_setting_ns.data(), true);
     settings.SetString(_setting_username_key.data(), username);
     settings.SetString(_setting_device_name_key.data(), device_name);
+    settings.SetString(_setting_owner_name_key.data(), _default_owner_name.data());
+    settings.SetString(_setting_birthday_key.data(), _default_birthday.data());
 
     mclog::tagInfo(_tag, "account updated: username={}, device_name={}", username, device_name);
     onLog(std::string("Account updated: ") + username);
@@ -236,6 +244,8 @@ bool Hal::unbindAccount(std::function<void(std::string_view)> onLog)
         Settings settings(_setting_ns.data(), true);
         settings.SetString(_setting_username_key.data(), "Account Info");
         settings.SetString(_setting_device_name_key.data(), "");
+        settings.SetString(_setting_owner_name_key.data(), _default_owner_name.data());
+        settings.SetString(_setting_birthday_key.data(), _default_birthday.data());
         mclog::tagInfo(_tag, "account unbound successfully");
         onLog("Account unbound successfully");
         success = true;

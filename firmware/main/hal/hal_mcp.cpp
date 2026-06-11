@@ -13,6 +13,24 @@ using namespace stackchan;
 
 static const std::string_view _tag = "HAL-MCP";
 
+namespace {
+
+void waitForMotionSettle(stackchan::motion::Motion& motion, uint32_t timeout_ms = 1500, uint32_t settle_ms = 120)
+{
+    const uint32_t start_ms = GetHAL().millis();
+    while (GetHAL().millis() - start_ms < timeout_ms) {
+        if (!motion.isMoving()) {
+            GetHAL().delay(settle_ms);
+            if (!motion.isMoving()) {
+                return;
+            }
+        }
+        GetHAL().delay(20);
+    }
+}
+
+}  // namespace
+
 void Hal::xiaozhi_mcp_init()
 {
     mclog::tagInfo(_tag, "init");
@@ -32,7 +50,7 @@ void Hal::xiaozhi_mcp_init()
 
                            auto& motion      = GetStackChan().motion();
                            int current_yaw   = motion.yawServo().getCurrentAngle() / 10;
-                           int current_pitch = motion.pitchServo().getCurrentAngle() / 10;
+                           int current_pitch = -motion.pitchServo().getCurrentAngle() / 10;
 
                            auto result = fmt::format(R"({{"yaw": {}, "pitch": {}}})", current_yaw, current_pitch);
                            mclog::tagInfo(_tag, "get_head_angles: {}", result);
@@ -60,11 +78,14 @@ void Hal::xiaozhi_mcp_init()
 
                            auto& motion = GetStackChan().motion();
                            if (pitch != -9999) {
-                               motion.pitchServo().moveWithSpeed(pitch * 10, speed);
+                               motion.pitchServo().moveWithSpeed(-pitch * 10, speed);
                            }
                            if (yaw != -9999) {
                                motion.yawServo().moveWithSpeed(yaw * 10, speed);
                            }
+
+                           // Wait for the head to settle before the tool returns.
+                           waitForMotionSettle(motion);
 
                            return true;
                        });
