@@ -12,10 +12,6 @@
 
 using namespace mooncake;
 
-namespace {
-constexpr int kAiAgentAppId = 1;
-}
-
 void AppLauncher::onLauncherCreate()
 {
     mclog::tagInfo(getAppInfo().name, "on create");
@@ -30,16 +26,16 @@ void AppLauncher::onLauncherOpen()
 
     LvglLockGuard lock;
 
-    if (GetHAL().getXiaozhiConfig().startAiAgentOnBoot) {
-        mclog::tagInfo(getAppInfo().name, "ai agent boot requested, open ai agent directly");
-        _direct_ai_agent_requested = true;
-        open_ai_agent_if_requested();
-        return;
-    }
-
     if (!_startup_checked && !GetHAL().isAppConfiged()) {
         mclog::tagInfo(getAppInfo().name, "app not configured, start startup worker");
         _startup_worker = std::make_unique<setup_workers::StartupWorker>();
+        return;
+    }
+
+    if (GetHAL().getXiaozhiConfig().startAiAgentOnBoot) {
+        mclog::tagInfo(getAppInfo().name, "ai agent boot requested, open ai agent directly");
+        _boot_ai_agent_requested = true;
+        create_launcher_view();
     } else {
         create_launcher_view();
     }
@@ -49,7 +45,8 @@ void AppLauncher::onLauncherRunning()
 {
     LvglLockGuard lock;
 
-    if (_direct_ai_agent_requested) {
+    if (_boot_ai_agent_requested) {
+        open_ai_agent_if_requested();
         return;
     }
 
@@ -94,12 +91,22 @@ void AppLauncher::create_launcher_view()
 
 void AppLauncher::open_ai_agent_if_requested()
 {
-    if (!_direct_ai_agent_requested) {
+    if (!_boot_ai_agent_requested) {
         return;
     }
 
-    _direct_ai_agent_requested = false;
-    openApp(kAiAgentAppId);
+    _boot_ai_agent_requested = false;
+
+    for (const auto& props : getAppProps()) {
+        if (props.info.name == "AI.AGENT") {
+            mclog::tagInfo(getAppInfo().name, "opening app by name: {}", props.info.name);
+            openApp(props.appID);
+            return;
+        }
+    }
+
+    mclog::tagError(getAppInfo().name, "AI.Agent app not found, fall back to launcher");
+    create_launcher_view();
 }
 
 void AppLauncher::screensaver_update()
