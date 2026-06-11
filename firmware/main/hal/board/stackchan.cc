@@ -185,9 +185,16 @@ public:
 
     Ft6336(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : I2cDevice(i2c_bus, addr)
     {
-        uint8_t chip_id = ReadReg(0xA3);
-        ESP_LOGI(TAG, "Get chip ID: 0x%02X", chip_id);
+        esp_err_t err = TryReadRegs(0xA3, &chip_id_, 1);
+        if (err != ESP_OK) {
+            init_ok_ = false;
+            ESP_LOGW(TAG, "FT6336 init failed: %s", esp_err_to_name(err));
+            return;
+        }
+
+        ESP_LOGI(TAG, "Get chip ID: 0x%02X", chip_id_);
         read_buffer_ = new uint8_t[6];
+        init_ok_     = true;
     }
 
     ~Ft6336()
@@ -197,6 +204,10 @@ public:
 
     bool UpdateTouchPoint()
     {
+        if (!init_ok_ || read_buffer_ == nullptr) {
+            return false;
+        }
+
         auto err = TryReadRegs(0x02, read_buffer_, 6);
         if (err != ESP_OK) {
             tp_.num = 0;
@@ -228,6 +239,8 @@ public:
 private:
     uint8_t* read_buffer_ = nullptr;
     TouchPoint_t tp_;
+    uint8_t chip_id_ = 0;
+    bool init_ok_    = false;
     int64_t last_error_log_us_     = 0;
     uint32_t consecutive_failures_ = 0;
 };
@@ -399,6 +412,10 @@ private:
     {
         ESP_LOGI(TAG, "Init FT6336");
         ft6336_ = new Ft6336(i2c_bus_, 0x38);
+        if (ft6336_ == nullptr) {
+            ESP_LOGW(TAG, "FT6336 unavailable, touch input disabled");
+            return;
+        }
 
         // 创建定时器，20ms 间隔
         esp_timer_create_args_t timer_args = {

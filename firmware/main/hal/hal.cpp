@@ -232,13 +232,18 @@ void Hal::startXiaozhi()
                 }
 
                 vTaskDelay(pdMS_TO_TICKS(500));
-                mclog::tagInfo(_tag, "boot chat wakeword skipped");
-                hal_bridge::set_xiaozhi_conversation_active(false);
+                mclog::tagInfo(_tag, "boot chat starting listening");
+                Application::GetInstance().StartListening();
+                hal_bridge::set_xiaozhi_conversation_active(true);
+                mclog::tagInfo(_tag, "boot chat conversation active");
 
                 if (config.conversationStopAfterSeconds > 0) {
                     mclog::tagInfo(_tag, "boot chat auto stop scheduled after {} s", config.conversationStopAfterSeconds);
                     vTaskDelay(pdMS_TO_TICKS(config.conversationStopAfterSeconds * 1000));
-                    mclog::tagInfo(_tag, "boot chat auto stop completed");
+                    mclog::tagInfo(_tag, "boot chat auto stop stopping listening");
+                    Application::GetInstance().StopListening();
+                    hal_bridge::set_xiaozhi_conversation_active(false);
+                    mclog::tagInfo(_tag, "boot chat conversation inactive");
                 }
                 vTaskDelete(nullptr);
             },

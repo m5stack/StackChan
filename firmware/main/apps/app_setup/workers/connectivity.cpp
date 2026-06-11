@@ -251,8 +251,7 @@ void WifiSetupWorker::update_state()
                     avatar.setSpeech(fmt::format("Done!  Reboot in {}s.", _state_done_data.reboot_count));
                 } else {
                     mclog::tagInfo(_tag, "rebooting...");
-                    GetHAL().delay(100);
-                    GetHAL().reboot();
+                    _is_done = true;
                 }
             }
 

@@ -184,6 +184,6 @@ void start_ota_update(const char *url, void (*on_progress)(int progress))
         ESP_LOGI(TAG, "OTA Succeed, Rebooting...");
         esp_restart();
     } else {
-        ESP_LOGE(TAG, "Firmware upgrade failed");
+        ESP_LOGE(TAG, "Firmware upgrade failed: %s (0x%x)", esp_err_to_name(ret), (unsigned)ret);
     }
 }

@@ -32,6 +32,12 @@ void AppLauncher::onLauncherOpen()
     } else {
         create_launcher_view();
     }
+
+    if (!_boot_ai_agent_opened && GetHAL().getXiaozhiConfig().startAiAgentOnBoot) {
+        _boot_ai_agent_opened = true;
+        mclog::tagInfo(getAppInfo().name, "auto open AI.Agent on boot");
+        openApp(1);
+    }
 }
 
 void AppLauncher::onLauncherRunning()
