@@ -88,6 +88,11 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    if (!Urls.isConfigured) {
+      AppState.shared.showToast("Backend server is not configured.");
+      return;
+    }
+
     loading.value = true;
     try {
       final Map<String, dynamic> map = {
