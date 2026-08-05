@@ -20,6 +20,10 @@ RUN go mod download
 
 COPY . .
 
+# go.mod/go.sum may be out of sync after upstream merges (new imports
+# missing from go.sum). `go mod tidy` reconciles before the build.
+RUN go mod tidy
+
 ENV CGO_ENABLED=1 GOOS=linux
 RUN go build -trimpath -ldflags="-s -w" -o /out/stackChan main.go
 
