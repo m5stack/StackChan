@@ -36,6 +36,12 @@ WORKDIR /app
 COPY --from=builder /out/stackChan /app/stackChan
 COPY --from=builder /src/manifest/config/config.yaml /app/config.yaml
 
+# Backend v2 calls s.SetServerRoot("web/management") at boot and FATAs if the
+# directory is missing. The frontend admin UI is built separately (npm) and not
+# bundled here. Provide an empty dir so the API boots; the UI is not needed for
+# the robot pipeline.
+RUN mkdir -p /app/web/management
+
 EXPOSE 12800
 
 CMD ["/app/stackChan"]
