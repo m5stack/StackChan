@@ -29,7 +29,9 @@ RUN go build -trimpath -ldflags="-s -w" -o /out/stackChan main.go
 
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates tzdata
+# openssl is needed by entrypoint.sh to provision RSA keys at first boot.
+# ca-certificates + tzdata are runtime deps for the Go binary.
+RUN apk add --no-cache ca-certificates tzdata openssl
 
 WORKDIR /app
 
