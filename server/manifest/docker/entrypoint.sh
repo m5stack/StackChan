@@ -24,6 +24,20 @@ set -eu
 CONFIG_PATH="${CONFIG_PATH:-/app/config.yaml}"
 RSA_KEYS_DIR="${RSA_KEYS_DIR:-/app/rsa-keys}"
 
+# Workaround for upstream bug: device.NewV1 (ControllerV1.GetUserAccountInfo)
+# and stackchandevice.NewV2 (ControllerV2.GetDeviceUserInfo) both register
+# GET /stackChan/device/user. Backend v2 FATAs at boot on the duplicate.
+# Inject routeOverWrite: true just under the top-level server: key so the
+# second registration silently overwrites the first. Idempotent.
+if ! grep -q "^  routeOverWrite:" "$CONFIG_PATH" 2>/dev/null; then
+    echo "[entrypoint] injecting server.routeOverWrite (upstream duplicate-route bug)"
+    awk '
+        BEGIN { inserted = 0 }
+        /^server:/ && !inserted { print; print "  routeOverWrite: true"; inserted = 1; next }
+        { print }
+    ' "$CONFIG_PATH" > "$CONFIG_PATH.tmp" && mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
+fi
+
 # Skip if operator pre-filled RSA material in the mounted config.
 if grep -q "BEGIN RSA PRIVATE KEY\|BEGIN PRIVATE KEY\|BEGIN PUBLIC KEY" "$CONFIG_PATH" 2>/dev/null; then
     echo "[entrypoint] config.yaml already contains RSA material, skipping generation"
