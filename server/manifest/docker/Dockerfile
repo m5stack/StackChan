@@ -35,13 +35,16 @@ WORKDIR /app
 
 COPY --from=builder /out/stackChan /app/stackChan
 COPY --from=builder /src/manifest/config/config.yaml /app/config.yaml
+COPY manifest/docker/entrypoint.sh /app/entrypoint.sh
 
 # Backend v2 calls s.SetServerRoot("web/management") at boot and FATAs if the
 # directory is missing. The frontend admin UI is built separately (npm) and not
 # bundled here. Provide an empty dir so the API boots; the UI is not needed for
 # the robot pipeline.
-RUN mkdir -p /app/web/management
+RUN mkdir -p /app/web/management && chmod +x /app/entrypoint.sh
 
 EXPOSE 12800
 
-CMD ["/app/stackChan"]
+# Entrypoint provisions RSA keys at first boot (backend v2 panics on empty keys).
+# Mount /app/rsa-keys as a volume to keep stable keys across container recreates.
+CMD ["/app/entrypoint.sh"]
