@@ -11,6 +11,7 @@
 #include <board.h>
 #include <web_socket.h>
 #include <esp_log.h>
+#include <esp_mac.h>
 #include <arpa/inet.h>
 #include <jpg/image_to_jpeg.h>
 #include <wifi_station.h>
@@ -63,7 +64,11 @@ public:
 
     void init()
     {
-        _url = fmt::format("{}/stackChan/ws?deviceType=StackChan", secret_logic::get_server_url());
+        uint8_t mac[6] = {0};
+        esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
+        _url = fmt::format(
+            "{}/stackChan/ws?mac={:02X}{:02X}{:02X}{:02X}{:02X}{:02X}&deviceType=StackChan",
+            secret_logic::get_server_url(), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
         connect();
 
