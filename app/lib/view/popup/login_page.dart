@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -66,63 +67,90 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     nameTextEditingController.dispose();
     passwordTextEditingController.dispose();
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
   Future<void> login() async {
+    // Guard against double taps starting several requests.
     if (loading.value) {
       return;
     }
-    loading.value = true;
+    // Validate before showing the spinner so a validation error never hides
+    // the form behind an endless spinner.
     if (username.isEmpty) {
       AppState.shared.showToast(
         "Please enter your account number or email address.",
       );
-      loading.value = false;
       return;
     }
     if (password.isEmpty) {
       AppState.shared.showToast("Please enter the password.");
-      loading.value = false;
       return;
     }
-    final Map<String, dynamic> map = {
-      ValueConstant.username: username,
-      ValueConstant.password: password,
-    };
-    final response = await Http.instance.post(Urls.login, data: map);
-    if (response.data != null) {
-      Model<LoginResponseModel> responseData = Model.fromJsonT(
-        response.data,
-        factory: (value) => LoginResponseModel.fromJson(value),
-      );
-      if (responseData.isSuccess()) {
-        final token = responseData.data?.token;
-        if (token != null) {
-          AppState.shared.setIsLogin(true);
-          await AppState.asyncPrefs.setString(ValueConstant.token, token);
-          AppState.shared.showToast("Login successful");
-          if (mounted) {
-            AppState.shared.getUserInfo();
-            AppState.shared.getDevices();
-            if (widget.isWelCome != true) {
-              CupertinoSheetRoute.popSheet(context);
-            } else {
-              Navigator.of(context).pop();
+
+    if (!Urls.isConfigured) {
+      AppState.shared.showToast("Backend server is not configured.");
+      return;
+    }
+
+    loading.value = true;
+    try {
+      final Map<String, dynamic> map = {
+        ValueConstant.username: username,
+        ValueConstant.password: password,
+      };
+      final response = await Http.instance.post(Urls.login, data: map);
+      // --- existing server-response handling (unchanged) ---
+      if (response.data != null) {
+        Model<LoginResponseModel> responseData = Model.fromJsonT(
+          response.data,
+          factory: (value) => LoginResponseModel.fromJson(value),
+        );
+        if (responseData.isSuccess()) {
+          final token = responseData.data?.token;
+          if (token != null) {
+            AppState.shared.setIsLogin(true);
+            await AppState.asyncPrefs.setString(ValueConstant.token, token);
+            AppState.shared.showToast("Login successful");
+            if (mounted) {
+              AppState.shared.getUserInfo();
+              AppState.shared.getDevices();
+              if (widget.isWelCome != true) {
+                CupertinoSheetRoute.popSheet(context);
+              } else {
+                Navigator.of(context).pop();
+              }
+              BlueUtil.shared.cachedDeviceMacs = [];
             }
-            BlueUtil.shared.cachedDeviceMacs = [];
           }
+        } else {
+          showLoginErrMessage(responseData.message);
         }
       } else {
-        showLoginErrMessage(responseData.message);
+        AppState.shared.showToast(response.statusMessage);
       }
-    } else {
-      AppState.shared.showToast(response.statusMessage);
+    } on FormatException catch (error, stackTrace) {
+      // e.g. RSA key parsing when encryption keys are not configured.
+      debugPrint("Login configuration/format error: $error");
+      debugPrintStack(stackTrace: stackTrace);
+      AppState.shared.showToast(
+        "The application encryption keys are not configured.",
+      );
+    } on DioException catch (error, stackTrace) {
+      // Network / server errors (timeout, DNS, TLS, HTTP status, bad body).
+      debugPrint("Login network error: ${error.type}");
+      debugPrintStack(stackTrace: stackTrace);
+      AppState.shared.showToast(
+        "Login failed. Check the internet connection or server configuration.",
+      );
+    } catch (error, stackTrace) {
+      debugPrint("Unexpected login error: $error");
+      debugPrintStack(stackTrace: stackTrace);
+      AppState.shared.showToast("An unexpected login error occurred.");
+    } finally {
+      // Always release the spinner, whatever happened above.
+      loading.value = false;
     }
-    loading.value = false;
   }
 
   void showLoginErrMessage(String? text) {

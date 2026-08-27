@@ -4,7 +4,6 @@ SPDX-License-Identifier: MIT
 */
 
 import 'package:dio/dio.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:stack_chan/app_state.dart';
 import 'package:stack_chan/network/urls.dart';
 import 'package:stack_chan/network/web_socket_util.dart';
@@ -18,7 +17,7 @@ void logPrint(Object? object) {
   const int chunkSize = 800; //800（limit）
   //ifcontent,directPrint
   if (log.length <= chunkSize) {
-        return;
+    return;
   }
 
   //contentPrint
@@ -26,7 +25,7 @@ void logPrint(Object? object) {
     int end = i + chunkSize;
     if (end > log.length) end = log.length;
     //usedebugPrint(print,supportcontent)
-      }
+  }
 }
 
 class Http {
@@ -41,11 +40,21 @@ class Http {
     InterceptorsWrapper(
       onRequest:
           (RequestOptions options, RequestInterceptorHandler handler) async {
-            /// v1 mac
-            final encryptedToken = RsaUtil.encrypt(
-              WebSocketUtil.shared.getAuthorization(AppState.shared.deviceMac),
-            );
-            options.headers[ValueConstant.authorization] = encryptedToken;
+            /// v1 mac — RSA-encrypted authorization header.
+            /// Only attach it when RSA keys are actually configured. The
+            /// public repo ships empty placeholder keys, and the login /
+            /// registration endpoints don't require this header (the server
+            /// whitelists them in V2TokenAuthMiddleware). Skipping it here
+            /// prevents a FormatException before every request. Post-login /
+            /// device flows still send it once real keys are provided.
+            if (RsaUtil.isConfigured) {
+              final encryptedToken = RsaUtil.encrypt(
+                WebSocketUtil.shared.getAuthorization(
+                  AppState.shared.deviceMac,
+                ),
+              );
+              options.headers[ValueConstant.authorization] = encryptedToken;
+            }
 
             /// v2 token
             final token = await AppState.asyncPrefs.getString(
@@ -65,11 +74,11 @@ class Http {
           },
       onResponse:
           (Response response, ResponseInterceptorHandler handler) async {
-        if (response.statusCode == 401) {
-          await AppState.shared.logout();
-        }
-        return handler.next(response);
-      },
+            if (response.statusCode == 401) {
+              await AppState.shared.logout();
+            }
+            return handler.next(response);
+          },
       onError: (DioException error, ErrorInterceptorHandler handler) async {
         if (error.response?.statusCode == 401) {
           await AppState.shared.logout();
