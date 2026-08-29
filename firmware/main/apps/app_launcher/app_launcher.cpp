@@ -5,6 +5,7 @@
  */
 #include "app_launcher.h"
 #include <hal/hal.h>
+#include <hal/hal_toggles.h>
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <stackchan/stackchan.h>
@@ -70,7 +71,16 @@ void AppLauncher::onLauncherDestroy()
 void AppLauncher::create_launcher_view()
 {
     _view = std::make_unique<view::LauncherView>();
-    _view->init(getAppProps());
+
+    auto app_props = getAppProps();
+    std::vector<mooncake::AppProps_t> filtered_props;
+    for (const auto& props : app_props) {
+        if (hal_toggles::is_app_enabled(props.info.name)) {
+            filtered_props.push_back(props);
+        }
+    }
+
+    _view->init(filtered_props);
     _view->onAppClicked = [&](int appID) {
         mclog::tagInfo(getAppInfo().name, "handle open app, app id: {}", appID);
         openApp(appID);
