@@ -470,7 +470,7 @@ private:
             return;
         }
 
-        mclog::tagInfo(_tag, "get wifi config: {} / {}", ssid, password);
+        mclog::tagInfo(_tag, "get wifi config for ssid: {}", ssid);
 
         // Notify state: connecting
         notify_state(0, "wifiConnecting");
