@@ -464,7 +464,13 @@ private:
         const char* ssid     = data["ssid"];
         const char* password = data["password"];
 
-        mclog::tagInfo(_tag, "get wifi config: {} / {}", ssid, password);
+        if (ssid == nullptr || password == nullptr) {
+            mclog::tagWarn(_tag, "setWifi is missing ssid or password");
+            notify_state(2, "wifiConnectFailed");
+            return;
+        }
+
+        mclog::tagInfo(_tag, "get wifi config for ssid: {}", ssid);
 
         // Notify state: connecting
         notify_state(0, "wifiConnecting");
