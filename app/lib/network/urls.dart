@@ -21,8 +21,16 @@ class Urls {
   /// Example: "192.168.1.100:8080/" or "api.example.com/"
   ///
   /// For development, you can use the commented local IP below
-  static const String url = "00.000.000.000:0000/";
+  static const String placeholderUrl = "00.000.000.000:0000/";
+  static const String url = placeholderUrl;
 
+  static bool get isConfigured {
+    final value = url.trim();
+
+    return value.isNotEmpty &&
+        value != placeholderUrl &&
+        !value.contains("00.000.000.000");
+  }
 
   /// Get the HTTP base URL for API requests
   ///
@@ -144,5 +152,6 @@ class Urls {
 
   /// Generate license token for device activation
   /// Used for StackChan device licensing and activation
-  static const String xiaozhiGenerateLicenseToken = "xiaozhi/generateLicenseToken";
+  static const String xiaozhiGenerateLicenseToken =
+      "xiaozhi/generateLicenseToken";
 }

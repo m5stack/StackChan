@@ -272,7 +272,7 @@ class _StackChanRotaryRobotJsState extends State<StackChanRotaryRobotJs> {
     if (byteData != null) {
       //convertas three_js Uint8Array
       final uint8List = byteData.buffer.asUint8List();
-      final nativeArray = three.Uint8Array.fromList(uint8List);
+      final nativeArray = uint8List;
 
       //updatetexture
       expressionTexture.image = three.ImageElement(
