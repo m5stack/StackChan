@@ -17,7 +17,7 @@
     {
         "url": "https://github.com/78/xiaozhi-esp32.git",
         "path": "xiaozhi-esp32",
-        "branch": "v2.2.4",
+        "branch": "v2.5.2",
         "patch": "patches/xiaozhi-esp32.patch"
     },
     {
@@ -28,6 +28,6 @@
     {
         "url": "https://github.com/espressif/esp-now.git",
         "path": "components/esp-now",
-        "branch": "c33383de97f3ed2fc52117f5ef04f71990432e5d"
+        "branch": "c3b5f9be245f1a80db9cb938600566aa6a8dd1e5"
     }
 ]

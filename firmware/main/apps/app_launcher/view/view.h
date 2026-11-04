@@ -30,7 +30,7 @@ public:
 
     std::function<void(int appID)> onAppClicked;
 
-    void init(std::vector<mooncake::AppProps_t> appPorps);
+    void init(std::vector<mooncake::AppProps_t> appPorps, int restoreAppID = -1);
     void update();
 
 private:

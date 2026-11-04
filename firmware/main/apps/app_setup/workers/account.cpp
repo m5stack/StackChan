@@ -131,11 +131,8 @@ void AccountWorker::update()
                     loading_page->setMessage(msg);
                 });
 
-                if (!result) {
-                    GetHAL().delay(5000);
-                }
-
                 GetHAL().lvglLock();
+                return result;
             });
         } else if (_page_account->isQuitClicked()) {
             mclog::tagInfo(_tag, "quit clicked");

@@ -200,7 +200,7 @@ void TimezoneWorker::update()
     }
 }
 
-FactoryResetWorker::FactoryResetWorker(std::function<void()> beforeResetAction)
+FactoryResetWorker::FactoryResetWorker(std::function<bool()> beforeResetAction)
 {
     _before_reset_action = std::move(beforeResetAction);
 
@@ -264,8 +264,22 @@ void FactoryResetWorker::update()
         _confirm_count++;
 
         if (_confirm_count >= 3) {
-            mclog::tagInfo(_tag, "factory reset triggered");
+            // Keep the controls alive until the prerequisite succeeds. A
+            // failed server unbind must never erase local configuration.
+            _btn_cancel->addState(LV_STATE_DISABLED);
+            _btn_confirm->addState(LV_STATE_DISABLED);
+            if (_before_reset_action && !_before_reset_action()) {
+                _confirm_flag  = false;
+                _confirm_count = 2;
+                _btn_cancel->removeState(LV_STATE_DISABLED);
+                _btn_confirm->removeState(LV_STATE_DISABLED);
+                _label_info->setText("Unbind failed.\nLocal settings kept.");
+                _btn_confirm->label().setText("Retry");
+                mclog::tagWarn(_tag, "Reset stopped: prerequisite failed; local settings kept");
+                return;
+            }
 
+            mclog::tagInfo(_tag, "factory reset triggered");
             _btn_cancel.reset();
             _btn_confirm.reset();
             _label_title.reset();
@@ -273,17 +287,13 @@ void FactoryResetWorker::update()
             _label_info->setText("Factory Resetting...\nDo not turn off power.");
             _label_info->align(LV_ALIGN_CENTER, 0, 0);
 
-            if (_before_reset_action) {
-                _before_reset_action();
-            }
-
             GetHAL().lvglUnlock();
             GetHAL().delay(200);
             GetHAL().factoryReset();
 
-            while (1) {
-                GetHAL().delay(200);
-            }
+            // The device reboots above. Desktop HALs may return instead.
+            GetHAL().lvglLock();
+            _is_done = true;
 
         } else {
             update_ui();

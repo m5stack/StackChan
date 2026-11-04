@@ -144,8 +144,8 @@ void AppSetup::onOpen()
             },
         },
         {
-            "Others",
-            {{"Feature Toggles",
+            "Apps",
+            {{"App visibility",
               [&]() {
                   _destroy_menu = true;
                   _worker       = std::make_unique<FeatureToggleWorker>();
