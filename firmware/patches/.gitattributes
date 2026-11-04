@@ -1,0 +1,2 @@
+# Unified diff context lines retain the upstream source's whitespace.
+*.patch text eol=lf whitespace=-blank-at-eol

@@ -181,7 +181,8 @@ private:
             return "";
         }
 
-        int status_code = http->GetStatusCode();
+        const auto status     = http->GetStatusCode();
+        const int status_code = status.value_or(-1);
 
         if (status_code != 200) {
             ESP_LOGE(_tag.c_str(), "HTTP request failed, status code: %d", status_code);

@@ -72,7 +72,7 @@ inline WifiConnectionFailure wifiDisconnectFailure(uint16_t reason, const WifiBa
         case WIFI_REASON_ASSOC_TOOMANY:
             return {"ap_full", "The router has reached its connected-device limit.", reason};
         case WIFI_REASON_ASSOC_FAIL:
-        case WIFI_REASON_ASSOC_EXPIRE:
+        case WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY:
             return {"association_failed",
                     "The router rejected or timed out the connection. Check access restrictions and signal strength.",
                     reason};

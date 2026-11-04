@@ -61,11 +61,17 @@ void AppEspnowControl::onOpen()
                    _receiver_id, _wifi_channel);
 
     // Start espnow
-    GetHAL().startEspNow(_wifi_channel);
-    GetHAL().onEspNowData.connect([](const std::vector<uint8_t>& data) {
+    {
         std::lock_guard<std::mutex> lock(_mutex);
-        _received_data = data;
-    });
+        _received_data.clear();
+    }
+    _espnow_ready = GetHAL().startEspNow(_wifi_channel);
+    if (_espnow_ready && _receive_signal_id < 0) {
+        _receive_signal_id = GetHAL().onEspNowData.connect([](const std::vector<uint8_t>& data) {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _received_data = data;
+        });
+    }
 
     // Normal avatar
     LvglLockGuard lock;
@@ -87,6 +93,9 @@ void AppEspnowControl::onOpen()
 
     view::create_home_indicator([&]() { close(); }, 0xA0D99C, 0x154311);
     view::create_status_bar(0xA0D99C, 0x154311);
+    if (!_espnow_ready) {
+        view::pop_a_toast("ESP-NOW start failed.\nExit and retry.", view::ToastType::Error);
+    }
 }
 
 bool AppEspnowControl::start_startup_page()
@@ -235,9 +244,9 @@ void AppEspnowControl::onRunning()
 {
     LvglLockGuard lock;
 
-    if (_is_receiver) {
+    if (_espnow_ready && _is_receiver) {
         handle_received_data();
-    } else {
+    } else if (_espnow_ready) {
         handle_send_pose();
     }
 
@@ -250,6 +259,12 @@ void AppEspnowControl::onRunning()
 void AppEspnowControl::onClose()
 {
     mclog::tagInfo(getAppInfo().name, "on close");
+
+    _espnow_ready = false;
+    if (_receive_signal_id >= 0) {
+        GetHAL().onEspNowData.disconnect(_receive_signal_id);
+        _receive_signal_id = -1;
+    }
 
     LvglLockGuard lock;
 

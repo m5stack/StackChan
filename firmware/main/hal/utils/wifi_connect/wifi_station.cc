@@ -76,7 +76,9 @@ void StackChanWifiStation::connectCurrent()
         memcpy(config.sta.ssid, ssid_.data(), ssid_.size());
         memcpy(config.sta.password, password_.data(), password_.size());
     }
-    auto error = esp_wifi_set_config(WIFI_IF_STA, &config);
+    config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    auto error             = esp_wifi_set_config(WIFI_IF_STA, &config);
     if (error != ESP_OK) {
         fail({"invalid_configuration", "Wi-Fi configuration was rejected: " + std::string(esp_err_to_name(error)), 0,
               error});

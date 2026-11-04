@@ -52,7 +52,8 @@ static bool request_authorized_get(std::string_view token, std::string_view url,
         return false;
     }
 
-    int status_code = http->GetStatusCode();
+    const auto status     = http->GetStatusCode();
+    const int status_code = status.value_or(-1);
     if (status_code != 200) {
         mclog::tagError(_tag, "account HTTP GET failed, status code: {}", status_code);
         onLog("HTTP Request Failed");
@@ -212,7 +213,8 @@ bool Hal::unbindAccount(std::function<void(std::string_view)> onLog)
         return false;
     }
 
-    int status_code = http->GetStatusCode();
+    const auto status     = http->GetStatusCode();
+    const int status_code = status.value_or(-1);
     if (status_code != 200) {
         mclog::tagError(_tag, "http post failed, status code: {}", status_code);
         onLog("HTTP Request Failed");

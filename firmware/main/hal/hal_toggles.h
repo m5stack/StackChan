@@ -1,40 +1,58 @@
+// Adapted from ThisIsBenny's StackChan PR #31.
 #pragma once
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <string_view>
 
 namespace hal_toggles {
 
-constexpr const char* NVS_NAMESPACE = "feature_toggles";
+inline constexpr const char* NVS_NAMESPACE = "feature_toggles";
+inline constexpr const char* MASK_KEY      = "visible_mask";
 
-constexpr const char* KEY_AI_AGENT = "ai_agent";
-constexpr const char* KEY_AVATAR = "avatar";
-constexpr const char* KEY_ESPNOW_REMOTE = "espnow_remote";
-constexpr const char* KEY_APP_CENTER = "app_center";
-constexpr const char* KEY_EZDATA = "ezdata";
-constexpr const char* KEY_DANCE = "dance";
-
-constexpr uint8_t TOGGLE_COUNT = 6;
+enum class App { AiAgent, Avatar, EspnowRemote, AppCenter, Ezdata, Dance, Count };
+inline constexpr size_t TOGGLE_COUNT = static_cast<size_t>(App::Count);
+using ToggleStates                   = std::array<bool, TOGGLE_COUNT>;
 
 struct ToggleInfo {
     const char* key;
     const char* display_name;
-    bool default_value;
 };
 
-const ToggleInfo TOGGLE_LIST[TOGGLE_COUNT] = {
-    {KEY_AI_AGENT, "AI.AGENT", true},
-    {KEY_AVATAR, "AVATAR", true},
-    {KEY_ESPNOW_REMOTE, "ESPNOW.REMOTE", true},
-    {KEY_APP_CENTER, "APP.CENTER", true},
-    {KEY_EZDATA, "EZDATA", true},
-    {KEY_DANCE, "DANCE", true},
-};
+// Keep these keys compatible with the original PR's saved preferences.
+inline constexpr std::array<ToggleInfo, TOGGLE_COUNT> TOGGLE_LIST = {{
+    {"ai_agent", "AI.AGENT"},
+    {"avatar", "AVATAR"},
+    {"espnow_remote", "ESPNOW.REMOTE"},
+    {"app_center", "APP.CENTER"},
+    {"ezdata", "EZDATA"},
+    {"dance", "DANCE"},
+}};
 
-bool get_toggle_state(std::string_view key);
-void set_toggle_state(std::string_view key, bool value);
-void reset_toggles_to_defaults();
-bool is_first_boot();
-bool init_nvs();
-bool is_app_enabled(std::string_view app_name);
+inline constexpr ToggleStates default_states()
+{
+    return {true, true, true, true, true, true};
+}
+
+// Associate persistent feature keys with actual Mooncake IDs at installation.
+// Neither translated display names nor filtered menu positions identify an app.
+inline std::array<int, TOGGLE_COUNT> registered_app_ids = {-1, -1, -1, -1, -1, -1};
+inline void register_app_id(App app, int app_id)
+{
+    const auto index = static_cast<size_t>(app);
+    if (index < TOGGLE_COUNT) registered_app_ids[index] = app_id;
+}
+
+inline bool is_app_enabled(int app_id, const ToggleStates& states)
+{
+    for (size_t i = 0; i < TOGGLE_COUNT; ++i) {
+        if (app_id >= 0 && registered_app_ids[i] == app_id) return states[i];
+    }
+    // SETUP and other apps are never hidden by these preferences.
+    return true;
+}
+
+// Load failures leave safe defaults. Saving never initializes or erases NVS.
+bool load_states(ToggleStates& states);
+bool save_states(const ToggleStates& states);
 
 }  // namespace hal_toggles

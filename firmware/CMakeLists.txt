@@ -2,7 +2,12 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
-set(PROJECT_VER "1.6.0")
+# Keep compiler and linker arguments below Windows command-line limits.
+if(CMAKE_GENERATOR MATCHES "^Ninja")
+    set(CMAKE_NINJA_FORCE_RESPONSE_FILE TRUE CACHE INTERNAL "Use Ninja response files")
+endif()
+
+set(PROJECT_VER "1.6.2")
 add_definitions(-DFIRMWARE_VERSION=\"${PROJECT_VER}\")
 
 # Add this line to disable the specific warning

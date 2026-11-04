@@ -1,88 +1,114 @@
+// Adapted from ThisIsBenny's StackChan PR #31.
 #include "feature_toggle.h"
-#include "toggle_row.h"
-#include <mooncake_log.h>
-#include <hal/hal.h>
 #include "common.h"
+#include <mooncake_log.h>
 
 using namespace setup_workers;
+using namespace uitk::lvgl_cpp;
 using namespace hal_toggles;
 
-static const char* TAG = "FeatureToggle";
+namespace {
+constexpr const char* TAG  = "AppVisibility";
+constexpr const char* HELP = "Only menu icons change.\nAI auto-start is set separately.";
+}  // namespace
 
 FeatureToggleWorker::FeatureToggleWorker()
 {
-    if (!hal_toggles::init_nvs()) {
-        mclog::tagError(TAG, "NVS init failed");
-        return;
-    }
-
-    for (int i = 0; i < TOGGLE_COUNT; i++) {
-        _states[i] = hal_toggles::get_toggle_state(TOGGLE_LIST[i].key);
-    }
-
+    // Always build Back / Retry controls, even when preferences cannot load.
     create_toggle_ui();
+    load_preferences();
 }
 
 void FeatureToggleWorker::create_toggle_ui()
 {
-    auto screen = lv_screen_active();
-
-    _panel = std::make_unique<uitk::lvgl_cpp::Container>(screen);
+    _panel = std::make_unique<Container>(lv_screen_active());
     _panel->setAlign(LV_ALIGN_CENTER);
-    _panel->setPos(0, 0);
     _panel->setSize(320, 240);
     _panel->setBgColor(lv_color_hex(0xEDF4FF));
     _panel->setRadius(0);
     _panel->setBorderWidth(0);
     _panel->setFlexFlow(LV_FLEX_FLOW_COLUMN);
     _panel->setFlexAlign(LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    _panel->setPadding(15, 20, 10, 20);
-    _panel->setPadRow(10);
+    _panel->setPadding(16, 16, 16, 16);
+    _panel->setPadRow(12);
+    _panel->setScrollDir(LV_DIR_VER);
+    _panel->setScrollbarMode(LV_SCROLLBAR_MODE_ACTIVE);
 
-    _title = std::make_unique<uitk::lvgl_cpp::Label>(_panel->get());
-    _title->setText("Feature Toggles");
+    _title = std::make_unique<Label>(_panel->get());
+    _title->setText("App visibility");
     _title->setTextFont(&lv_font_montserrat_20);
     _title->setTextColor(lv_color_hex(0x26206A));
-    _title->setTextAlign(LV_TEXT_ALIGN_CENTER);
 
-    _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+    _status = std::make_unique<Label>(_panel->get());
+    _status->setWidth(280);
+    _status->setTextFont(&lv_font_montserrat_14);
+    _status->setTextColor(lv_color_hex(0x26206A));
+    _status->setTextAlign(LV_TEXT_ALIGN_CENTER);
 
-    for (int i = 0; i < TOGGLE_COUNT; i++) {
-        auto row = std::make_unique<ToggleRow>(_panel->get(), TOGGLE_LIST[i].display_name);
-        row->set_state(_states[i]);
-        _toggle_rows_widgets.push_back(std::move(row));
+    for (const auto& toggle : TOGGLE_LIST) {
+        _toggle_rows_widgets.push_back(std::make_unique<ToggleRow>(_panel->get(), toggle.display_name));
     }
 
-    _reset_button = std::make_unique<uitk::lvgl_cpp::Button>(_panel->get());
-    _reset_button->setSize(260, 40);
+    _reset_button = std::make_unique<Button>(_panel->get());
+    _reset_button->setSize(280, 44);
     apply_button_common_style(*_reset_button);
     _reset_button->label().setText("Reset");
-    _reset_button->onClick().connect([this]() {
-        hal_toggles::reset_toggles_to_defaults();
-        for (int i = 0; i < TOGGLE_COUNT; i++) {
-            _states[i] = true;
-            _toggle_rows_widgets[i]->set_state(true);
-        }
-        mclog::tagInfo(TAG, "Toggles reset to defaults");
-    });
+    _reset_button->onClick().connect([this]() { _reset_requested = true; });
 
-    _back_button = std::make_unique<uitk::lvgl_cpp::Button>(_panel->get());
-    _back_button->setSize(260, 40);
+    _back_button = std::make_unique<Button>(_panel->get());
+    _back_button->setSize(280, 44);
     apply_button_common_style(*_back_button);
     _back_button->label().setText("Back");
-    _back_button->onClick().connect([this]() {
-        _is_done = true;
-    });
+    _back_button->onClick().connect([this]() { _is_done = true; });
+}
+
+void FeatureToggleWorker::refresh_rows()
+{
+    for (size_t i = 0; i < TOGGLE_COUNT; ++i) {
+        _toggle_rows_widgets[i]->set_state(_states[i]);
+        _toggle_rows_widgets[i]->set_editable(_loaded);
+    }
+    _reset_button->label().setText(_loaded ? "Reset" : "Retry");
+}
+
+void FeatureToggleWorker::load_preferences()
+{
+    _loaded = load_states(_states);
+    refresh_rows();
+    _status->setText(_loaded ? HELP : "Unable to load preferences.\nTap Retry or Back.");
+}
+
+bool FeatureToggleWorker::save_preferences(const ToggleStates& desired)
+{
+    if (save_states(desired)) {
+        _states = desired;
+        _status->setText(HELP);
+        refresh_rows();
+        return true;
+    }
+    // The storage API may have failed after writing. Reload its actual state;
+    // if that also fails, disable editing until Retry succeeds.
+    _loaded = load_states(_states);
+    refresh_rows();
+    _status->setText(_loaded ? "Unable to save preferences.\nTry again."
+                             : "Unable to load preferences.\nTap Retry or Back.");
+    mclog::tagWarn(TAG, "Unable to save menu preferences");
+    return false;
 }
 
 void FeatureToggleWorker::update()
 {
-    for (int i = 0; i < TOGGLE_COUNT; i++) {
-        bool current_state = _toggle_rows_widgets[i]->get_state();
-        if (current_state != _states[i]) {
-            _states[i] = current_state;
-            hal_toggles::set_toggle_state(TOGGLE_LIST[i].key, current_state);
-            mclog::tagInfo(TAG, "Toggle %s = %s", TOGGLE_LIST[i].display_name, current_state ? "ON" : "OFF");
-        }
+    if (_reset_requested) {
+        _reset_requested = false;
+        if (!_loaded)
+            load_preferences();
+        else
+            save_preferences(default_states());
+        return;
     }
+    if (!_loaded) return;
+
+    auto desired = _states;
+    for (size_t i = 0; i < TOGGLE_COUNT; ++i) desired[i] = _toggle_rows_widgets[i]->get_state();
+    if (desired != _states) save_preferences(desired);
 }

@@ -1,115 +1,74 @@
+// Adapted from ThisIsBenny's StackChan PR #31.
 #include "hal_toggles.h"
-#include <nvs_flash.h>
-#include <nvs.h>
 #include <esp_log.h>
-#include <cstring>
-
-static const char* TAG = "hal_toggles";
+#include <nvs.h>
 
 namespace hal_toggles {
+namespace {
+constexpr const char* TAG    = "AppVisibility";
+constexpr uint8_t VALID_MASK = (1u << TOGGLE_COUNT) - 1;
 
-static bool _initialized = false;
-
-bool init_nvs()
+bool fail(esp_err_t error)
 {
-    if (_initialized) {
-        return true;
-    }
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        err = nvs_flash_init();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS init failed after erase: %s", esp_err_to_name(err));
-            return false;
-        }
-    } else if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS init failed: %s", esp_err_to_name(err));
-        return false;
-    }
-    _initialized = true;
-    ESP_LOGI(TAG, "NVS toggles initialized");
-    return true;
-}
-
-bool is_first_boot()
-{
-    init_nvs();
-    nvs_handle_t handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
-    if (err != ESP_OK) {
-        return true;
-    }
-    nvs_close(handle);
+    ESP_LOGW(TAG, "Preference storage failed: %s", esp_err_to_name(error));
     return false;
 }
+}  // namespace
 
-bool get_toggle_state(std::string_view key)
+bool load_states(ToggleStates& states)
 {
-    init_nvs();
+    states = default_states();
     nvs_handle_t handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to open NVS, returning default true for %.*s", (int)key.size(), key.data());
-        return true;
-    }
+    auto error = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (error == ESP_ERR_NVS_NOT_FOUND) return true;
+    if (error != ESP_OK) return fail(error);
 
-    uint8_t value = 1;
-    err = nvs_get_u8(handle, key.data(), &value);
-    if (err != ESP_OK) {
-        value = 1;
-    }
-    nvs_close(handle);
-    return value != 0;
-}
-
-void set_toggle_state(std::string_view key, bool value)
-{
-    init_nvs();
-    nvs_handle_t handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS for write");
-        return;
-    }
-    err = nvs_set_u8(handle, key.data(), value ? 1 : 0);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set toggle %.*s", (int)key.size(), key.data());
-    }
-    nvs_commit(handle);
-    nvs_close(handle);
-    ESP_LOGI(TAG, "Set toggle %.*s = %s", (int)key.size(), key.data(), value ? "ON" : "OFF");
-}
-
-void reset_toggles_to_defaults()
-{
-    init_nvs();
-    nvs_handle_t handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS for reset");
-        return;
-    }
-
-    for (int i = 0; i < TOGGLE_COUNT; i++) {
-        err = nvs_set_u8(handle, TOGGLE_LIST[i].key, TOGGLE_LIST[i].default_value ? 1 : 0);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to reset toggle %s", TOGGLE_LIST[i].key);
+    uint8_t mask = VALID_MASK;
+    error        = nvs_get_u8(handle, MASK_KEY, &mask);
+    auto loaded  = default_states();
+    if (error == ESP_OK) {
+        if ((mask & ~VALID_MASK) != 0) {
+            nvs_close(handle);
+            return fail(ESP_ERR_INVALID_STATE);
         }
-    }
-    nvs_commit(handle);
-    nvs_close(handle);
-    ESP_LOGI(TAG, "All toggles reset to defaults");
-}
-
-bool is_app_enabled(std::string_view app_name)
-{
-    for (int i = 0; i < TOGGLE_COUNT; i++) {
-        if (app_name == TOGGLE_LIST[i].display_name) {
-            return get_toggle_state(TOGGLE_LIST[i].key);
+        for (size_t i = 0; i < TOGGLE_COUNT; ++i) loaded[i] = (mask & (1u << i)) != 0;
+    } else if (error == ESP_ERR_NVS_NOT_FOUND) {
+        // Migrate the six original keys on the next successful save, without
+        // touching other settings or writing merely to open the launcher.
+        for (size_t i = 0; i < TOGGLE_COUNT; ++i) {
+            uint8_t value = 1;
+            error         = nvs_get_u8(handle, TOGGLE_LIST[i].key, &value);
+            if (error == ESP_ERR_NVS_NOT_FOUND) continue;
+            if (error != ESP_OK || value > 1) {
+                nvs_close(handle);
+                return fail(error == ESP_OK ? ESP_ERR_INVALID_STATE : error);
+            }
+            loaded[i] = value != 0;
         }
+    } else {
+        nvs_close(handle);
+        return fail(error);
     }
+    nvs_close(handle);
+    states = loaded;
     return true;
 }
 
+bool save_states(const ToggleStates& states)
+{
+    nvs_handle_t handle;
+    auto error = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (error != ESP_OK) return fail(error);
+
+    uint8_t mask = 0;
+    for (size_t i = 0; i < TOGGLE_COUNT; ++i) {
+        if (states[i]) mask |= 1u << i;
+    }
+    // One value stores the complete selection, including Reset. Do not leave
+    // six independently updated keys after a partially failed reset.
+    error = nvs_set_u8(handle, MASK_KEY, mask);
+    if (error == ESP_OK) error = nvs_commit(handle);
+    nvs_close(handle);
+    return error == ESP_OK ? true : fail(error);
+}
 }  // namespace hal_toggles

@@ -128,7 +128,8 @@ public:
     {
         const auto token = secret_logic::generate_auth_token();
         if (_stopping) return;
-        auto socket           = std::make_shared<local_network::AvatarSocket>(*Board::GetInstance().GetNetwork(), 1);
+        auto socket           = std::make_shared<local_network::AvatarSocket>(*Board::GetInstance().GetNetwork(), 1,
+                                                                              local_network::AvatarSocket::RemoteSendTimeoutMs);
         const auto generation = ++_remote_generation;
         _remote_connected     = false;
         socket->SetHeader("Authorization", token.c_str());
@@ -428,6 +429,10 @@ public:
             return;
         }
 
+        // AI capture/upload owns the same frame. Skip video instead of blocking
+        // the HAL loop or encoding a frame that another task is replacing.
+        auto frame_lock = camera->TryLockFrame();
+        if (!frame_lock.owns_lock()) return;
         _time_count = esp_timer_get_time();
         if (camera->StreamCaptures()) {
             _interval = esp_timer_get_time() - _time_count;

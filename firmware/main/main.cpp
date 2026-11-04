@@ -9,6 +9,7 @@
 #include <mooncake.h>
 #include <apps/apps.h>
 #include <hal/hal.h>
+#include <hal/hal_toggles.h>
 
 using namespace mooncake;
 using namespace smooth_ui_toolkit;
@@ -26,18 +27,20 @@ extern "C" void app_main(void)
     ui_hal::on_delay([](uint32_t ms) { GetHAL().delay(ms); });
     ui_hal::on_get_tick([]() { return GetHAL().millis(); });
 
-    const bool skip_mooncake =
-        GetHAL().getXiaozhiConfig().startAiAgentOnBoot && GetHAL().getWarmRebootTarget() < 0;
+    const bool skip_mooncake = GetHAL().getXiaozhiConfig().startAiAgentOnBoot && GetHAL().getWarmRebootTarget() < 0;
 
     if (!skip_mooncake) {
         // Install apps
         GetMooncake().installApp(std::make_unique<AppLauncher>());
-        GetMooncake().installApp(std::make_unique<AppAiAgent>());
-        GetMooncake().installApp(std::make_unique<AppAvatar>());
-        GetMooncake().installApp(std::make_unique<AppEspnowControl>());
-        GetMooncake().installApp(std::make_unique<AppAppCenter>());
-        GetMooncake().installApp(std::make_unique<AppEzdata>());
-        GetMooncake().installApp(std::make_unique<AppDance>());
+        hal_toggles::register_app_id(hal_toggles::App::AiAgent,
+                                     GetMooncake().installApp(std::make_unique<AppAiAgent>()));
+        hal_toggles::register_app_id(hal_toggles::App::Avatar, GetMooncake().installApp(std::make_unique<AppAvatar>()));
+        hal_toggles::register_app_id(hal_toggles::App::EspnowRemote,
+                                     GetMooncake().installApp(std::make_unique<AppEspnowControl>()));
+        hal_toggles::register_app_id(hal_toggles::App::AppCenter,
+                                     GetMooncake().installApp(std::make_unique<AppAppCenter>()));
+        hal_toggles::register_app_id(hal_toggles::App::Ezdata, GetMooncake().installApp(std::make_unique<AppEzdata>()));
+        hal_toggles::register_app_id(hal_toggles::App::Dance, GetMooncake().installApp(std::make_unique<AppDance>()));
         GetMooncake().installApp(std::make_unique<AppSetup>());
 
         // Main loop
