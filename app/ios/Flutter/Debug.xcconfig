@@ -1,2 +1,5 @@
+// SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+// SPDX-License-Identifier: MIT
+
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"

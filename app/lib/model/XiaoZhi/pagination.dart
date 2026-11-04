@@ -10,9 +10,9 @@ class Pagination {
   bool? hasMore;
   int? page;
   int? limit;
-  int? totaPages; //：fieldiserror，is totalPages
+  int? totaPages; // Misspelled in the API; the intended name is totalPages.
 
-  //Constructorfunction
+  // Creates a pagination record with every field optional.
   Pagination({
     this.total,
     this.current,
@@ -23,7 +23,7 @@ class Pagination {
     this.totaPages,
   });
 
-  //fromJSONparse
+  // Creates a pagination record from a JSON map.
   factory Pagination.fromJson(Map<String, dynamic> json) {
     return Pagination(
       total: json['total'] as int?,
@@ -33,11 +33,11 @@ class Pagination {
       page: json['page'] as int?,
       limit: json['limit'] as int?,
       totaPages:
-          json['totaPages'] as int? ?? json['totalPages'] as int?, //field
+          json['totaPages'] as int? ?? json['totalPages'] as int?, // Accept both spellings
     );
   }
 
-  //convertasJSON
+  // Converts this record to a JSON map, omitting unset fields.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     if (total != null) data['total'] = total;

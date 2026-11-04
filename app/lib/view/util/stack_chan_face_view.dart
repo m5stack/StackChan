@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:stack_chan/model/expression_data.dart';
@@ -22,9 +22,9 @@ class StackChanFaceView extends StatefulWidget {
     this.onCallback,
   });
 
-  final bool captureScreen; //output
-  final Function(Uint8List)? onFrameCallback; //outputcallback
-  final Function(DanceData)? onCallback; //datacallback
+  final bool captureScreen; // Whether camera frames are exported
+  final Function(Uint8List)? onFrameCallback; // Receives each exported frame
+  final Function(DanceData)? onCallback; // Receives the detected face data
 
   @override
   State<StatefulWidget> createState() => _StackChanFaceViewState();
@@ -88,16 +88,16 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
         });
   }
 
-  ///faceandSurface / Side
+  /// Detect faces and export camera frames
   void processCameraImage(CameraImage image, int sensorOrientation) {
-    ///face
+    // Detect faces in the current frame
     MlKitUtil.shared.testing(image, sensorOrientation, (faces) {
       if (faces.isNotEmpty) {
         dataConversionTesting(faces.first);
       }
     });
     if (widget.captureScreen) {
-      //willimagecompressConcurrencyBack
+      // Compress and hand off the frame asynchronously
       final now = DateTime.now();
       if (now.difference(lastProcessTime).inMilliseconds >= 100) {
         if (isProcessing) return;
@@ -108,7 +108,7 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
     }
   }
 
-  ///willdataconvert
+  /// Convert face tracking data into a dance frame
   void dataConversionTesting(Face face) {
     double headYaw = face.headEulerAngleY ?? 0;
     double headPitch = face.headEulerAngleX ?? 0;
@@ -168,7 +168,7 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
     }
   }
 
-  ///compressAndsend
+  /// Encode the frame as JPEG and emit it
   Future<void> handleAsyncCompression(
     CameraImage image,
     int sensorOrientation,
@@ -215,7 +215,7 @@ class _StackChanFaceViewState extends State<StackChanFaceView> {
   @override
   Widget build(BuildContext context) {
     if (cameraController == null) {
-      return Center(child: CupertinoActivityIndicator());
+      return const Center(child: CupertinoActivityIndicator());
     } else {
       return SizedBox.expand(child: CameraPreview(cameraController!));
     }

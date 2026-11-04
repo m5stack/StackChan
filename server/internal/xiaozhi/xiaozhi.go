@@ -8,6 +8,7 @@ package xiaozhi
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"stackChan/internal/model"
 	"stackChan/internal/model/xiaozhi"
@@ -33,11 +34,19 @@ var (
 	globalClient      *gclient.Client // Global HTTP client
 )
 
+// ErrDeviceAlreadyAdded and OtherSerialNumbers mirror the exact messages
+// returned by the XiaoZhi API, so they must not be translated.
+var ErrDeviceAlreadyAdded = errors.New("该设备已经添加过，请不要重复添加")
+var OtherSerialNumbers = errors.New("该设备已绑定其他序列号")
+
 const (
 	baseUrl            = "https://xiaozhi.me/"
 	tokenPath          = "api/developers/token"
 	agentTemplatesList = "api/developers/agent-templates/list"
+	ttsList            = "api/user/tts-list"
 	devices            = "api/developers/devices"
+	generateLicense    = "api/developers/generate-license"
+	deviceActivate     = "api/agents/devices/activate"
 	deviceUnbind       = "api/developers/unbind-device"
 	agentsDelete       = "api/agents/delete"
 	createAgent        = "api/agents"
@@ -50,7 +59,7 @@ func init() {
 	// Initialize global HTTP client
 	globalClient = g.Client()
 	globalClient.SetTimeout(10 * time.Second)
-	globalClient.SetHeader("Content-Type", "application/json")
+	globalClient.SetContentType("application/json")
 
 	// Start 24-hour timer to periodically check and refresh Token
 	ticker = time.NewTicker(tokenExpiry)
@@ -75,6 +84,12 @@ func doRequest(method string, path string, data interface{}, resp interface{}) e
 	if err != nil {
 		return err
 	}
+	methodUpper := strings.ToUpper(method)
+	requestURL := baseUrl + path
+	if methodUpper == "GET" {
+		requestURL = buildXiaoZhiGetRequestURL(path, data)
+	}
+	logXiaoZhiRequest(methodUpper, path, tokenString)
 
 	// Clone client and set Authorization header
 	client := globalClient.Clone()
@@ -83,28 +98,15 @@ func doRequest(method string, path string, data interface{}, resp interface{}) e
 	var response *g.Var
 
 	// Send request based on HTTP method
-	switch strings.ToUpper(method) {
+	switch methodUpper {
 	case "GET":
-		fullUrl := baseUrl + path
-		if params, ok := data.(g.Map); ok && len(params) > 0 {
-			var queryParts []string
-			for k, v := range params {
-				queryParts = append(queryParts, fmt.Sprintf("%s=%v", k, v))
-			}
-			queryStr := strings.Join(queryParts, "&")
-			if strings.Contains(fullUrl, "?") {
-				fullUrl += "&" + queryStr
-			} else {
-				fullUrl += "?" + queryStr
-			}
-		}
-		response = client.GetVar(ctx, fullUrl)
+		response = client.GetVar(ctx, requestURL)
 	case "POST":
-		response = client.PostVar(ctx, baseUrl+path, data)
+		response = client.ContentJson().PostVar(ctx, requestURL, data)
 	case "PUT":
-		response = client.PutVar(ctx, baseUrl+path, data)
+		response = client.ContentJson().PutVar(ctx, requestURL, data)
 	case "DELETE":
-		response = client.DeleteVar(ctx, baseUrl+path, data)
+		response = client.ContentJson().DeleteVar(ctx, requestURL, data)
 	default:
 		return fmt.Errorf("unsupported request method: %s", method)
 	}
@@ -129,6 +131,54 @@ func doRequest(method string, path string, data interface{}, resp interface{}) e
 		}
 	}
 	return nil
+}
+
+func buildXiaoZhiGetRequestURL(path string, data interface{}) string {
+	fullURL := baseUrl + path
+	params, ok := data.(g.Map)
+	if !ok || len(params) == 0 {
+		return fullURL
+	}
+
+	queryValues := url.Values{}
+	for k, v := range params {
+		queryValues.Set(k, fmt.Sprint(v))
+	}
+	queryStr := queryValues.Encode()
+	if strings.Contains(fullURL, "?") {
+		return fullURL + "&" + queryStr
+	}
+	return fullURL + "?" + queryStr
+}
+
+// logXiaoZhiRequest logs request metadata only. Credentials and request
+// payloads are deliberately omitted: the developer token is sent in the
+// Authorization header, the license token is sent as a query parameter, and
+// activation payloads contain device serial numbers.
+func logXiaoZhiRequest(method string, path string, tokenString string) {
+	operationName := ""
+	switch path {
+	case deviceActivate:
+		operationName = "ActivateDevice"
+	case generateLicense:
+		operationName = "GenerateLicense"
+	default:
+		return
+	}
+
+	g.Log().Info(ctx, operationName+" request: ", gjson.MustEncodeString(g.Map{
+		"method": method,
+		"path":   path,
+		"auth":   tokenString != "",
+	}))
+}
+
+func newXiaoZhiFailureError(operation string, message string) error {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		message = "unknown error"
+	}
+	return fmt.Errorf("%s failed: %s", operation, message)
 }
 
 // GetToken Get Token (thread-safe, 24-hour auto-expiration)
@@ -205,12 +255,34 @@ func GetAgentTemplate(page int, pageSize int) (*xiaozhi.ListData[xiaozhi.AgentTe
 		g.Log().Error(ctx, "Get agent template failed: %v", err)
 		return nil, err
 	}
+	if !resp.Success {
+		return nil, newXiaoZhiFailureError("get agent template", resp.Message)
+	}
+	if resp.Data == nil {
+		return nil, errors.New("get agent template failed: response data is empty")
+	}
 
 	g.Log().Info(ctx,
 		"Get agent template success, list length: ", len(resp.Data.List),
 		" total count: ", resp.Pagination.Total,
 	)
 
+	return resp.Data, nil
+}
+
+// GetTTSList returns the developer account's available TTS voices.
+func GetTTSList() (*xiaozhi.TTSList, error) {
+	var resp xiaozhi.XiaoZhiResponse[xiaozhi.TTSList]
+	if err := doRequest("GET", ttsList, nil, &resp); err != nil {
+		g.Log().Error(ctx, "Get TTS voice list failed: %v", err)
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, newXiaoZhiFailureError("get TTS voice list", resp.Message)
+	}
+	if resp.Data == nil {
+		return nil, errors.New("get TTS voice list failed: response data is empty")
+	}
 	return resp.Data, nil
 }
 
@@ -227,8 +299,133 @@ func SetAgentSetting(agentId int, parameters xiaozhi.AgentConfig) (bool, error) 
 		g.Log().Error(ctx, "Update agent setting failed: %v", err)
 		return false, err
 	}
+	if !resp.Success {
+		return false, newXiaoZhiFailureError("update agent setting", resp.Message)
+	}
 
 	g.Log().Info(ctx, "Update agent setting success, agentId:", agentId)
+	return true, nil
+}
+
+// GenerateLicense generates a XiaoZhi device license by MAC seed.
+func GenerateLicense(seed string) (*xiaozhi.GenerateLicense, error) {
+	generateLicenseToken := g.Cfg().MustGet(ctx, "xiaozhi.generate_license_token").String()
+	if generateLicenseToken == "" {
+		return nil, errors.New("xiaozhi.generate_license_token is empty")
+	}
+
+	if existingLicense, ok, err := findLicenseByMACSeedVariants(seed); err != nil {
+		return nil, err
+	} else if ok {
+		return existingLicense, nil
+	}
+
+	return createLicense(generateLicenseToken, seed)
+}
+
+func findLicenseByMACSeedVariants(seed string) (*xiaozhi.GenerateLicense, bool, error) {
+	macVariants := licenseMACSeedVariants(seed)
+	if len(macVariants) == 0 {
+		return nil, false, nil
+	}
+
+	for _, mac := range macVariants {
+		devices, err := getDevicesByRawMAC(mac)
+		if err != nil {
+			return nil, false, err
+		}
+		if license := firstLicenseFromDevices(devices); license != nil {
+			g.Log().Infof(ctx, "found existing license by mac seed, mac=%s, serial_number=%s", mac, license.SerialNumber)
+			return license, true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+func createLicense(generateLicenseToken string, seed string) (*xiaozhi.GenerateLicense, error) {
+	queryMap := g.Map{
+		"token": generateLicenseToken,
+		"seed":  seed,
+	}
+
+	var resp xiaozhi.XiaoZhiResponse[xiaozhi.GenerateLicense]
+	err := doRequest("GET", generateLicense, queryMap, &resp)
+	if err != nil {
+		g.Log().Error(ctx, "generate license failed: %v", err)
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, newXiaoZhiFailureError("generate license", resp.Message)
+	}
+	if resp.Data == nil || resp.Data.SerialNumber == "" {
+		return nil, errors.New("generate license failed: serial number is empty")
+	}
+	return resp.Data, nil
+}
+
+func getDevicesByRawMAC(mac string) (*[]xiaozhi.Device, error) {
+	queryMap := g.Map{
+		"page":        1,
+		"pageSize":    10,
+		"mac_address": mac,
+	}
+
+	var resp xiaozhi.XiaoZhiResponse[xiaozhi.ListData[xiaozhi.Device]]
+	err := doRequest("GET", devices, queryMap, &resp)
+	if err != nil {
+		g.Log().Error(ctx, "Get device list by raw mac failed: %v", err)
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, newXiaoZhiFailureError("get device list by raw mac", resp.Message)
+	}
+	if resp.Data == nil {
+		emptyList := []xiaozhi.Device{}
+		return &emptyList, nil
+	}
+	return &resp.Data.List, nil
+}
+
+func firstLicenseFromDevices(devices *[]xiaozhi.Device) *xiaozhi.GenerateLicense {
+	if devices == nil {
+		return nil
+	}
+	for _, device := range *devices {
+		serialNumber := strings.TrimSpace(device.SerialNumber)
+		if serialNumber == "" {
+			continue
+		}
+		return &xiaozhi.GenerateLicense{
+			ProductName:  device.ProductName,
+			BoardName:    device.BoardName,
+			SerialNumber: serialNumber,
+		}
+	}
+	return nil
+}
+
+// ActivateDevice activates an enterprise XiaoZhi device.
+func ActivateDevice(serialNumber string, macAddress string) (bool, error) {
+	requestData := g.Map{
+		"serial_number": serialNumber,
+		"mac_address":   macAddress,
+	}
+
+	var resp xiaozhi.XiaoZhiResponse[xiaozhi.AgentsDevicesActivate]
+	err := doRequest("POST", deviceActivate, requestData, &resp)
+	if err != nil {
+		g.Log().Error(ctx, "activate device failed: %v", err)
+		return false, err
+	}
+	if !resp.Success {
+		if resp.Message == ErrDeviceAlreadyAdded.Error() {
+			return false, ErrDeviceAlreadyAdded
+		}
+		if resp.Message == OtherSerialNumbers.Error() {
+			return false, OtherSerialNumbers
+		}
+		return false, newXiaoZhiFailureError("activate device", resp.Message)
+	}
 	return true, nil
 }
 
@@ -254,6 +451,9 @@ func GetDevices(
 		queryMap["pageSize"] = *pageSize
 	}
 	if macAddress != nil {
+		if newMacAddress == nil {
+			return nil, fmt.Errorf("invalid mac address: %s", *macAddress)
+		}
 		queryMap["mac_address"] = *newMacAddress
 	}
 	if serialNumber != nil {
@@ -276,10 +476,19 @@ func GetDevices(
 		g.Log().Error(ctx, "Get device list failed: %v", err)
 		return nil, err
 	}
+	if !resp.Success {
+		return nil, newXiaoZhiFailureError("get device list", resp.Message)
+	}
+	if resp.Data == nil {
+		emptyList := []xiaozhi.Device{}
+		return &emptyList, nil
+	}
 
 	g.Log().Info(ctx, "Get device list success, list length:", len(resp.Data.List), " total count:", resp.Pagination.Total)
 
-	g.Log().Info(ctx, "Get device list success, first device:", resp.Data.List[0])
+	if len(resp.Data.List) > 0 {
+		g.Log().Info(ctx, "Get device list success, first device:", resp.Data.List[0])
+	}
 
 	return &resp.Data.List, nil
 }
@@ -331,6 +540,43 @@ func formatMac(mac *string) *string {
 	return new(strings.Join(parts, ":"))
 }
 
+func licenseMACSeedVariants(seed string) []string {
+	cleanMac := macSeparatorRegex.ReplaceAllString(strings.TrimSpace(seed), "")
+	if !isValidMac(cleanMac) {
+		return nil
+	}
+
+	upperMac := strings.ToUpper(cleanMac)
+	lowerMac := strings.ToLower(cleanMac)
+	return uniqueStrings([]string{
+		upperMac,
+		formatMACWithColon(lowerMac),
+		lowerMac,
+		formatMACWithColon(upperMac),
+	})
+}
+
+func formatMACWithColon(mac string) string {
+	var parts []string
+	for i := 0; i < 12; i += 2 {
+		parts = append(parts, mac[i:i+2])
+	}
+	return strings.Join(parts, ":")
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 func isValidMac(cleanMac string) bool {
 	return len(cleanMac) == 12
 }
@@ -354,18 +600,34 @@ func refreshToken() (string, error) {
 
 	client := g.Client()
 	client.SetTimeout(10 * time.Second)
-	client.SetHeader("Content-Type", "application/json")
+	client.SetContentType("application/json")
 
 	var resp xiaozhi.XiaoZhiResponse[ZhiGetToken]
-	err := client.PostVar(ctx, baseUrl+tokenPath, requestData).Scan(&resp)
+	clientResp, err := client.ContentJson().Post(ctx, baseUrl+tokenPath, requestData)
 	if err != nil {
 		g.Log().Error(ctx, "refresh token failed: %v", err)
 		return "", fmt.Errorf("refresh token failed: %w", err)
 	}
+	if clientResp == nil || clientResp.Response == nil {
+		g.Log().Error(ctx, "refresh token failed: empty response")
+		return "", errors.New("refresh token failed: empty response")
+	}
+	defer clientResp.Close()
+
+	respBody := clientResp.ReadAllString()
+	err = gjson.New(respBody).Scan(&resp)
+	if err != nil {
+		g.Log().Error(ctx, "refresh token response parse failed: %v, status=%d, response=%s", err, clientResp.StatusCode, respBody)
+		return "", fmt.Errorf("refresh token response parse failed: %w", err)
+	}
 
 	if !resp.Success {
-		g.Log().Error(ctx, "refresh token failed: %s", resp.Message)
-		return "", fmt.Errorf("refresh token failed: %s", resp.Message)
+		message := resp.Message
+		if message == "" {
+			message = respBody
+		}
+		g.Log().Error(ctx, "refresh token failed: %s", message)
+		return "", fmt.Errorf("refresh token failed: %s", message)
 	}
 
 	// Generic structure direct value, no need for map assertion!!!
@@ -447,6 +709,10 @@ func UpdateAllDevices() (bool, error) {
 		g.Log().Info(ctx, "update all devices, page: ", page, ", total: ", len(*agents))
 
 		for _, agent := range *agents {
+			if strings.TrimSpace(agent.TtsVoice) == "" {
+				g.Log().Warning(ctx, "skip agent config update because tts_voice is empty, agentId: ", agent.ID)
+				continue
+			}
 			agentId := agent.ID
 
 			parameters := xiaozhi.AgentConfig{

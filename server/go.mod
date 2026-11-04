@@ -1,10 +1,10 @@
 module stackChan
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/gogf/gf/contrib/drivers/mysql/v2 v2.10.0
-	github.com/gogf/gf/v2 v2.10.0
+	github.com/gogf/gf/v2 v2.10.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/websocket v1.5.3
 )

@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 //  StackChanArView.swift
 //  Runner
 //
-// Created by on 2026/2/5.
+//  Created on 2026/2/5.
 //
 
 import RealityKit
@@ -57,13 +57,13 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
             self?.handleMethodCall(call, result: result)
         }
         
-        // translated comment
+        // Event channel for expression data
         let expressionChannelName = "\(methodChannelName)_expression"
         expressionStreamHandler = ExpressionStreamHandler()
         expressionChannel = FlutterEventChannel(name: expressionChannelName, binaryMessenger: messenger)
         expressionChannel?.setStreamHandler(expressionStreamHandler)
         
-        // translated comment
+        // Event channel for frame data
         let frameChannelName = "\(methodChannelName)_frame"
         frameStreamHandler = FrameStreamHandler()
         frameChannel = FlutterEventChannel(name: frameChannelName, binaryMessenger: messenger)
@@ -72,7 +72,8 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
     
     private func setupARSession() {
         guard ARFaceTrackingConfiguration.isSupported else {
-                        return
+            print("设备不支持面部追踪")
+            return
         }
         let configuration = ARFaceTrackingConfiguration()
         configuration.isLightEstimationEnabled = true
@@ -109,7 +110,7 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
         }
     }
     
-    //translated comment
+    /// Face tracking data
     func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
         DispatchQueue.main.async {
             self.emotionDetection(session: session, anchors: anchors)
@@ -292,7 +293,7 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
         // 1. Slight or clear head tilt downward
         let transform = faceAnchor.transform
         let rotation = SCNMatrix4(transform)
-        let pitch = asin(-rotation.m32) // translated comment
+        let pitch = asin(-rotation.m32) // Pitch (up/down rotation)
         let isHeadDown = pitch > emotionThresholds.shy.headPitch
         
         // 2. Mouth closed with a slight smile
@@ -378,7 +379,8 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
     private func createStackChanModel() -> SCNNode {
         guard let scene = SCNScene(named: "StackChanModel.scn"),
               let modelNode = scene.rootNode.childNodes.first else {
-                        return SCNNode()
+            print("no model")
+            return SCNNode()
         }
         modelNode.name = "StackChanModel"
         modelNode.scale = SCNVector3(0.004, 0.004, 0.004)
@@ -387,7 +389,7 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
         modelNode.eulerAngles = SCNVector3Zero
         modelNode.eulerAngles.x = -Float.pi / 2
         
-        //translated comment
+        // Hide part of the mesh
         if let foundation = modelNode.childNode(withName: "_00_stackchan450_3",recursively: false),let centralComponent = modelNode.childNode(withName: "_00_stackchan450_2", recursively: false) {
             foundation.opacity = 0
             centralComponent.opacity = 0
@@ -454,7 +456,7 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
         )
     }()
     
-    //translated comment
+    /// Output frame
     func renderer(_ renderer: any SCNSceneRenderer, updateAtTime time: TimeInterval) {
         if captureScreen {
             if time - lastCaptureTime >= 0.5 {
@@ -470,7 +472,7 @@ class StackChanArView : NSObject, FlutterPlatformView, ARSessionDelegate, ARSCNV
         }
     }
     
-    //translated comment
+    /// Render the robot expression
     private func updateDecoration(expressionData: ExpressionData) {
         DispatchQueue.main.async {
             if self.decorate == 1 {
@@ -534,7 +536,7 @@ class FrameStreamHandler: NSObject, FlutterStreamHandler {
     func sendFrameData(_ data: Data) {
         guard let sink = eventSink else { return }
         
-        // translated comment
+        // Make sure data is sent on the main thread
         DispatchQueue.main.async {
             sink(FlutterStandardTypedData(bytes: data))
         }

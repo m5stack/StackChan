@@ -24,6 +24,7 @@ static constexpr std::string_view _xiaozhi_config_nvs_ns                        
 static constexpr std::string_view _xiaozhi_config_idle_shutdown_time_key           = "idle_sec";
 static constexpr std::string_view _xiaozhi_config_allow_shutdown_when_charging_key = "ext_pwr";
 static constexpr std::string_view _xiaozhi_config_idle_random_movement_key         = "idle_lv";
+static constexpr std::string_view _xiaozhi_config_start_ai_agent_on_boot_key       = "boot_ai";
 
 namespace hal_bridge {
 
@@ -129,6 +130,8 @@ XiaozhiConfig_t get_xiaozhi_config()
         settings.GetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
     config.idleRandomMovementLevel =
         settings.GetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
+    config.startAiAgentOnBoot =
+        settings.GetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);
 
     return config;
 }
@@ -139,6 +142,7 @@ void set_xiaozhi_config(const XiaozhiConfig_t& config)
     settings.SetInt(_xiaozhi_config_idle_shutdown_time_key.data(), config.idleShutdownTimeSeconds);
     settings.SetBool(_xiaozhi_config_allow_shutdown_when_charging_key.data(), config.allowShutdownWhenCharging);
     settings.SetInt(_xiaozhi_config_idle_random_movement_key.data(), config.idleRandomMovementLevel);
+    settings.SetBool(_xiaozhi_config_start_ai_agent_on_boot_key.data(), config.startAiAgentOnBoot);
 }
 
 void app_play_sound(const std::string_view& sound)

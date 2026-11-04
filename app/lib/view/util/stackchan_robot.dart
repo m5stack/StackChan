@@ -7,7 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -108,7 +108,7 @@ class _StackchanRobotState extends State<StackChanRobot> {
         } else if (Platform.isAndroid) {
           return Image.asset("assets/image1.png");
         } else {
-          return Center(child: Text("暂时不支持"));
+          return const Center(child: Text("暂时不支持"));
         }
       },
     );
@@ -173,7 +173,7 @@ class StackChanRotary extends StatelessWidget {
         viewType: _viewType,
       );
     } else {
-      return Center(child: Text("暂时不支持"));
+      return const Center(child: Text("暂时不支持"));
     }
   }
 }

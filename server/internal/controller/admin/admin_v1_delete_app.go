@@ -13,12 +13,13 @@ import (
 
 	"stackChan/api/admin/v1"
 	"stackChan/internal/dao"
-
-	"github.com/gogf/gf/v2/frame/g"
+	"stackChan/internal/model/do"
 )
 
 func (c *ControllerV1) DeleteApp(ctx context.Context, req *v1.DeleteAppReq) (res *v1.DeleteAppRes, err error) {
-	_, err = dao.AppStore.Ctx(ctx).Where("id", req.Id).Data(g.Map{"is_deleted": 1}).Update()
+	_, err = dao.AppStore.Ctx(ctx).WherePri(req.Id).Data(do.AppStore{
+		IsDeleted: 1,
+	}).Update()
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "Failed to delete app")
 	}

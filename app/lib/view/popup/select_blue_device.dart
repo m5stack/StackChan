@@ -7,11 +7,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
+import 'package:stack_chan/native/native_bluetooth_bridge.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
-import 'package:stack_chan/util/XiaoZhi_util.dart';
 import 'package:stack_chan/util/rsa_util.dart';
 import 'package:stack_chan/view/popup/login_page.dart';
 
@@ -19,13 +19,11 @@ import '../../app_state.dart';
 import '../../model/blue_device_info.dart';
 import '../../model/blue_model.dart';
 import '../../util/blue_util.dart';
-import '../../util/mac_address_validator.dart';
 import '../../util/value_constant.dart';
+import '../util/popup.dart';
 import 'device_name_page.dart';
 
-enum DeviceWifiConfigStep { selectDevice, wifiConfig }
-
-///scanBluetoothbinddevicepopup
+/// Bluetooth scanning and device-binding sheet.
 class SelectBlueDevice extends StatefulWidget {
   const SelectBlueDevice({super.key});
 
@@ -34,17 +32,19 @@ class SelectBlueDevice extends StatefulWidget {
 }
 
 class _SelectBlueDeviceState extends State<SelectBlueDevice> {
-  //connecttimeouttimer(preventNoWait)
   Timer? _connectTimer;
 
-  //verifytimeouttimer(preventdeviceNoresponsewhen1to)
   Timer? _verifyTimer;
 
   //timeouttime:30Second(s)
   static const int _connectTimeout = 30;
 
-  //verifytimeouttime:20Second(s)
   static const int _verifyTimeout = 20;
+  static const int _wifiNotifyMaxBytes = 8 * 1024;
+  static const Duration _wifiNotifyFragmentTimeout = Duration(seconds: 2);
+
+  final List<int> _wifiNotifyBytes = <int>[];
+  Timer? _wifiNotifyFragmentTimer;
 
   String? _getDeviceId(BlueDeviceInfo blueDeviceInfo) {
     final Map<int, List<int>> manufacturerDataMap =
@@ -67,6 +67,8 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
   void dispose() {
     _connectTimer?.cancel();
     _verifyTimer?.cancel();
+    _resetWifiNotifyBuffer();
+    BlueUtil.shared.blufDevicesMonitoring = null;
     BlueUtil.shared.characteristicCallback = null;
     BlueUtil.shared.wifiSetCharacteristicCall = null;
     BlueUtil.shared.onReconnectSuccess = null;
@@ -77,21 +79,85 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
 
   bool isSuccess = false;
 
+  Future<void> _preparePairingMtu(NativeBluetoothDevice device) async {
+    if (Platform.isIOS) {
+      try {
+        final effectiveMtu = await device.requestMtu(185);
+        debugPrint("ℹ️ iOS 使用系统协商 MTU，当前可用 MTU: $effectiveMtu");
+      } catch (e) {
+        debugPrint("⚠️ iOS 读取 MTU 信息失败，继续使用系统默认值: $e");
+      }
+      return;
+    }
+
+    if (Platform.isAndroid) {
+      await _ensureAndroidMtu(device);
+    }
+  }
+
+  Future<void> _ensureAndroidMtu(NativeBluetoothDevice device) async {
+    // 512 often fails to negotiate or yields unstable packet reception on low-end
+    // Android devices, so prefer more common MTUs that are known to be stable.
+    // 23 is the BLE default MTU and needs no explicit request.
+    const List<int> mtuFallbackList = [247, 185, 158, 100, 69];
+    bool mtuNegotiated = false;
+
+    for (final targetMtu in mtuFallbackList) {
+      try {
+        final negotiatedMtu = await device.requestMtu(targetMtu);
+        mtuNegotiated = true;
+        debugPrint("✅ MTU 协商成功，目标: $targetMtu，实际: $negotiatedMtu");
+        if (negotiatedMtu < targetMtu) {
+          debugPrint("ℹ️ 实际 MTU 低于目标值，将依赖通知分包拼接保证完整数据");
+        }
+        break;
+      } catch (e) {
+        debugPrint("⚠️ MTU 尝试 $targetMtu 失败: $e");
+      }
+    }
+
+    if (!mtuNegotiated) {
+      debugPrint("⚠️ MTU 协商失败，继续使用系统默认 MTU(通常为 23)");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    //enterbindStreamProcess / Thread,setbindflag
+    // Enter binding mode and set the binding flag.
+    BlueUtil.shared.blueMode = 3;
+    _registerDeviceScanCallbacks();
     _registerBlueCallbacks();
-    BlueUtil.shared.onReconnectSuccess = (device) {
+    unawaited(BlueUtil.shared.ensureBluetoothReady(triggerScan: true));
+    BlueUtil.shared.onReconnectSuccess = (device) async {
       if (mounted) {
         AppState.shared.showToast("Reconnected to device successfully.");
       }
+      await _preparePairingMtu(device);
       _registerBlueCallbacks();
       //reconnectafterretriggerdeviceverify（key：originallogiconlyhasfirstconnectwhentrigger）
       if (BlueUtil.shared.writeWifiSetCharacteristic != null) {
-        startVerificationEquipment(BlueUtil.shared.writeWifiSetCharacteristic!);
+        await startVerificationEquipment(
+          BlueUtil.shared.writeWifiSetCharacteristic!,
+        );
       }
     };
+  }
+
+  void _registerDeviceScanCallbacks() {
+    BlueUtil.shared.blufDevicesMonitoring = (devices) {
+      if (!mounted) {
+        return;
+      }
+      _updatePairingDevices(devices);
+    };
+    _updatePairingDevices(BlueUtil.shared.discoveredDevices);
+  }
+
+  void _updatePairingDevices(List<BlueDeviceInfo> devices) {
+    AppState.shared.blueDeviceList.value = AppState.shared.screeningDevices(
+      devices,
+    );
   }
 
   //resetconnectstate(System1wrap)
@@ -99,6 +165,7 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
     connectDeviceId.value = "";
     _connectTimer?.cancel();
     _verifyTimer?.cancel();
+    _resetWifiNotifyBuffer();
     if (mounted) {
       setState(() {});
     }
@@ -112,215 +179,246 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
         final uuid = characteristic.uuid.toString();
         if (uuid == BlueUtil.wifiSetCharacteristicUUID) {
           BlueUtil.shared.writeWifiSetCharacteristic = characteristic;
-          if (Platform.isAndroid) {
-            await device
-                .requestMtu(512)
-                .then((mtu) {
-                                  })
-                .catchError((e) {
-                                    if (mounted) {
-                    AppState.shared.showToast(
-                      "Failed to set MTU. Device may not work properly.",
-                    );
-                  }
-                });
-          }
-          //enablefeatureValuenotify
-          try {
-            await characteristic.setNotifyValue(true);
-                        startVerificationEquipment(characteristic);
-          } catch (e) {
-                        _resetConnectState();
-            if (mounted) {
-              AppState.shared.showToast(
-                "Failed to enable device notification.",
-              );
-            }
-          }
+          debugPrint(" DeviceConfigurationCharacteristicReady");
+          await _preparePairingMtu(device);
+          await startVerificationEquipment(characteristic);
           return;
         }
       }
-            if (mounted) {
-        AppState.shared.showToast("Device configuration feature not found.");
+      debugPrint(" Not找到WiFiConfigurationCharacteristic");
+      if (mounted) {
+        AppState.shared.showToast(
+          "Pairing service not found. Restart StackChan in binding mode and try again.",
+        );
       }
     };
+
     BlueUtil.shared.wifiSetCharacteristicCall = (data) async {
-      try {
-        String json = utf8.decode(data);
-                final model = BlueNotifyStateModel.fromJson(json);
-
-        if (model == null) {
-                    if (mounted) {
-            AppState.shared.showToast("Failed to parse device data.");
-          }
-          return;
-        }
-
-        if (model.cmd != null &&
-            model.cmd == "notifyState" &&
-            model.data?.type == 4) {
-          //toEncryptinfo
-          String? data = model.data?.state;
-          if (data == null) {
-                        if (mounted) {
-              AppState.shared.showToast(
-                "Device did not return encryption data.",
-              );
-            }
-            return;
-          }
-
-          //RSADecrypt
-          final result = RsaUtil.decryptStackChanBlue(data);
-          //newIncrease / Add:Decryptfail/lengthNot
-          if (result.isEmpty || result.length < 12) {
-                        if (mounted) {
-              AppState.shared.showToast(
-                "Device verification decryption failed.",
-              );
-            }
-            return;
-          }
-
-          if (isSuccess) return;
-          isSuccess = true;
-          _connectTimer?.cancel(); //cancelconnecttimeouttimer
-          _verifyTimer?.cancel(); //cancelverifytimeouttimer
-
-          final macAddress = result.substring(0, 12);
-
-          AppState.shared.showToast(
-            "The initially activated MAC address: $macAddress",
-          );
-
-          AppState.shared.deviceMac = macAddress;
-          AppState.shared.connectWebSocket();
-          activateDevice(macAddress);
-        }
-      } catch (e) {
-                if (mounted) {
-          AppState.shared.showToast("Failed to process device data.");
-        }
+      final jsonMessages = _appendWifiNotifyData(data);
+      for (final json in jsonMessages) {
+        await _handleWifiSetNotification(json);
       }
     };
   }
 
-  String formatMacAddress(String mac) {
-    if (mac.length != 12) return mac;
-    return mac
-        .toUpperCase()
-        .replaceAllMapped(RegExp(r'(.{2})'), (match) => '${match.group(1)}:')
-        .substring(0, 17); //removeafter
-  }
+  List<String> _appendWifiNotifyData(List<int> data) {
+    _wifiNotifyFragmentTimer?.cancel();
+    _wifiNotifyBytes.addAll(data);
 
-  bool isValidMac(String mac) {
-    final RegExp macRegex = RegExp(r'^[0-9A-Fa-f]{12}$');
-    return macRegex.hasMatch(mac);
-  }
+    if (_wifiNotifyBytes.length > _wifiNotifyMaxBytes) {
+      debugPrint("⚠️ DeviceNotification buffer too large, dropped");
+      _resetWifiNotifyBuffer();
+      return const <String>[];
+    }
 
-  //activatedevice
-  Future<void> activateDevice(String macAddress) async {
+    String text;
     try {
-      ///startqueryagentconfiginfo
-      bool isConfiguration = await queryConfiguration(macAddress);
-      if (!isConfiguration) {
-        _resetConnectState();
-        //activatefail(Alreadyhashint,NoRepeat)
+      text = utf8.decode(_wifiNotifyBytes);
+    } catch (e) {
+      debugPrint("📥 DeviceNotification UTF-8 分包接收中: $e");
+      _scheduleWifiNotifyBufferCleanup();
+      return const <String>[];
+    }
+
+    final extractResult = _extractCompleteJsonObjects(text);
+    if (extractResult.consumedCharacters > 0) {
+      final consumedText = text.substring(0, extractResult.consumedCharacters);
+      final consumedBytes = utf8.encode(consumedText).length;
+      final safeConsumedBytes = consumedBytes > _wifiNotifyBytes.length
+          ? _wifiNotifyBytes.length
+          : consumedBytes;
+      _wifiNotifyBytes.removeRange(0, safeConsumedBytes);
+    }
+
+    if (extractResult.messages.isEmpty) {
+      if (_wifiNotifyBytes.isNotEmpty) {
+        debugPrint(
+          "📥 DeviceNotification 分包接收中: ${_wifiNotifyBytes.length} bytes",
+        );
+        _scheduleWifiNotifyBufferCleanup();
+      }
+      return const <String>[];
+    }
+
+    if (_wifiNotifyBytes.isNotEmpty) {
+      _scheduleWifiNotifyBufferCleanup();
+    }
+
+    return extractResult.messages;
+  }
+
+  _JsonExtractResult _extractCompleteJsonObjects(String text) {
+    final messages = <String>[];
+    var start = -1;
+    var depth = 0;
+    var inString = false;
+    var escaping = false;
+    var consumedCharacters = 0;
+
+    for (var i = 0; i < text.length; i++) {
+      final codeUnit = text.codeUnitAt(i);
+
+      if (start < 0) {
+        if (codeUnit == 0x7B) {
+          start = i;
+          depth = 1;
+        }
+        continue;
+      }
+
+      if (inString) {
+        if (escaping) {
+          escaping = false;
+        } else if (codeUnit == 0x5C) {
+          escaping = true;
+        } else if (codeUnit == 0x22) {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (codeUnit == 0x22) {
+        inString = true;
+      } else if (codeUnit == 0x7B) {
+        depth++;
+      } else if (codeUnit == 0x7D) {
+        depth--;
+        if (depth == 0) {
+          messages.add(text.substring(start, i + 1));
+          consumedCharacters = i + 1;
+          start = -1;
+        }
+      }
+    }
+
+    if (start < 0 && text.isNotEmpty) {
+      consumedCharacters = text.length;
+    } else if (messages.isEmpty && start > 0) {
+      consumedCharacters = start;
+    }
+
+    return _JsonExtractResult(messages, consumedCharacters);
+  }
+
+  void _scheduleWifiNotifyBufferCleanup() {
+    _wifiNotifyFragmentTimer?.cancel();
+    _wifiNotifyFragmentTimer = Timer(_wifiNotifyFragmentTimeout, () {
+      if (_wifiNotifyBytes.isEmpty) return;
+      debugPrint(
+        "⚠️ DeviceNotification 分包超时，丢弃 ${_wifiNotifyBytes.length} bytes",
+      );
+      _wifiNotifyBytes.clear();
+    });
+  }
+
+  void _resetWifiNotifyBuffer() {
+    _wifiNotifyFragmentTimer?.cancel();
+    _wifiNotifyFragmentTimer = null;
+    _wifiNotifyBytes.clear();
+  }
+
+  Future<void> _handleWifiSetNotification(String json) async {
+    try {
+      debugPrint("📥 收到DeviceNotification: $json");
+      final model = BlueNotifyStateModel.fromJson(json);
+
+      if (model == null) {
+        debugPrint(" DeviceDataParseFailed");
+        if (mounted) {
+          AppState.shared.showToast(
+            "Could not read StackChan's pairing response. Keep the device nearby and try again.",
+          );
+        }
         return;
       }
 
-      if (mounted) {
-        AppState.shared.showToast("The AI Agent has been configured.");
-      }
+      if (model.cmd != null &&
+          model.cmd == "notifyState" &&
+          model.data?.type == 4) {
+        // Read the identity encryption payload.
+        String? data = model.data?.state;
+        if (data == null) {
+          debugPrint(" DeviceNotReturnEncryptInfo");
+          if (mounted) {
+            AppState.shared.showToast(
+              "StackChan returned incomplete verification data. Restart binding mode and try again.",
+            );
+          }
+          return;
+        }
 
-      //binddevice
+        // Decrypt the RSA-encrypted device info.
+        final result = RsaUtil.decryptStackChanBlue(data);
+        // Decryption failed or the payload is shorter than the expected MAC prefix.
+        if (result.isEmpty || result.length < 12) {
+          debugPrint(" DeviceInfoDecryptFailed");
+          if (mounted) {
+            AppState.shared.showToast(
+              "StackChan's verification data was invalid. Restart binding mode and try again.",
+            );
+          }
+          return;
+        }
+
+        if (isSuccess) return;
+        isSuccess = true;
+        _connectTimer?.cancel(); // Cancel the connection timeout
+        _verifyTimer?.cancel(); // Cancel the verification timeout
+        _resetWifiNotifyBuffer();
+
+        final macAddress = result.substring(0, 12);
+
+        AppState.shared.showToast("Detected device MAC address: $macAddress");
+        await _activateAndBindDevice(macAddress);
+      }
+    } catch (e) {
+      debugPrint(" HandleDeviceNotificationFailed: $e");
+      if (mounted) {
+        AppState.shared.showToast(
+          "Could not process StackChan's pairing response. Restart binding mode and try again.",
+        );
+      }
+    }
+  }
+
+  Future<void> _activateAndBindDevice(String macAddress) async {
+    try {
+      debugPrint(" DeviceActivateBindStart, mac: $macAddress");
       bool result = await AppState.shared.bindDevice(macAddress);
+      _resetConnectState();
       if (result) {
-        _resetConnectState();
         if (mounted) {
           AppState.shared.showToast("Device bound successfully!");
-          //configjump
           Navigator.of(context).push(
             CupertinoPageRoute(builder: (context) => const DeviceNamePage()),
           );
         }
       } else {
-        _resetConnectState();
-        //newIncrease / Add:binddevicefail
-                if (mounted) {
-          AppState.shared.showToast("Device binding failed. Please try again.");
+        debugPrint(" DeviceActivateBindFailed, mac: $macAddress");
+        if (mounted) {
+          AppState.shared.showToast(
+            "Verification succeeded, but binding failed. Check your internet connection and account, then try again.",
+          );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       _resetConnectState();
-            if (mounted) {
-        AppState.shared.showToast("Device activation exception.");
-      }
-    }
-  }
-
-  //querydeviceconfig(StreamProcess / Threaderrorhint)
-  Future<bool> queryConfiguration(String macAddress) async {
-    try {
-      //1. querydevicewhetheractivated (laterNotAgainquery directactivate)
-      // final devices = await XiaoZhiUtil.shared.getDevice(macAddress);
-      // if (devices.isNotEmpty) {
-      //   if (devices.first.agent_id != null) {
-      //debugPrint("✅ deviceactivated");
-      //     return true;
-      //   }
-      // }
-
-      //2. generatelicense
-      final generateLicense = await XiaoZhiUtil.shared.generateLicense(
-        macAddress,
+      debugPrint(
+        " DeviceActivateBindProcess / ThreadException, mac: $macAddress, error: $e",
       );
-      if (generateLicense == null || generateLicense.serialNumber == null) {
-                if (mounted) {
-          AppState.shared.showToast("Failed to generate device license.");
-        }
-        return false;
+      debugPrint(" DeviceActivateBindStackTrace: $stackTrace");
+      if (mounted) {
+        AppState.shared.showToast(
+          "Binding failed unexpectedly. Check your internet connection and try again.",
+        );
       }
-
-      //3. activatedevice
-      final serialNumber = generateLicense.serialNumber!;
-      final mac = MacAddressValidator.formatMac(AppState.shared.deviceMac);
-      if (mac == null) {
-        AppState.shared.showToast("Failed to format device MAC address.");
-        return false;
-      }
-      bool activateResult = await XiaoZhiUtil.shared.agentsDevicesActivate(
-        serialNumber,
-        mac,
-      );
-      if (!activateResult) {
-                if (mounted) {
-          AppState.shared.showToast("Device cloud activation failed.");
-        }
-        return false;
-      }
-
-      ///deviceMayexist Notactivate,Needverify
-      final checkDevice = await XiaoZhiUtil.shared.serialNumberGetDevice(
-        serialNumber,
-      );
-      if (checkDevice == null || checkDevice.agent_id == null) {
-        //activatefail
-        return false;
-      } else {
-        AppState.shared.showToast("Device activation successful");
-                return true;
-      }
-    } catch (e) {
-            if (mounted) {
-        AppState.shared.showToast("Failed to query device configuration.");
-      }
-      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
@@ -328,121 +426,156 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       child: CustomScrollView(
         slivers: [
           CupertinoSliverNavigationBar(
-            largeTitle: Text("Select Device"),
-            leading: SizedBox.shrink(),
+            backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+              context,
+            ),
+            border: ThemeSetting.cupertinoNavigationBarBorder(context),
+            padding: ThemeSetting.navigationBarPadding,
+            largeTitle: const Text("Select Device"),
+            stretch: true,
+            leading: const SizedBox.shrink(),
             trailing: CupertinoButton(
-              padding: .zero,
-              child: Icon(
-                CupertinoIcons.xmark_circle_fill,
-                size: 25,
-                color: CupertinoColors.separator.resolveFrom(context),
-              ),
+              sizeStyle: .medium,
+              child: const Icon(CupertinoIcons.xmark),
               onPressed: () {
                 AppState.shared.manualShutdownTime = DateTime.now();
                 BlueUtil.shared.characteristicCallback = null;
                 BlueUtil.shared.wifiSetCharacteristicCall = null;
                 BlueUtil.shared.onReconnectSuccess = null;
-                CupertinoSheetRoute.popSheet(context);
+                closeCustomCupertinoSheet(context);
               },
             ),
           ),
           SliverList.list(
             children: [
               Obx(
-                () => CupertinoListSection.insetGrouped(
-                  children: AppState.shared.blueDeviceList.isNotEmpty
-                      ? AppState.shared.blueDeviceList.map((deviceInfo) {
-                          String? deviceId = _getDeviceId(deviceInfo);
-                          return CupertinoListTile(
-                            onTap: () async {
-                              if (!AppState.shared.isLogin.value) {
-                                if (mounted) {
-                                  Navigator.of(context).push(
-                                    CupertinoPageRoute(
-                                      builder: (context) =>
-                                          const LoginPage(isWelCome: true),
-                                    ),
+                () => Padding(
+                  padding: .only(
+                    left: padding.left + 20,
+                    top: 20,
+                    right: padding.right + 20,
+                    bottom: 10,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: .circular(ThemeSetting.cardRadius),
+                    child: CupertinoListSection.insetGrouped(
+                      margin: .zero,
+                      children: AppState.shared.blueDeviceList.isNotEmpty
+                          ? AppState.shared.blueDeviceList.indexed.map((entry) {
+                              final deviceInfo = entry.$2;
+                              String? deviceId = _getDeviceId(deviceInfo);
+                              return CupertinoListTile(
+                                onTap: () async {
+                                  if (!AppState.shared.isLogin.value) {
+                                    if (mounted) {
+                                      Navigator.of(context).push(
+                                        CupertinoPageRoute(
+                                          builder: (context) =>
+                                              const LoginPage(isWelCome: true),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+
+                                  final bluetoothReady = await BlueUtil.shared
+                                      .ensureBluetoothReady(triggerScan: true);
+                                  if (!bluetoothReady) {
+                                    if (mounted) {
+                                      AppState.shared.showToast(
+                                        "Bluetooth is unavailable. Turn it on and allow app Bluetooth access, then try again.",
+                                      );
+                                    }
+                                    return;
+                                  }
+
+                                  // Ignore repeated taps while a connection is in progress.
+                                  final deviceRemoteId = deviceInfo
+                                      .device
+                                      .remoteId
+                                      .toString();
+                                  if (deviceRemoteId == connectDeviceId.value) {
+                                    if (mounted) {
+                                      AppState.shared.showToast(
+                                        "Already connecting... Please wait patiently.",
+                                      );
+                                    }
+                                    return;
+                                  }
+
+                                  // Start connecting.
+                                  isSuccess = false;
+                                  _resetWifiNotifyBuffer();
+                                  connectDeviceId.value = deviceRemoteId;
+                                  AppState.shared.blueDeviceList.refresh();
+
+                                  // Connection timeout timer.
+                                  _connectTimer?.cancel();
+                                  _connectTimer = Timer(
+                                    const Duration(seconds: _connectTimeout),
+                                    () {
+                                      _resetConnectState();
+                                      debugPrint(" DeviceConnectTimeout");
+                                      if (mounted) {
+                                        AppState.shared.showToast(
+                                          "Connection timed out after 30 seconds. Keep StackChan nearby and in binding mode, then try again.",
+                                        );
+                                      }
+                                    },
                                   );
-                                }
-                                return;
-                              }
 
-                              //Repeatclick:Alreadyinconnectin
-                              final deviceRemoteId = deviceInfo.device.remoteId
-                                  .toString();
-                              if (deviceRemoteId == connectDeviceId.value) {
-                                if (mounted) {
-                                  AppState.shared.showToast(
-                                    "Already connecting... Please wait patiently.",
-                                  );
-                                }
-                                return;
-                              }
-
-                              //startconnect
-                              isSuccess = false;
-                              connectDeviceId.value = deviceRemoteId;
-                              AppState.shared.blueDeviceList.refresh();
-
-                              //newIncrease / Add:connecttimeouttimer
-                              _connectTimer?.cancel();
-                              _connectTimer = Timer(
-                                Duration(seconds: _connectTimeout),
-                                () {
-                                  _resetConnectState();
-                                                                    if (mounted) {
-                                    AppState.shared.showToast(
-                                      "Device connection timed out. Please try again.",
+                                  // Catch Bluetooth connection errors.
+                                  try {
+                                    if (mounted) {
+                                      AppState.shared.showToast(
+                                        "Connecting to device...",
+                                      );
+                                    }
+                                    await BlueUtil.shared.connect(
+                                      deviceInfo.device,
                                     );
+                                  } catch (e) {
+                                    _resetConnectState();
+                                    debugPrint(" BluetoothConnectFailed: $e");
+                                    if (mounted) {
+                                      AppState.shared.showToast(
+                                        "Bluetooth connection failed. Keep StackChan nearby and in binding mode, then retry. Details: ${e.toString()}",
+                                      );
+                                    }
                                   }
                                 },
+                                leading: Image.asset(
+                                  "assets/image1.png",
+                                  width: 28,
+                                  height: 28,
+                                ),
+                                title: Text(deviceInfo.device.advName),
+                                subtitle: deviceId != null
+                                    ? Text("ID: $deviceId")
+                                    : null,
+                                trailing:
+                                    deviceInfo.device.remoteId.toString() ==
+                                        connectDeviceId.value
+                                    ? const CupertinoActivityIndicator()
+                                    : SvgPicture.asset(
+                                        "assets/chevron.right.svg",
+                                        width: 15,
+                                        height: 15,
+                                        colorFilter: ColorFilter.mode(
+                                          CupertinoColors.secondaryLabel
+                                              .resolveFrom(context),
+                                          BlendMode.srcIn,
+                                        ),
+                                      ),
                               );
-
-                              //newIncrease / Add:BluetoothconnectThrowsCatch
-                              try {
-                                if (mounted) {
-                                  AppState.shared.showToast(
-                                    "Connecting to device...",
-                                  );
-                                }
-                                await BlueUtil.shared.connect(
-                                  deviceInfo.device,
-                                );
-                              } catch (e) {
-                                _resetConnectState();
-                                                                if (mounted) {
-                                  AppState.shared.showToast(
-                                    "Bluetooth connection failed: ${e.toString()}",
-                                  );
-                                }
-                              }
-                            },
-                            leading: Image.asset(
-                              "assets/image1.png",
-                              width: 28,
-                              height: 28,
-                            ),
-                            title: Text(deviceInfo.device.advName),
-                            subtitle: deviceId != null
-                                ? Text("ID: $deviceId")
-                                : null,
-                            trailing:
-                                deviceInfo.device.remoteId.toString() ==
-                                    connectDeviceId.value
-                                ? const CupertinoActivityIndicator()
-                                : SvgPicture.asset(
-                                    "assets/chevron.right.svg",
-                                    width: 15,
-                                    height: 15,
-                                    colorFilter: ColorFilter.mode(
-                                      CupertinoColors.secondaryLabel
-                                          .resolveFrom(context),
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                          );
-                        }).toList()
-                      : [CupertinoListTile(title: Text("No devices found"))],
+                            }).toList()
+                          : [
+                              const CupertinoListTile(
+                                title: Text("No devices found"),
+                              ),
+                            ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -452,25 +585,26 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
     );
   }
 
-  //startverifydevice(senddata)
-  void startVerificationEquipment(
-    BluetoothCharacteristic characteristic,
+  // Start device verification by sending the handshake payload.
+  Future<void> startVerificationEquipment(
+    NativeBluetoothCharacteristic characteristic,
   ) async {
     try {
       if (mounted) {
         AppState.shared.showToast("Verifying device...");
       }
-      //startverifytimeouttimer
+      // Start the verification timeout timer
       _verifyTimer?.cancel();
-      _verifyTimer = Timer(Duration(seconds: _verifyTimeout), () {
+      _verifyTimer = Timer(const Duration(seconds: _verifyTimeout), () {
         _resetConnectState();
-                if (mounted) {
+        debugPrint(" DeviceVerifyTimeout");
+        if (mounted) {
           AppState.shared.showToast(
-            "Device verification timed out. Please try again.",
+            "Verification timed out after 20 seconds. Restart StackChan in binding mode and try again.",
           );
         }
       });
-      //data
+      // Build the handshake payload.
       final dateTimeString = DateTime.now().millisecondsSinceEpoch.toString();
       final BlueEncryptionDecryption data = BlueEncryptionDecryption(
         cmd: "handshake",
@@ -478,24 +612,34 @@ class _SelectBlueDeviceState extends State<SelectBlueDevice> {
       );
       final jsonString = jsonEncode(data.toJson());
 
-      //senddata
-      bool result = await BlueUtil.shared.sendWifiSetData(jsonString);
-      if (result) {
-              } else {
+      // Send the handshake payload.
+      final result = await BlueUtil.shared.sendWifiSetData(jsonString);
+      if (result.success) {
+        debugPrint(" 发送DeviceVerify指令Success");
+      } else {
         _verifyTimer?.cancel();
         AppState.shared.showToast(
-          "The equipment may have been disconnected. Please reconfigure it on the StackChan end.",
+          "Could not send the verification request: "
+          "${result.displayMessage} Keep StackChan nearby and retry.",
         );
         _resetConnectState();
       }
     } catch (e) {
       _verifyTimer?.cancel();
       _resetConnectState();
-            if (mounted) {
+      debugPrint(" 发送DeviceVerify指令Failed: $e");
+      if (mounted) {
         AppState.shared.showToast(
-          "Failed to send device verification command.",
+          "Bluetooth disconnected while sending the verification request. Keep StackChan nearby and try again.",
         );
       }
     }
   }
+}
+
+class _JsonExtractResult {
+  const _JsonExtractResult(this.messages, this.consumedCharacters);
+
+  final List<String> messages;
+  final int consumedCharacters;
 }

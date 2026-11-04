@@ -22,7 +22,7 @@ class Device {
   }
 
   Device.fromJson(Map<String, dynamic> json)
-    : mac = json['mac'] ?? UuidV4().toString(),
+    : mac = json['mac'] ?? const UuidV4().toString(),
       uid = json['uid'] as int?,
       name = json['name']?.toString(),
       bindTime = json["bind_time"]?.toString();

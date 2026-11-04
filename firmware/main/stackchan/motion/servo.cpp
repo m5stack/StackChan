@@ -117,6 +117,13 @@ void Servo::update_angle_anim_target(int angle)
     _snap_to_target_on_rest = true;
 }
 
+void Servo::stop_motion_at_angle(int angle)
+{
+    angle = uitk::clamp(angle, _angle_limit.x, _angle_limit.y);
+    _angle_anim.teleport(angle);
+    _snap_to_target_on_rest = false;
+}
+
 uitk::SpringOptions_t Servo::map_speed_to_spring_options(int speed)
 {
     auto profile = calculateServoSpringProfile(speed);

@@ -22,7 +22,7 @@ public:
 private:
     std::unique_ptr<view::LauncherView> _view;
     std::unique_ptr<view::Screensaver> _screensaver;
-    std::unique_ptr<setup_workers::StartupWorker> _startup_worker;
+    std::unique_ptr<setup_workers::WorkerBase> _startup_worker;
     uint32_t _screensaver_timecount = 0;
     bool _startup_checked           = false;
 

@@ -34,7 +34,7 @@ class RegistrationResponse {
     this.userStatus,
   });
 
-  ///from JSON toobject
+  /// Creates a registration response from a JSON map.
   RegistrationResponse.fromJson(Map<String, dynamic> json) {
     uid = json['uid'];
     username = json['username'];
@@ -51,7 +51,7 @@ class RegistrationResponse {
     userStatus = json['status'];
   }
 
-  ///objectto JSON
+  /// Converts this registration response to a JSON map.
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
     map['uid'] = uid;

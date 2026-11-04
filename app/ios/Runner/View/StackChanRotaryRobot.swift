@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 //  StackChanRotaryRobot.swift
 //  Runner
 //
-// Created by on 2026/1/30.
+//  Created on 2026/1/30.
 //
 import SceneKit
 
@@ -55,7 +55,8 @@ class StackChanRotaryRobot: NSObject, FlutterPlatformView, FlutterStreamHandler 
     
     private func setupInitialScene() {
         guard let scene = SCNScene(named: "StackChanModel.scn") else {
-                        return
+            print("Failed to load StackChanModel.scn")
+            return
         }
         scene.rootNode.eulerAngles = SCNVector3Zero
         scene.rootNode.eulerAngles.x = -Float.pi / 2
@@ -102,7 +103,7 @@ class StackChanRotaryRobot: NSObject, FlutterPlatformView, FlutterStreamHandler 
         // Add expression plane to head
         addExpressionPlane(to: head)
         
-        // translated comment
+        // Rotation
         let rotateAction = SCNAction.rotateBy(x: 0, y: CGFloat(2 * Double.pi), z: 0, duration: 5)
         let repeatAction = SCNAction.repeatForever(rotateAction)
         scene.rootNode.runAction(repeatAction)

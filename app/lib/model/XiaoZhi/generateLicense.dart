@@ -4,7 +4,7 @@ SPDX-License-Identifier: MIT
 */
 
 class GenerateLicense {
-  //fieldDartnamingstandard,parsewhenmapAPIreturnDownnaming
+  // Dart-style field names; the API uses snake_case.
   String? productName;
   String? boardName;
   String? serialNumber;
@@ -13,7 +13,7 @@ class GenerateLicense {
   String? createdAt;
   dynamic firmware;
 
-  //defaultConstructorfunction
+  // Creates a license payload with every field optional.
   GenerateLicense({
     this.productName,
     this.boardName,
@@ -24,21 +24,21 @@ class GenerateLicense {
     this.firmware,
   });
 
-  //core:fromJsonFactorymethod,parseJSONdatatoobject
+  // Creates a license payload from a JSON map.
   factory GenerateLicense.fromJson(Map<String, dynamic> json) {
     return GenerateLicense(
-      //mapAPIreturnDownfieldtoDartfield
+      // Map the API's snake_case fields to Dart fields.
       productName: json['product_name'] as String?,
       boardName: json['board_name'] as String?,
       serialNumber: json['serial_number'] as String?,
       licenseKey: json['license_key'] as String?,
       licenseAlgorithm: json['license_algorithm'] as String?,
       createdAt: json['created_at'] as String?,
-      firmware: json['firmware'], //dynamictypedirect
+      firmware: json['firmware'], // Kept dynamic; the shape varies by product.
     );
   }
 
-  //optional:addtoJsonmethod(For easylaterSerialize,Local)
+  // Serializes the payload for local storage or later use.
   Map<String, dynamic> toJson() {
     return {
       'product_name': productName,

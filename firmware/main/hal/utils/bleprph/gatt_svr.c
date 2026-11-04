@@ -225,8 +225,7 @@ static int stackchan_svc_access(uint16_t conn_handle, uint16_t attr_handle, stru
                 rc = gatt_svr_write(ctxt->om, 0, STACKCHAN_MAX_JSON_LEN, stackchan_config_data, &stackchan_config_len);
                 if (rc == 0) {
                     stackchan_config_data[stackchan_config_len] = '\0';
-                    MODLOG_DFLT(INFO, "Config data received (%d bytes): %s", stackchan_config_len,
-                                stackchan_config_data);
+                    MODLOG_DFLT(INFO, "Config data received (%d bytes)", stackchan_config_len);
 
                     /* Call user callback if registered */
                     if (g_stackchan_callbacks.config_cb) {

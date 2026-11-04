@@ -5,69 +5,69 @@ SPDX-License-Identifier: MIT
 
 class ConversationMessageData {
   int? id;
-  int? user_id;
-  int? chat_id;
+  int? userId;
+  int? chatId;
   String? role;
   String? content;
-  String? voice_embedding_id;
-  String? created_at;
+  String? voiceEmbeddingId;
+  String? createdAt;
   String? name;
-  int? prompt_tokens;
-  int? total_tokens;
-  int? completion_tokens;
-  int? prompt_ms;
-  int? total_ms;
-  int? completion_ms;
+  int? promptTokens;
+  int? totalTokens;
+  int? completionTokens;
+  int? promptMs;
+  int? totalMs;
+  int? completionMs;
   String? model;
   String? url;
 
-  //optionalparameterConstructorfunction
+  // Creates a message record; every field is optional.
   ConversationMessageData({
     this.id,
-    this.user_id,
-    this.chat_id,
+    this.userId,
+    this.chatId,
     this.role,
     this.content,
-    this.voice_embedding_id,
-    this.created_at,
+    this.voiceEmbeddingId,
+    this.createdAt,
     this.name,
-    this.prompt_tokens,
-    this.total_tokens,
-    this.completion_tokens,
-    this.prompt_ms,
-    this.total_ms,
-    this.completion_ms,
+    this.promptTokens,
+    this.totalTokens,
+    this.completionTokens,
+    this.promptMs,
+    this.totalMs,
+    this.completionMs,
     this.model,
     this.url,
   });
 
-  //fromJSONconvert(Factorymethod,handlenullandtypesafe)
+  // Creates a message from a JSON map, ignoring values of unexpected type.
   factory ConversationMessageData.fromJson(Map<String, dynamic> json) {
     return ConversationMessageData(
       id: json['id'] is int ? json['id'] as int : null,
-      user_id: json['user_id'] is int ? json['user_id'] as int : null,
-      chat_id: json['chat_id'] is int ? json['chat_id'] as int : null,
+      userId: json['user_id'] is int ? json['user_id'] as int : null,
+      chatId: json['chat_id'] is int ? json['chat_id'] as int : null,
       role: json['role'] is String ? json['role'] as String : null,
       content: json['content'] is String ? json['content'] as String : null,
-      voice_embedding_id: json['voice_embedding_id'] is String
+      voiceEmbeddingId: json['voice_embedding_id'] is String
           ? json['voice_embedding_id'] as String
           : null,
-      created_at: json['created_at'] is String
+      createdAt: json['created_at'] is String
           ? json['created_at'] as String
           : null,
       name: json['name'] is String ? json['name'] as String : null,
-      prompt_tokens: json['prompt_tokens'] is int
+      promptTokens: json['prompt_tokens'] is int
           ? json['prompt_tokens'] as int
           : null,
-      total_tokens: json['total_tokens'] is int
+      totalTokens: json['total_tokens'] is int
           ? json['total_tokens'] as int
           : null,
-      completion_tokens: json['completion_tokens'] is int
+      completionTokens: json['completion_tokens'] is int
           ? json['completion_tokens'] as int
           : null,
-      prompt_ms: json['prompt_ms'] is int ? json['prompt_ms'] as int : null,
-      total_ms: json['total_ms'] is int ? json['total_ms'] as int : null,
-      completion_ms: json['completion_ms'] is int
+      promptMs: json['prompt_ms'] is int ? json['prompt_ms'] as int : null,
+      totalMs: json['total_ms'] is int ? json['total_ms'] as int : null,
+      completionMs: json['completion_ms'] is int
           ? json['completion_ms'] as int
           : null,
       model: json['model'] is String ? json['model'] as String : null,
@@ -75,29 +75,29 @@ class ConversationMessageData {
     );
   }
 
-  //convertasJSON(handlenull,avoidnullfieldPollute / Add unnecessaryJSON)
+  // Converts this message to a JSON map, omitting unset fields.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
 
-    //onlyaddNot emptyfield,ReduceJSONSize
+    // Skip unset fields to keep the payload small.
     if (id != null) data['id'] = id;
-    if (user_id != null) data['user_id'] = user_id;
-    if (chat_id != null) data['chat_id'] = chat_id;
+    if (userId != null) data['user_id'] = userId;
+    if (chatId != null) data['chat_id'] = chatId;
     if (role != null) data['role'] = role;
     if (content != null) data['content'] = content;
-    if (voice_embedding_id != null) {
-      data['voice_embedding_id'] = voice_embedding_id;
+    if (voiceEmbeddingId != null) {
+      data['voice_embedding_id'] = voiceEmbeddingId;
     }
-    if (created_at != null) data['created_at'] = created_at;
+    if (createdAt != null) data['created_at'] = createdAt;
     if (name != null) data['name'] = name;
-    if (prompt_tokens != null) data['prompt_tokens'] = prompt_tokens;
-    if (total_tokens != null) data['total_tokens'] = total_tokens;
-    if (completion_tokens != null) {
-      data['completion_tokens'] = completion_tokens;
+    if (promptTokens != null) data['prompt_tokens'] = promptTokens;
+    if (totalTokens != null) data['total_tokens'] = totalTokens;
+    if (completionTokens != null) {
+      data['completion_tokens'] = completionTokens;
     }
-    if (prompt_ms != null) data['prompt_ms'] = prompt_ms;
-    if (total_ms != null) data['total_ms'] = total_ms;
-    if (completion_ms != null) data['completion_ms'] = completion_ms;
+    if (promptMs != null) data['prompt_ms'] = promptMs;
+    if (totalMs != null) data['total_ms'] = totalMs;
+    if (completionMs != null) data['completion_ms'] = completionMs;
     if (model != null) data['model'] = model;
     if (url != null) data['url'] = url;
     return data;

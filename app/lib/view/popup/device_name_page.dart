@@ -3,8 +3,9 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-//====================== devicename(completed) ======================
-import 'package:flutter/cupertino.dart';
+//====================== Device name page ======================
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:stack_chan/view/popup/XiaoZhi_welcome_page.dart';
 
 import '../../app_state.dart';
@@ -28,15 +29,15 @@ class _DeviceNamePageState extends State<DeviceNamePage> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _nameController.dispose();
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
@@ -46,49 +47,69 @@ class _DeviceNamePageState extends State<DeviceNamePage> {
           Expanded(
             child: CustomScrollView(
               slivers: [
-                CupertinoSliverNavigationBar(largeTitle: Text("Device Name")),
-                SliverList.list(
-                  children: [
-                    Image.asset(
-                      "assets/lateral_image.png",
-                      width: double.infinity,
-                      height: 120,
-                      fit: BoxFit.contain,
-                    ),
-                    SizedBox(height: 15),
-                    CupertinoListSection.insetGrouped(
-                      header: Text("Give this StackChan a name"),
-                      children: [
-                        CupertinoListTile(
-                          padding: .all(15),
-                          title: CupertinoTextField(
-                            decoration: BoxDecoration(),
+                CupertinoSliverNavigationBar(
+                  backgroundColor:
+                      ThemeSetting.cupertinoNavigationBarBackgroundColor(
+                        context,
+                      ),
+                  border: ThemeSetting.cupertinoNavigationBarBorder(context),
+                  padding: ThemeSetting.navigationBarPadding,
+                  stretch: true,
+                  largeTitle: const Text("Device Name"),
+                ),
+                SliverPadding(
+                  padding: .only(left: padding.left, right: padding.right),
+                  sliver: SliverList.list(
+                    children: [
+                      const SizedBox(height: 15),
+                      Image.asset(
+                        "assets/lateral_image.png",
+                        width: double.infinity,
+                        height: 120,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 15),
+                      CupertinoListSection.insetGrouped(
+                        header: const Text("Give this StackChan a name"),
+                        children: [
+                          CupertinoTextField(
+                            maxLines: 1,
+                            padding: const .all(12),
+                            textAlign: .center,
+                            decoration: const BoxDecoration(),
                             controller: _nameController,
                             placeholder: "Enter device name",
                             clearButtonMode: OverlayVisibilityMode.editing,
                             autofocus: true,
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           Padding(
             padding: .only(
-              left: 15,
-              right: 15,
-              top: 15,
-              bottom: MediaQuery.paddingOf(context).bottom + 15,
+              left: 20 + padding.left,
+              right: 20 + padding.right,
+              top: 20,
+              bottom: padding.bottom + 20,
             ),
             child: Row(
               spacing: 15,
               children: [
                 Expanded(
                   child: CupertinoButton.tinted(
-                    child: Text("Skip"),
+                    child: Center(
+                      child: Text(
+                        "Skip",
+                        style: TextStyle(
+                          color: CupertinoTheme.of(context).primaryColor,
+                        ),
+                      ),
+                    ),
                     onPressed: () {
                       if (mounted) {
                         FocusScope.of(context).unfocus();
@@ -96,7 +117,7 @@ class _DeviceNamePageState extends State<DeviceNamePage> {
                       Navigator.of(context).push(
                         CupertinoPageRoute(
                           builder: (context) {
-                            return DeviceWifiConfig();
+                            return const DeviceWifiConfig();
                           },
                         ),
                       );
@@ -105,7 +126,12 @@ class _DeviceNamePageState extends State<DeviceNamePage> {
                 ),
                 Expanded(
                   child: CupertinoButton.filled(
-                    child: Text("Continue"),
+                    child: const Center(
+                      child: Text(
+                        "Continue",
+                        style: TextStyle(color: CupertinoColors.white),
+                      ),
+                    ),
                     onPressed: () async {
                       if (mounted) {
                         FocusScope.of(context).unfocus();
@@ -121,7 +147,7 @@ class _DeviceNamePageState extends State<DeviceNamePage> {
                       Navigator.of(context).push(
                         CupertinoPageRoute(
                           builder: (context) {
-                            return XiaoZhiWelcomePage(isWelCome: true);
+                            return const XiaoZhiWelcomePage(isWelCome: true);
                           },
                         ),
                       );

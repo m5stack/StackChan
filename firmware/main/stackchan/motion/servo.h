@@ -177,6 +177,7 @@ protected:
 
     void apply_default_spring_options();
     void update_angle_anim_target(int angle);
+    void stop_motion_at_angle(int angle);
     uitk::SpringOptions_t map_speed_to_spring_options(int speed);
 };
 

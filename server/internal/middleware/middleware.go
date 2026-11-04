@@ -63,7 +63,7 @@ func V2TokenAuthMiddleware(r *ghttp.Request) {
 	if jwtSecret == "" {
 		r.Response.WriteJsonExit(gerror.NewCode(gcode.CodeInternalError, "jwt The secret has not been configured."))
 	}
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, gerror.NewCodef(gcode.CodeNotAuthorized, "token signing algorithm error: %v, %v", token.Header["alg"])
 		}

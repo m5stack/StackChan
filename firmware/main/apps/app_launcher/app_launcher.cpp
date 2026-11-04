@@ -5,6 +5,7 @@
  */
 #include "app_launcher.h"
 #include <hal/hal.h>
+#include <hal/hal_toggles.h>
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <stackchan/stackchan.h>
@@ -26,7 +27,10 @@ void AppLauncher::onLauncherOpen()
 
     LvglLockGuard lock;
 
-    if (!_startup_checked && !GetHAL().isAppConfiged()) {
+    if (!_startup_checked && GetHAL().consumeAppSetupRequest()) {
+        mclog::tagInfo(getAppInfo().name, "resume App setup after network/binding failure");
+        _startup_worker = std::make_unique<setup_workers::WifiSetupWorker>();
+    } else if (!_startup_checked && !GetHAL().isAppConfiged()) {
         mclog::tagInfo(getAppInfo().name, "app not configured, start startup worker");
         _startup_worker = std::make_unique<setup_workers::StartupWorker>();
     } else {
@@ -70,7 +74,28 @@ void AppLauncher::onLauncherDestroy()
 void AppLauncher::create_launcher_view()
 {
     _view = std::make_unique<view::LauncherView>();
-    _view->init(getAppProps());
+    hal_toggles::ToggleStates states;
+    if (!hal_toggles::load_states(states)) {
+        mclog::tagWarn(getAppInfo().name, "Unable to load menu preferences; showing all apps");
+    }
+    auto app_props       = getAppProps();
+    int restore_app_id   = -1;
+    const int warm_index = GetHAL().getWarmRebootTarget();
+    if (warm_index >= 0) {
+        // Existing callers store an index in the unfiltered app list.
+        if (!app_props.empty()) {
+            const auto index = uitk::clamp(warm_index, 0, static_cast<int>(app_props.size()) - 1);
+            restore_app_id   = app_props[index].appID;
+        }
+        GetHAL().clearWarmRebootRequest();
+    }
+    std::vector<mooncake::AppProps_t> filtered_props;
+    for (const auto& props : app_props) {
+        if (hal_toggles::is_app_enabled(props.appID, states)) {
+            filtered_props.push_back(props);
+        }
+    }
+    _view->init(filtered_props, restore_app_id);
     _view->onAppClicked = [&](int appID) {
         mclog::tagInfo(getAppInfo().name, "handle open app, app id: {}", appID);
         openApp(appID);

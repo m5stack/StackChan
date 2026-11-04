@@ -4,94 +4,103 @@ SPDX-License-Identifier: MIT
 */
 
 class AgentTemplate {
-  int? id;
-  int? developer_id;
-  String? agent_name;
-  List<String>? tts_voices;
-  String? default_tts_voice;
-  String? llm_model;
-  String? assistant_name;
-  String? user_name;
-  String? created_at;
-  String? updated_at;
-  String? character;
-  String? tts_speech_speed;
-  String? asr_speed;
-  int? tts_pitch;
-  List<int>? knowledge_base_ids;
-  String? xiaozhi_version;
-  String? tts_voice_name;
+  static List<String>? _stringList(dynamic value) {
+    if (value is! List) return null;
+    return value.map((item) => item.toString()).toList();
+  }
 
-  //defaultConstructorfunction
+  static List<int>? _intList(dynamic value) {
+    if (value is! List) return null;
+    return value
+        .map((item) => item is int ? item : int.tryParse(item.toString()))
+        .whereType<int>()
+        .toList();
+  }
+
+  int? id;
+  int? developerId;
+  String? agentName;
+  List<String>? ttsVoices;
+  String? defaultTtsVoice;
+  String? llmModel;
+  String? assistantName;
+  String? userName;
+  String? createdAt;
+  String? updatedAt;
+  String? character;
+  String? ttsSpeechSpeed;
+  String? asrSpeed;
+  int? ttsPitch;
+  List<int>? knowledgeBaseIds;
+  String? xiaozhiVersion;
+  String? ttsVoiceName;
+
+  // Creates a template; every field is optional.
   AgentTemplate({
     this.id,
-    this.developer_id,
-    this.agent_name,
-    this.tts_voices,
-    this.default_tts_voice,
-    this.llm_model,
-    this.assistant_name,
-    this.user_name,
-    this.created_at,
-    this.updated_at,
+    this.developerId,
+    this.agentName,
+    this.ttsVoices,
+    this.defaultTtsVoice,
+    this.llmModel,
+    this.assistantName,
+    this.userName,
+    this.createdAt,
+    this.updatedAt,
     this.character,
-    this.tts_speech_speed,
-    this.asr_speed,
-    this.tts_pitch,
-    this.knowledge_base_ids,
-    this.xiaozhi_version,
-    this.tts_voice_name,
+    this.ttsSpeechSpeed,
+    this.asrSpeed,
+    this.ttsPitch,
+    this.knowledgeBaseIds,
+    this.xiaozhiVersion,
+    this.ttsVoiceName,
   });
 
-  //fromJSONparseFactorymethod
+  // Creates a template from a JSON map.
   factory AgentTemplate.fromJson(Map<String, dynamic> json) {
     return AgentTemplate(
       id: json['id'] as int?,
-      developer_id: json['developer_id'] as int?,
-      agent_name: json['agent_name'] as String?,
-      //handlelisttype,avoidnullorNon-listtypeCauseCrash
-      tts_voices: json['tts_voices'] != null
-          ? List<String>.from(json['tts_voices'] as List)
-          : null,
-      default_tts_voice: json['default_tts_voice'] as String?,
-      llm_model: json['llm_model'] as String?,
-      assistant_name: json['assistant_name'] as String?,
-      user_name: json['user_name'] as String?,
-      created_at: json['created_at'] as String?,
-      updated_at: json['updated_at'] as String?,
+      developerId: json['developer_id'] as int?,
+      agentName: json['agent_name'] as String?,
+      // List fields are normalized; malformed values become null.
+      ttsVoices: _stringList(json['tts_voices']),
+      defaultTtsVoice: json['default_tts_voice'] as String?,
+      llmModel: json['llm_model'] as String?,
+      assistantName: json['assistant_name'] as String?,
+      userName: json['user_name'] as String?,
+      createdAt: json['created_at'] as String?,
+      updatedAt: json['updated_at'] as String?,
       character: json['character'] as String?,
-      tts_speech_speed: json['tts_speech_speed'] as String?,
-      asr_speed: json['asr_speed'] as String?,
-      tts_pitch: json['tts_pitch'] as int?,
-      knowledge_base_ids: json['knowledge_base_ids'],
-      //dynamictypedirectAssignValue
-      xiaozhi_version: json['xiaozhi_version'] as String?,
-      tts_voice_name: json['tts_voice_name'] as String?,
+      ttsSpeechSpeed: json['tts_speech_speed'] as String?,
+      asrSpeed: json['asr_speed'] as String?,
+      ttsPitch: json['tts_pitch'] as int?,
+      knowledgeBaseIds: _intList(json['knowledge_base_ids']),
+      // Remaining fields are optional strings.
+      xiaozhiVersion: json['xiaozhi_version'] as String?,
+      ttsVoiceName: json['tts_voice_name'] as String?,
     );
   }
 
-  //convertasJSONmethod
+  // Converts this template to a JSON map, omitting unset fields.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     if (id != null) data['id'] = id;
-    if (developer_id != null) data['developer_id'] = developer_id;
-    if (agent_name != null) data['agent_name'] = agent_name;
-    if (tts_voices != null) data['tts_voices'] = tts_voices;
-    if (default_tts_voice != null)
-      data['default_tts_voice'] = default_tts_voice;
-    if (llm_model != null) data['llm_model'] = llm_model;
-    if (assistant_name != null) data['assistant_name'] = assistant_name;
-    if (user_name != null) data['user_name'] = user_name;
-    if (created_at != null) data['created_at'] = created_at;
-    if (updated_at != null) data['updated_at'] = updated_at;
+    if (developerId != null) data['developer_id'] = developerId;
+    if (agentName != null) data['agent_name'] = agentName;
+    if (ttsVoices != null) data['tts_voices'] = ttsVoices;
+    if (defaultTtsVoice != null) data['default_tts_voice'] = defaultTtsVoice;
+    if (llmModel != null) data['llm_model'] = llmModel;
+    if (assistantName != null) data['assistant_name'] = assistantName;
+    if (userName != null) data['user_name'] = userName;
+    if (createdAt != null) data['created_at'] = createdAt;
+    if (updatedAt != null) data['updated_at'] = updatedAt;
     if (character != null) data['character'] = character;
-    if (tts_speech_speed != null) data['tts_speech_speed'] = tts_speech_speed;
-    if (asr_speed != null) data['asr_speed'] = asr_speed;
-    if (tts_pitch != null) data['tts_pitch'] = tts_pitch;
-    if (knowledge_base_ids != null)
-      data['knowledge_base_ids'] = knowledge_base_ids;
-    if (xiaozhi_version != null) data['xiaozhi_version'] = xiaozhi_version;
-    if (tts_voice_name != null) data['tts_voice_name'] = tts_voice_name;
+    if (ttsSpeechSpeed != null) data['tts_speech_speed'] = ttsSpeechSpeed;
+    if (asrSpeed != null) data['asr_speed'] = asrSpeed;
+    if (ttsPitch != null) data['tts_pitch'] = ttsPitch;
+    if (knowledgeBaseIds != null) data['knowledge_base_ids'] = knowledgeBaseIds;
+    if (xiaozhiVersion != null) data['xiaozhi_version'] = xiaozhiVersion;
+    if (ttsVoiceName != null) data['tts_voice_name'] = ttsVoiceName;
     return data;
   }
 }

@@ -4,118 +4,224 @@ SPDX-License-Identifier: MIT
 */
 
 import 'dart:async';
+import 'dart:ui';
 
-import 'package:flutter/cupertino.dart';
-import 'package:stack_chan/app_state.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
-class AppToast extends StatefulWidget {
-  const AppToast({super.key, this.child});
+/// Global toast overlay.
+class GlobalToast extends StatefulWidget {
+  const GlobalToast({super.key, this.child});
 
   final Widget? child;
 
+  static final ValueNotifier<_ToastRequest?> _requestNotifier =
+      ValueNotifier<_ToastRequest?>(null);
+  static int _requestId = 0;
+
+  static void show({
+    String? title,
+    String? message,
+    Duration duration = const Duration(seconds: 3),
+    Duration debounceDuration = const Duration(milliseconds: 160),
+  }) {
+    if (!_hasText(title) && !_hasText(message)) return;
+    _requestNotifier.value = _ToastRequest(
+      id: _requestId++,
+      title: title,
+      message: message,
+      duration: duration,
+      debounceDuration: debounceDuration,
+    );
+  }
+
+  static bool _hasText(String? value) {
+    return value != null && value.trim().isNotEmpty;
+  }
+
   @override
-  State<AppToast> createState() => _AppToastState();
+  State<GlobalToast> createState() => _GlobalToastState();
 }
 
-class _AppToastState extends State<AppToast> {
-  String _toastText = "";
-  bool _isShowToast = false;
-
-  //Replace with standard Timer, fix timer invalidation issue
-  Timer? _hideTimer;
-
-  static const _duration = Duration(milliseconds: 1500);
-  static const _fadeDuration = Duration(milliseconds: 200);
+class _GlobalToastState extends State<GlobalToast> {
+  Timer? _debounceTimer;
+  Timer? _dismissTimer;
+  _ToastRequest? _activeToast;
+  _ToastRequest? _pendingToast;
 
   @override
   void initState() {
     super.initState();
-    //listenAndsaveSubscribe
-    AppState.shared.toastFunction = (toastText) {
-      if (toastText == null || toastText.isEmpty) {
-        _hideToast();
-      } else {
-        _updateToast(toastText);
-      }
-    };
+    GlobalToast._requestNotifier.addListener(_handleToastRequest);
   }
 
   @override
   void dispose() {
-    AppState.shared.toastFunction = null;
-    _hideTimer?.cancel();
+    GlobalToast._requestNotifier.removeListener(_handleToastRequest);
+    _debounceTimer?.cancel();
+    _dismissTimer?.cancel();
     super.dispose();
   }
 
-  ///Update Toast text and show
-  void _updateToast(String text) {
-    //First / Previouslycanceltimer,avoidRepeatwhen
-    _hideTimer?.cancel();
-    setState(() {
-      _toastText = text;
-      _isShowToast = true;
-    });
-    //startnewautohidetimer
-    _hideTimer = Timer(_duration, _hideToast);
-  }
+  void _handleToastRequest() {
+    final request = GlobalToast._requestNotifier.value;
+    if (request == null) return;
 
-  ///Hide Toast
-  void _hideToast() {
-    if (mounted) {
-      //Avoid setState error when page is already disposed
-      setState(() {
-        _isShowToast = false;
-      });
+    _pendingToast = request;
+    _debounceTimer?.cancel();
+    if (request.debounceDuration <= Duration.zero) {
+      _showToast(request);
+      return;
     }
-    _hideTimer?.cancel();
-    _hideTimer = null;
+
+    _debounceTimer = Timer(request.debounceDuration, () {
+      if (!mounted || _pendingToast != request) return;
+      _showToast(request);
+    });
   }
 
-  ///Build Toast style (remove redundant Visibility, use only AnimatedOpacity)
-  Widget _buildToastWidget() {
-    return Positioned(
-      top: 80,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: AnimatedOpacity(
-          opacity: _isShowToast ? 1.0 : 0.0,
-          duration: _fadeDuration,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: CupertinoColors.secondarySystemGroupedBackground
-                  .resolveFrom(context)
-                  .withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: CupertinoColors.systemBackground
+  void _showToast(_ToastRequest request) {
+    _dismissTimer?.cancel();
+    setState(() {
+      _activeToast = request;
+    });
+
+    if (request.duration <= Duration.zero) return;
+    _dismissTimer = Timer(request.duration, () {
+      if (!mounted) return;
+      _dismissToast(request);
+    });
+  }
+
+  void _dismissToast([_ToastRequest? request]) {
+    if (request != null && _activeToast != request) return;
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+    if (_activeToast == null) return;
+    setState(() {
+      _activeToast = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeToast = _activeToast;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child ?? const SizedBox.expand(),
+        Positioned(
+          left: 20,
+          right: 20,
+          top: MediaQuery.paddingOf(context).top + 20,
+          child: IgnorePointer(
+            ignoring: _activeToast == null,
+            child: activeToast == null
+                ? const SizedBox.shrink(key: ValueKey('empty-toast'))
+                : _GlobalToastCard(
+                    key: ValueKey(activeToast.id),
+                    toast: activeToast,
+                    onDismiss: () => _dismissToast(activeToast),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GlobalToastCard extends StatelessWidget {
+  const _GlobalToastCard({
+    required this.toast,
+    required this.onDismiss,
+    super.key,
+  });
+
+  final _ToastRequest toast;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = toast.title;
+    final message = toast.message;
+    final hasTitle = GlobalToast._hasText(title);
+    final hasMessage = GlobalToast._hasText(message);
+    final textTheme = CupertinoTheme.of(context).textTheme;
+    final shadowColor = CupertinoColors.systemFill
+        .resolveFrom(context)
+        .withValues(alpha: 0.2);
+
+    return Semantics(
+      liveRegion: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onDismiss,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: .circular(23),
+            boxShadow: [BoxShadow(color: shadowColor, blurRadius: 12)],
+          ),
+          child: ClipRSuperellipse(
+            clipBehavior: Clip.antiAlias,
+            borderRadius: .circular(23),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: CupertinoColors.tertiarySystemBackground
                       .resolveFrom(context)
-                      .withValues(alpha: 0.1),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
+                      .withValues(alpha: 0.5),
                 ),
-              ],
-            ),
-            child: Text(
-              _toastText,
-              style: TextStyle(
-                color: CupertinoColors.label.resolveFrom(context),
-                fontSize: 16,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasTitle)
+                          Text(
+                            title!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.navTitleTextStyle,
+                          ),
+                        if (hasTitle && hasMessage) const SizedBox(height: 4),
+                        if (hasMessage)
+                          Text(
+                            message!,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.textStyle,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [if (widget.child != null) widget.child!, _buildToastWidget()],
-    );
-  }
+class _ToastRequest {
+  const _ToastRequest({
+    required this.id,
+    required this.duration,
+    required this.debounceDuration,
+    this.title,
+    this.message,
+  });
+
+  final int id;
+  final String? title;
+  final String? message;
+  final Duration duration;
+  final Duration debounceDuration;
 }

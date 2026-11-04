@@ -5,14 +5,14 @@ SPDX-License-Identifier: MIT
 
 class McpEndpoints {
   int? id;
-  int? developerId; //namingstandard：snake_case camelCase
+  int? developerId; // camelCase in Dart, snake_case in the API
   String? name;
   String? description;
   int? enabled;
-  String? createdAt; //namingstandard：snake_case camelCase
-  String? updatedAt; //namingstandard：snake_case camelCase
+  String? createdAt; // camelCase in Dart, snake_case in the API
+  String? updatedAt; // camelCase in Dart, snake_case in the API
 
-  //defaultConstructorfunction
+  // Creates an endpoint record with every field optional.
   McpEndpoints({
     this.id,
     this.developerId,
@@ -23,42 +23,42 @@ class McpEndpoints {
     this.updatedAt,
   });
 
-  ///fromsingle JSON objectconvertas McpEndpoints instance
+  /// Creates an endpoint record from a JSON object.
   factory McpEndpoints.fromJson(Map<String, dynamic> json) {
     return McpEndpoints(
       id: json['id'] as int?,
       developerId: json['developer_id'] as int?,
-      //map snake_case field
+      // snake_case from the API
       name: json['name'] as String?,
       description: json['description'] as String?,
       enabled: json['enabled'] as int?,
       createdAt: json['created_at'] as String?,
-      //map snake_case field
-      updatedAt: json['updated_at'] as String?, //map snake_case field
+      // snake_case from the API
+      updatedAt: json['updated_at'] as String?, // snake_case from the API
     );
   }
 
-  ///from JSON arrayconvertas McpEndpoints list
+  /// Creates endpoint records from a JSON array.
   static List<McpEndpoints> fromListJson(List<dynamic> jsonList) {
-    //nullhandle + typeverify,avoidCrash
+    // Guard against empty input and non-object entries.
     if (jsonList.isEmpty) return [];
 
     return jsonList
-        .where((item) => item is Map<String, dynamic>) //filter Map type
-        .map((item) => McpEndpoints.fromJson(item as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>() // Ignore entries that are not JSON objects
+        .map(McpEndpoints.fromJson)
         .toList();
   }
 
-  ///convertas JSON object(forNetworkrequest/)
+  /// Converts the record to JSON for network requests or storage.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'developer_id': developerId, // snake_case adaptafter
+      'developer_id': developerId, // snake_case expected by the API
       'name': name,
       'description': description,
       'enabled': enabled,
-      'created_at': createdAt, // snake_case adaptafter
-      'updated_at': updatedAt, // snake_case adaptafter
+      'created_at': createdAt, // snake_case expected by the API
+      'updated_at': updatedAt, // snake_case expected by the API
     };
   }
 }

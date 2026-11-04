@@ -6,13 +6,13 @@ server:
 
 # https://goframe.org/docs/core/glog-config
 logger:
-  path: "./logs"        # 日志目录（相对或绝对路径）
-  file: "{Y-m-d}.log"   # 按天滚动
-  level: "all"          # 日志级别：all | debug | info | warning | error
-  stdout: true          # 是否同时输出到控制台
-  rotateExpire: "7d"    # 日志保留时间
-  rotateBackup: 10      # 最多保留文件数
-  rotateSize: "50M"     # 单文件最大大小
+  path: "./logs"        # Log directory (relative or absolute)
+  file: "{Y-m-d}.log"   # Rotate daily
+  level: "all"          # Log level: all | debug | info | warning | error
+  stdout: true          # Also print logs to stdout
+  rotateExpire: "7d"    # Log retention period
+  rotateBackup: 10      # Maximum number of retained files
+  rotateSize: "50M"     # Maximum size of a single file
 
 # https://goframe.org/docs/core/gdb-config-file
 database:

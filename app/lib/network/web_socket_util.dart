@@ -8,9 +8,9 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
-//Assume theseisYoucustomDepends on(according toActual situationAdjust)
+// Project-specific imports.
 import '../app_state.dart';
 import '../model/msg_type.dart';
 import '../util/rsa_util.dart';
@@ -24,12 +24,13 @@ class WebSocketUtil {
   WebSocket? _socket;
   StreamSubscription? _subscription;
 
-  //newIncrease / Add:Recordcurrentconnectstate,avoidRepeatPrint
+  // Track the connection state so reconnect logs are not repeated.
   bool _isConnected = false;
 
   Function()? connectionSuccessful;
 
   final Map<String, void Function(dynamic)> _observers = {};
+  final Map<Object, void Function()> _connectionObservers = {};
 
   String _urlString = '';
 
@@ -54,7 +55,7 @@ class WebSocketUtil {
    * Connect
    * ======================= */
   Future<void> connect(String urlString) async {
-    //ifalreadyexistconnect,First / PreviouslyDisconnect
+    // Disconnect any existing connection first.
     if (_socket != null) {
       disconnect();
     }
@@ -62,11 +63,13 @@ class WebSocketUtil {
     _urlString = urlString;
 
     if (AppState.shared.deviceMac.isEmpty) {
-            return;
+      debugPrint(' WebSocket ConnectFailed:DeviceMACAddressIs null/empty');
+      return;
     }
 
-    //Printconnectstartlog
-    
+    // Log the start of the connection attempt.
+    debugPrint('🔌 StartConnect WebSocket: $urlString');
+
     try {
       final encryptedToken = RsaUtil.encrypt(
         getAuthorization(AppState.shared.deviceMac),
@@ -74,10 +77,13 @@ class WebSocketUtil {
       final headers = {ValueConstant.authorization: encryptedToken};
       _socket = await WebSocket.connect(urlString, headers: headers);
 
-      //connectsuccesslog(ContainstimeandURL)
+      // Log successful connection details (time and URL).
       _isConnected = true;
       final connectTime = DateTime.now().toString().split('.').first;
-                  
+      debugPrint(' WebSocket ConnectSuccess [$connectTime]');
+      debugPrint('   ConnectAddress: $urlString');
+      debugPrint('   ConnectState: ${_socket?.readyState} (OPEN)');
+
       _subscription = _socket!.listen(
         _handleMessage,
         onError: _handleError,
@@ -88,11 +94,17 @@ class WebSocketUtil {
       if (connectionSuccessful != null) {
         connectionSuccessful!();
       }
+      for (final observer in List.of(_connectionObservers.values)) {
+        observer();
+      }
     } catch (e) {
       _isConnected = false;
-      //connectfaillog(ContainsSpecificerrorinfo)
+      // Log the failure with the specific error.
       final errorTime = DateTime.now().toString().split('.').first;
-                        _scheduleReconnect();
+      debugPrint(' WebSocket ConnectFailed [$errorTime]');
+      debugPrint('   ConnectAddress: $urlString');
+      debugPrint('   Error原Because: $e');
+      _scheduleReconnect();
     }
   }
 
@@ -107,16 +119,20 @@ class WebSocketUtil {
   }
 
   void _handleError(Object error) {
-    //errorlog(DistinguishconnecterrorandRunning / Runtimewhenerror)
-        _isConnected = false;
+    // Log runtime errors separately from connection errors.
+    debugPrint(' WebSocket Running / RuntimeWhenError: $error');
+    _isConnected = false;
     _scheduleReconnect();
   }
 
   void _handleDone() {
-    //connectcloselog(ContainscloseoriginalBecause)
+    // Log the close event and its reason.
     _isConnected = false;
     final closeTime = DateTime.now().toString().split('.').first;
-                _scheduleReconnect();
+    debugPrint(' WebSocket ConnectAlready关闭 [$closeTime]');
+    debugPrint('   关闭Address: $_urlString');
+    debugPrint('   关闭State: ${_socket?.closeCode} - ${_socket?.closeReason}');
+    _scheduleReconnect();
   }
 
   bool replyPong(dynamic message) {
@@ -142,27 +158,32 @@ class WebSocketUtil {
    * ======================= */
   void sendString(String message) {
     if (_socket == null) {
-            return;
+      debugPrint(' 发送StringMessageFailed:WebSocket Disconnected');
+      return;
     }
 
-        try {
+    debugPrint('📤 发送StringMessage: $message');
+    try {
       _socket!.add(message);
     } catch (e) {
-            _isConnected = false;
+      debugPrint(' 发送StringMessageFailed: $e');
+      _isConnected = false;
       _scheduleReconnect();
     }
   }
 
   void send(Uint8List data) {
     if (_socket == null) {
-            return;
+      debugPrint(' 发送2BaseMessageFailed:WebSocket Disconnected');
+      return;
     }
 
     //debugPrint('📤 send2Basemessage: length=${data.length} Byte');
     try {
       _socket!.add(data);
     } catch (e) {
-            _isConnected = false;
+      debugPrint(' 发送2BaseMessageFailed: $e');
+      _isConnected = false;
       _scheduleReconnect();
     }
   }
@@ -173,9 +194,10 @@ class WebSocketUtil {
   void _scheduleReconnect() async {
     if (_urlString.isEmpty) return;
 
-    //reconnectlog(avoidFrequentlyRepeatPrint)
+    // Log the reconnect attempt without repeating messages.
     if (!_isConnected) {
-          }
+      debugPrint('🔄 准备重连 WebSocket: $_urlString (1Second(s)BackRetry)');
+    }
 
     await Future.delayed(const Duration(seconds: 1));
     await connect(_urlString);
@@ -189,7 +211,8 @@ class WebSocketUtil {
     _socket?.close(WebSocketStatus.goingAway, '主动断开连接');
     _isConnected = false;
     _socket = null;
-      }
+    debugPrint('🔌 WebSocket AlreadyProactiveDisconnectConnect');
+  }
 
   /* =======================
    * Observer
@@ -202,16 +225,25 @@ class WebSocketUtil {
     _observers.remove(key);
   }
 
+  /// Pages subscribe individually so a shared reconnect callback cannot overwrite another handler or outlive its page.
+  void addConnectionObserver(Object key, void Function() observer) {
+    _connectionObservers[key] = observer;
+  }
+
+  void removeConnectionObserver(Object key) {
+    _connectionObservers.remove(key);
+  }
+
   void removeAllObservers() {
     _observers.clear();
   }
 
   void _notifyObservers(dynamic message) {
-    for (final observer in _observers.values) {
+    for (final observer in List.of(_observers.values)) {
       observer(message);
     }
   }
 
-  //newIncrease / Add:Getcurrentconnectstatemethod(ConvenientExternalquery)
+  // Current connection state, exposed for external checks.
   bool get isConnected => _isConnected && _socket?.readyState == WebSocket.open;
 }

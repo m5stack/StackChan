@@ -118,6 +118,7 @@ struct XiaozhiConfig_t {
     uint32_t idleShutdownTimeSeconds = 600;
     bool allowShutdownWhenCharging   = false;
     uint8_t idleRandomMovementLevel  = 2;
+    bool startAiAgentOnBoot          = false;
 };
 
 /**
@@ -263,7 +264,7 @@ public:
 
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;
-    void startEspNow(int channel);
+    bool startEspNow(int channel);
     bool espNowSend(const std::vector<uint8_t>& data, const uint8_t* destAddr = nullptr);
     void setLaserEnabled(bool enabled);
 
@@ -271,6 +272,8 @@ public:
     void requestWarmReboot(int appIndex);
     int getWarmRebootTarget();
     void clearWarmRebootRequest();
+    [[noreturn]] void requestAppSetup();
+    bool consumeAppSetupRequest();
 
     /* --------------------------------- Network -------------------------------- */
     void startNetwork(std::function<void(std::string_view)> onLog);

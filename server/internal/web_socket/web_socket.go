@@ -12,6 +12,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"slices"
 	"stackChan/internal/model"
 	"stackChan/internal/service"
 	"stackChan/utility"
@@ -89,7 +90,7 @@ func GetMac(r *ghttp.Request) (string, error) {
 		}
 		tokenStr := string(decrypted)
 		parts := strings.Split(tokenStr, "|")
-		if len(parts) < 2 {
+		if len(parts) < 3 {
 			return "", errors.New("invalid token")
 		}
 		mac := parts[0]
@@ -343,22 +344,27 @@ func readStackChanMessage(ctx context.Context, client *model.StackChanClient, me
 			}
 			break
 		case AgreeCall:
-			// Accept call, add App client to subscription list
+			// Accept call, add App client to subscription list before notifying
+			// it, so the first Opus frame cannot race ahead of the subscription.
 			appClient := client.GetCallAppClient()
 			if appClient != nil {
-				appSendMessage(ctx, appClient, messageType, msg)
 				client.AppendCameraSubscriptionList(appClient)
 				if len(client.GetCameraSubscriptionList()) == 1 {
 					onMsg := createMessage(OnCamera, nil)
 					onType := websocket.BinaryMessage
 					stackChanSendMessage(ctx, client, &onType, onMsg)
 				}
-				client.SetAudioSubscriptionList(append(client.GetAudioSubscriptionList(), appClient))
-				if len(client.GetAudioSubscriptionList()) == 1 {
+
+				alreadySubscribed := slices.Contains(client.GetAudioSubscriptionList(), appClient)
+				if !alreadySubscribed {
+					client.SetAudioSubscriptionList(append(client.GetAudioSubscriptionList(), appClient))
+				}
+				if !alreadySubscribed && len(client.GetAudioSubscriptionList()) == 1 {
 					onMsg := createMessage(OnAudio, nil)
 					onType := websocket.BinaryMessage
 					stackChanSendMessage(ctx, client, &onType, onMsg)
 				}
+				appSendMessage(ctx, appClient, messageType, msg)
 			}
 			break
 		case HangupCall:
@@ -389,9 +395,9 @@ func readStackChanMessage(ctx context.Context, client *model.StackChanClient, me
 				}
 				client.SetAudioSubscriptionList(newAudioList)
 				if len(client.GetAudioSubscriptionList()) == 0 {
-					onMsg := createMessage(OnAudio, nil)
-					onType := websocket.BinaryMessage
-					stackChanSendMessage(ctx, client, &onType, onMsg)
+					offMsg := createMessage(OffAudio, nil)
+					offType := websocket.BinaryMessage
+					stackChanSendMessage(ctx, client, &offType, offMsg)
 				}
 			}
 			break
@@ -493,7 +499,7 @@ func readAppClientMessage(ctx context.Context, client *model.AppClient, messageT
 			// Query device name
 			name, err := service.GetDeviceName(ctx, client.GetMac())
 			if err != nil {
-				logger.Errorf(ctx, err.Error())
+				logger.Errorf(ctx, "%v", err)
 				return
 			}
 			if name == "" {
@@ -501,7 +507,7 @@ func readAppClientMessage(ctx context.Context, client *model.AppClient, messageT
 				return
 			}
 			newMsg := createStringMessage(GetDeviceName, name)
-			logger.Infof(ctx, "Device name found, returning: "+name)
+			logger.Infof(ctx, "Device name found, returning: %s", name)
 			appSendMessage(ctx, client, messageType, newMsg)
 			break
 		case UpdateDeviceName:

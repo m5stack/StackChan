@@ -1,8 +1,7 @@
 /*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 import SwiftUI
 import simd
@@ -164,16 +163,21 @@ extension UIImage {
 extension String {
     func jsonPrint() {
         guard let data = self.data(using: .utf8) else {
-                        return
+            print(self)
+            return
         }
         do {
             let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
             let prettyData = try JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted, .sortedKeys])
             if let prettyString = String(data: prettyData, encoding: .utf8) {
-                            } else {
-                            }
+                print("✅ JSON formatted output:\n\(prettyString)")
+            } else {
+                print(self)
+            }
         } catch {
-                                }
+            print("❌ Invalid JSON format: \(error.localizedDescription)")
+            print(self)
+        }
     }
     
     func leftPadding(toLength: Int, withPad character: Character) -> String {
@@ -248,7 +252,8 @@ extension Encodable {
             let data = try encoder.encode(self)
             return String(data: data, encoding: .utf8) ?? "{}"
         } catch {
-                        return "{}"
+            print("❌ JSON serialization failed: \(error)")
+            return "{}"
         }
     }
     
@@ -257,7 +262,8 @@ extension Encodable {
         do {
             return try encoder.encode(self)
         } catch {
-                        return nil
+            print("❌ Failed to convert JSON to Data: \(error.localizedDescription)")
+            return nil
         }
     }
 }

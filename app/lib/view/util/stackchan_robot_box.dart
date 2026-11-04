@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 import 'dart:math';
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:three_js/three_js.dart' as three;
 
 import '../../model/dance_list.dart';
@@ -113,17 +113,17 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
   Future<void> setup() async {
     threeJs.scene = three.Scene();
 
-    //translated comment
+    // Ambient light
     final hemiLight = three.HemisphereLight(0xffffff, 0x444444, 1);
     hemiLight.position.setValues(0, 100, 0);
     threeJs.scene.add(hemiLight);
 
-    //translated comment
+    // Key light
     final dirLight = three.DirectionalLight(0xffffff, 1);
     dirLight.position.setValues(50, 50, 70);
     threeJs.scene.add(dirLight);
 
-    //andset
+    // Camera and lighting setup
     threeJs.camera = three.PerspectiveCamera(
       60,
       widget.width / widget.height,
@@ -132,7 +132,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     );
     threeJs.camera.position.setValues(0, -100, 0);
 
-    //loadmodel
+    // Load the robot model
     three.GLTFLoader loader = three.GLTFLoader(flipY: true).setPath('assets/');
     final sky = await loader.fromAsset('stack_chan_model.glb');
 
@@ -149,7 +149,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     applyDanceData();
   }
 
-  //setAngle
+  // Set the camera angle
   void setupCamera() {
     if (widget.topLook) {
       threeJs.camera.position.setValues(0, -100, 70);
@@ -162,14 +162,14 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
   three.Object3D yawAxis = three.Object3D();
   three.Object3D pitchAxis = three.Object3D();
 
-  three.Mesh? expressionPlaneMesh; //faceshow
-  three.CanvasTexture? expressionTexture; //facecanvastexture
-  final double canvasWidth = 210; //canvas（correspondingiOS 42*5）
-  final double canvasHeight = 160; //canvas（correspondingiOS 32*5）
-  final String expressionPlaneName = "expressionPlane"; //name（foriOS）
+  three.Mesh? expressionPlaneMesh; // Plane that shows the face
+  three.CanvasTexture? expressionTexture; // Canvas texture for the face
+  final double canvasWidth = 210; // Canvas width (matches iOS: 42 * 5)
+  final double canvasHeight = 160; // Canvas height (matches iOS: 32 * 5)
+  final String expressionPlaneName = "expressionPlane"; // Node name, kept in sync with iOS
   Function(double)? currentRotationEvent;
 
-  //translated comment
+  // Rebuild the node hierarchy so yaw/pitch become separate pivots
   void setupRobotHierarchy() {
     final model = threeJs.scene.children.firstWhere(
       (element) => element.type == "Group",
@@ -180,7 +180,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
 
     if (foundation == null || centralComponent == null || head == null) return;
 
-    //========== LeftRightto(yaw axis)logic(originalhaslogicCankeep,) ==========
+    //========== Yaw axis (left/right) ==========
     final centralWorldPos = centralComponent.worldPosition();
     centralWorldPos.y -= 20;
     yawAxis.setWorldPosition(centralWorldPos);
@@ -191,7 +191,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     centralComponent.setWorldTransform(centralWorldTransform);
     centralComponent.setWorldPosition(centralWorldPosition);
 
-    //========== UpDown(pitch axis)logic(corefixPart) ==========
+    //========== Pitch axis (up/down) ==========
     final headWorldPosition = head.worldPosition();
     final headWorldTransform = head.worldTransform();
     final pitchAxisWorldPosition = pitchAxis.worldPosition();
@@ -228,7 +228,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     material.needsUpdate = true;
   }
 
-  //writedata
+  // Apply the current dance frame to the model
   void applyDanceData() {
     updateServos();
     updateExpression();
@@ -291,29 +291,29 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       return;
     }
 
-    //1. createdrawExpressioncanvas
+    // 1. Create the canvas for drawing the expression
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint();
 
-    //fliphandle(Yaxisflip)
+    // Mirror horizontally (flip around the Y axis)
     if (widget.mirrorFace) {
       canvas.save();
       canvas.translate(canvasWidth, 0);
       canvas.scale(-1, 1);
     }
 
-    //background:With / Carry 70% transparency (0xB3 = 179/255)
+    // Background: black at 70% opacity (0xB3 = 179/255)
     paint.color = const ui.Color(0xB3000000);
     canvas.drawRect(ui.Rect.fromLTWH(0, 0, canvasWidth, canvasHeight), paint);
 
     final eyeSize = canvasWidth / 10;
 
-    //draweyefunction
+    // Draw a single eye
     void drawEye(ExpressionItem item, ui.Offset centerOffset) {
       canvas.save();
 
-      //calculatesizescale
+      // Scale factor for the eye size
       final clampedSize = item.size.clamp(-100, 100);
       final sizeScale = clampedSize >= 0
           ? 1.0 + clampedSize / 100.0
@@ -322,7 +322,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       final scaledEyeSize = eyeSize * sizeScale;
       final visibleHeight = scaledEyeSize * (item.weight / 100);
 
-      //positionoffset
+      // Eye position offset
       final centerX = centerOffset.dx + item.x / 10 + eyeSize / 2;
       final centerY = centerOffset.dy + item.y / 10 + eyeSize / 2;
 
@@ -332,13 +332,13 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
         height: scaledEyeSize,
       );
 
-      //rotatehandle
+      // Rotation handle
       final rotationDegrees = item.rotation / 10.0;
       canvas.translate(centerX, centerY);
       canvas.rotate(rotationDegrees * pi / 180);
       canvas.translate(-centerX, -centerY);
 
-      //createcropeye
+      // Clip the eye to simulate how far it is open
       final clipRect = ui.Rect.fromLTRB(
         eyeRect.left,
         eyeRect.bottom - visibleHeight,
@@ -347,14 +347,14 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       );
       canvas.clipRect(clipRect);
 
-      //draweye
+      // Draw the white eye ellipse
       paint.color = const ui.Color(0xFFFFFFFF);
       canvas.drawOval(eyeRect, paint);
 
       canvas.restore();
     }
 
-    //calculateeyeposition
+    // Base position of the eyes
     final eyeY = (canvasHeight * 0.4) - (eyeSize / 2);
     final leftEyePoint = ui.Offset((canvasWidth / 4) - (eyeSize / 2), eyeY);
     final rightEyePoint = ui.Offset(
@@ -365,7 +365,7 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     drawEye(data.leftEye, leftEyePoint);
     drawEye(data.rightEye, rightEyePoint);
 
-    //2. drawmouth
+    // 2. Draw the mouth
     canvas.save();
 
     final mouthWidth = (canvasWidth * 0.3 - data.mouth.weight / 10).toDouble();
@@ -395,12 +395,12 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
     );
     canvas.restore();
 
-    //resumecanvasstate（ifperformflip）
+    // Restore the canvas state if it was mirrored
     if (widget.mirrorFace) {
       canvas.restore();
     }
 
-    //3. will Canvas convertastexturedata
+    //3. Draw expression texture with canvas before conversion
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       canvasWidth.toInt(),
@@ -412,25 +412,25 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       return;
     }
 
-    //[Core Fix]:use rawRgba And / WhileNotis png
+    // Use raw RGBA rather than PNG for the texture upload
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
     if (byteData != null) {
-      //convertas three_js Uint8Array
+      // Convert to a three_js Uint8Array
       final uint8List = byteData.buffer.asUint8List();
-      final nativeArray = three.Uint8Array.fromList(uint8List);
+      // final nativeArray = three.Uint8Array.fromList(uint8List);
 
-      //updatetexture
+      // Update the texture
       expressionTexture!.image = three.ImageElement(
-        data: nativeArray,
+        data: uint8List,
         width: canvasWidth.toInt(),
         height: canvasHeight.toInt(),
       );
 
-      //marktextureNeedupdate
+      // Mark the texture and its source as needing an update
       expressionTexture!.needsUpdate = true;
 
-      //ifuse MeshBasicMaterial,EnsureWillrereadtexture
+      // Force MeshBasicMaterial to re-read the texture as well
       if (expressionPlaneMesh!.material is three.Material) {
         (expressionPlaneMesh!.material as three.Material).needsUpdate = true;
       }
@@ -451,7 +451,6 @@ class _StackchanRobotThreeState extends State<StackchanRobotJs> {
       return three.Color(1, 1, 1);
     }
     final intValue = int.parse(hex, radix: 16);
-    final int a = (intValue >> 24) & 0xFF;
     final int r = (intValue >> 16) & 0xFF;
     final int g = (intValue >> 8) & 0xFF;
     final int b = intValue & 0xFF;

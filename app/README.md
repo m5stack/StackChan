@@ -350,7 +350,12 @@ flutter pub get
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The source code authored by M5Stack Technology CO LTD is licensed under the MIT
+License - see the [LICENSE](LICENSE) file for details.
+
+Bundled assets and third-party dependencies may be covered by separate terms.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before redistributing
+third-party assets.
 
 ## Acknowledgments
 

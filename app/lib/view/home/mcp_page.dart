@@ -3,12 +3,13 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:stack_chan/app_state.dart';
 import 'package:stack_chan/model/XiaoZhi/device.dart';
-import 'package:stack_chan/util/XiaoZhi_util.dart';
+import 'package:stack_chan/util/xiao_zhi_util.dart';
 
 import '../../model/XiaoZhi/endpoints_response.dart';
 import '../../model/XiaoZhi/mcp_endpoints.dart';
@@ -48,9 +49,9 @@ class _McpPageState extends State<McpPage> {
       );
       if (devices.isNotEmpty) {
         device.value = devices.first;
-        if (device.value!.agent_id != null) {
-          getToken(device.value!.agent_id!);
-          getEndpointsList(device.value!.agent_id!);
+        if (device.value!.agentId != null) {
+          getToken(device.value!.agentId!);
+          getEndpointsList(device.value!.agentId!);
         }
       }
     }
@@ -76,11 +77,9 @@ class _McpPageState extends State<McpPage> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _nameController.dispose();
     _descController.dispose();
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
@@ -114,17 +113,19 @@ class _McpPageState extends State<McpPage> {
             spacing: 10,
             children: [
               CupertinoTextField(
+                decoration: ThemeSetting.dialogTextFieldDecoration(context),
                 controller: _nameController,
                 placeholder: "Please enter the name.",
               ),
               CupertinoTextField(
+                decoration: ThemeSetting.dialogTextFieldDecoration(context),
                 controller: _descController,
                 placeholder: "Please provide the description.",
               ),
               Row(
                 mainAxisAlignment: .spaceBetween,
                 children: [
-                  Text("Enabled status"),
+                  const Text("Enabled status"),
                   Obx(
                     () => CupertinoSwitch(
                       value: enabled.value,
@@ -138,12 +139,12 @@ class _McpPageState extends State<McpPage> {
           actions: [
             CupertinoDialogAction(
               child: const Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.maybePop(context),
             ),
             CupertinoDialogAction(
               isDestructiveAction: false,
               isDefaultAction: true,
-              child: Text("Confirm"),
+              child: const Text("Confirm"),
               onPressed: () async {
                 final name = _nameController.text.trim();
                 final desc = _descController.text.trim();
@@ -151,7 +152,7 @@ class _McpPageState extends State<McpPage> {
                   AppState.shared.showToast("The name cannot be left blank.");
                   return;
                 }
-                Navigator.pop(context);
+                Navigator.maybePop(context);
                 if (editItem == null) {
                   await XiaoZhiUtil.shared.createMcpEndpoints(
                     name,
@@ -180,8 +181,8 @@ class _McpPageState extends State<McpPage> {
       context: context,
       builder: (context) {
         return CupertinoAlertDialog(
-          title: Text("Are you sure you want to delete?"),
-          content: Text(
+          title: const Text("Are you sure you want to delete?"),
+          content: const Text(
             "Are you sure you want to delete this access point? This operation is irreversible.",
           ),
           actions: [
@@ -193,7 +194,7 @@ class _McpPageState extends State<McpPage> {
               isDestructiveAction: true,
               child: const Text('Delete'),
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.maybePop(context);
                 final success = await XiaoZhiUtil.shared.deleteEndpoints(id);
                 if (success) {
                   fetchMcpList();
@@ -220,84 +221,39 @@ class _McpPageState extends State<McpPage> {
     }
   }
 
-  Widget buildItem(McpEndpoints item) {
-    return CupertinoListTile(
-      title: Text(item.name ?? "Unnamed"),
-      subtitle: Column(
-        crossAxisAlignment: .start,
-        children: [
-          Text(
-            item.description ?? "No description",
-            style: TextStyle(fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text(
-                item.enabled == 1 ? "Enabled" : "Disabled",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: item.enabled == 1
-                      ? CupertinoColors.activeGreen
-                      : CupertinoColors.systemRed,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                item.createdAt ?? "",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: CupertinoColors.systemGrey,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      trailing: Row(
-        mainAxisSize: .min,
-        children: [
-          CupertinoButton(
-            padding: .zero,
-            child: const Icon(CupertinoIcons.doc_on_clipboard, size: 18),
-            onPressed: () => generateAndCopyToken(item.id!),
-          ),
-          CupertinoButton(
-            padding: .zero,
-            child: const Icon(CupertinoIcons.pencil, size: 18),
-            onPressed: () => showMcpDialog(editItem: item),
-          ),
-          CupertinoButton(
-            padding: .zero,
-            child: Icon(
-              CupertinoIcons.trash,
-              size: 18,
-              color: CupertinoColors.destructiveRed,
-            ),
-            onPressed: () => showDeleteDialog(item.id!),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
       ),
       navigationBar: CupertinoNavigationBar.large(
-        backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
           context,
         ),
-        largeTitle: Text("MCP"),
+        border: ThemeSetting.cupertinoNavigationBarBorder(context),
+        padding: ThemeSetting.navigationBarPadding,
+        largeTitle: const Text("MCP"),
+        leading: const SizedBox.shrink(),
+        trailing: CupertinoButton(
+          sizeStyle: .medium,
+          child: const Icon(CupertinoIcons.xmark),
+          onPressed: () {
+            Navigator.maybePop(context);
+          },
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          bottom: 15 + MediaQuery.of(context).padding.bottom,
-          left: 15,
-          right: 15,
+          bottom: MediaQuery.paddingOf(context).bottom,
+          top:
+              MediaQuery.paddingOf(context).top +
+              kMinInteractiveDimensionCupertino +
+              52,
+          left: padding.left,
+          right: padding.right,
         ),
         child: Column(
           children: [
@@ -307,10 +263,10 @@ class _McpPageState extends State<McpPage> {
                   padding: .zero,
                   children: [
                     CupertinoListSection.insetGrouped(
-                      header: Text("Access Point Status"),
+                      header: const Text("Access Point Status"),
                       children: toolList.isEmpty
                           ? [
-                              CupertinoListTile(
+                              const CupertinoListTile(
                                 title: Center(child: Text("Offline")),
                               ),
                             ]
@@ -322,25 +278,25 @@ class _McpPageState extends State<McpPage> {
                                 .toList(),
                     ),
                     CupertinoListSection.insetGrouped(
-                      header: Text("Access point address"),
+                      header: const Text("Access point address"),
                       children: [
                         if (endpointToken.value != null)
                           CupertinoListTile(
                             title: Padding(
-                              padding: .all(5),
+                              padding: const .all(5),
                               child: Text(
                                 softWrap: true,
                                 maxLines: 100,
-                                "wss://api.XiaoZhi.me/mcp/?token=${endpointToken.value}",
+                                "wss://api.xiaozhi.me/mcp/?token=${endpointToken.value}",
                               ),
                             ),
                             trailing: CupertinoButton(
-                              child: Icon(CupertinoIcons.doc_on_doc),
+                              child: const Icon(CupertinoIcons.doc_on_doc),
                               onPressed: () async {
                                 await Clipboard.setData(
                                   ClipboardData(
                                     text:
-                                        "wss://api.XiaoZhi.me/mcp/?token=${endpointToken.value}",
+                                        "wss://api.xiaozhi.me/mcp/?token=${endpointToken.value}",
                                   ),
                                 );
                                 AppState.shared.showToast("Already copied");
@@ -350,14 +306,14 @@ class _McpPageState extends State<McpPage> {
                               await Clipboard.setData(
                                 ClipboardData(
                                   text:
-                                      "wss://api.XiaoZhi.me/mcp/?token=${endpointToken.value}",
+                                      "wss://api.xiaozhi.me/mcp/?token=${endpointToken.value}",
                                 ),
                               );
                               AppState.shared.showToast("Already copied");
                             },
                           )
                         else
-                          CupertinoListTile(
+                          const CupertinoListTile(
                             title: Center(child: Text("Loading...")),
                           ),
                       ],
@@ -366,14 +322,25 @@ class _McpPageState extends State<McpPage> {
                 ),
               ),
             ),
-            CupertinoButton.filled(
+            Padding(
+              padding: .only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.paddingOf(context).bottom + 20,
+              ),
               child: SizedBox(
                 width: .infinity,
-                child: Center(child: Text("OK")),
+                child: CupertinoButton.filled(
+                  child: const Text(
+                    "OK",
+                    style: TextStyle(color: CupertinoColors.white),
+                  ),
+                  onPressed: () {
+                    Navigator.maybePop(context);
+                  },
+                ),
               ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
             ),
           ],
         ),

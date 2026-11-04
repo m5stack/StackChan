@@ -101,7 +101,8 @@ XiaozhiPowerSavingWorker::XiaozhiPowerSavingWorker()
     _switch_charging->setSize(64, 36);
     _switch_charging->align(LV_ALIGN_TOP_MID, 0, 66);
     _switch_charging->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
-    _switch_charging->setBgColor(lv_color_hex(0x615B9E), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    _switch_charging->setBgColor(lv_color_hex(0x615B9E),
+                                 static_cast<lv_style_selector_t>(LV_PART_INDICATOR) | LV_STATE_CHECKED);
     _switch_charging->setBgColor(lv_color_hex(0xFFFFFF), LV_PART_KNOB);
     if (_config.allowShutdownWhenCharging) {
         _switch_charging->addState(LV_STATE_CHECKED);
@@ -207,9 +208,37 @@ XiaozhiGeneralWorker::XiaozhiGeneralWorker()
     _slider_idle_motion->setValue(current_index);
     _slider_idle_motion->onValueChanged().connect([this](int32_t value) { _pending_idle_motion_index = value; });
 
+    _panel_startup = std::make_unique<Container>(_panel->get());
+    _panel_startup->setSize(296, 120);
+    _panel_startup->align(LV_ALIGN_TOP_MID, 0, 196);
+    _panel_startup->setBgColor(lv_color_hex(0xD2E3FF));
+    _panel_startup->setBorderWidth(0);
+    _panel_startup->setRadius(18);
+    _panel_startup->setPadding(0, 0, 0, 0);
+    _panel_startup->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _label_startup_title = std::make_unique<Label>(_panel_startup->get());
+    _label_startup_title->setText("Start AI Agent on boot:");
+    _label_startup_title->setTextFont(&lv_font_montserrat_16);
+    _label_startup_title->setTextColor(lv_color_hex(0x26206A));
+    _label_startup_title->setWidth(260);
+    _label_startup_title->setTextAlign(LV_TEXT_ALIGN_CENTER);
+    _label_startup_title->align(LV_ALIGN_TOP_MID, 0, 18);
+
+    _switch_start_ai_on_boot = std::make_unique<Switch>(_panel_startup->get());
+    _switch_start_ai_on_boot->setSize(64, 36);
+    _switch_start_ai_on_boot->align(LV_ALIGN_TOP_MID, 0, 66);
+    _switch_start_ai_on_boot->setBgColor(lv_color_hex(0xB8D3FD), LV_PART_MAIN);
+    _switch_start_ai_on_boot->setBgColor(lv_color_hex(0x615B9E),
+                                         static_cast<lv_style_selector_t>(LV_PART_INDICATOR) | LV_STATE_CHECKED);
+    _switch_start_ai_on_boot->setBgColor(lv_color_hex(0xFFFFFF), LV_PART_KNOB);
+    if (_config.startAiAgentOnBoot) {
+        _switch_start_ai_on_boot->addState(LV_STATE_CHECKED);
+    }
+
     _btn_confirm = std::make_unique<Button>(_panel->get());
     apply_button_common_style(*_btn_confirm);
-    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 196);
+    _btn_confirm->align(LV_ALIGN_TOP_MID, 0, 326);
     _btn_confirm->setSize(290, 50);
     _btn_confirm->label().setText("Confirm");
     _btn_confirm->onClick().connect([this]() { _confirm_flag = true; });
@@ -226,7 +255,8 @@ void XiaozhiGeneralWorker::update()
     }
 
     if (_confirm_flag) {
-        _confirm_flag = false;
+        _confirm_flag              = false;
+        _config.startAiAgentOnBoot = _switch_start_ai_on_boot->getValue();
         GetHAL().setXiaozhiConfig(_config);
         mclog::tagInfo(_tag, "xiaozhi config updated: idleRandomMovementLevel={} ({})", _config.idleRandomMovementLevel,
                        _idle_motion_level_labels[_config.idleRandomMovementLevel]);

@@ -5,79 +5,79 @@ SPDX-License-Identifier: MIT
 
 class AgentsDevice {
   int? id;
-  int? user_id;
-  String? mac_address;
-  String? created_at;
-  String? updated_at;
-  String? last_connected_at;
-  int? auto_update;
+  int? userId;
+  String? macAddress;
+  String? createdAt;
+  String? updatedAt;
+  String? lastConnectedAt;
+  int? autoUpdate;
   dynamic board;
   String? alias;
-  String? agent_code;
-  int? agent_id;
-  String? app_version;
-  int? is_deleted;
-  String? board_name;
-  String? serial_number;
+  String? agentCode;
+  int? agentId;
+  String? appVersion;
+  int? isDeleted;
+  String? boardName;
+  String? serialNumber;
 
-  //Constructorfunction
+  // Creates a device record; every field is optional.
   AgentsDevice({
     this.id,
-    this.user_id,
-    this.mac_address,
-    this.created_at,
-    this.updated_at,
-    this.last_connected_at,
-    this.auto_update,
+    this.userId,
+    this.macAddress,
+    this.createdAt,
+    this.updatedAt,
+    this.lastConnectedAt,
+    this.autoUpdate,
     this.board,
     this.alias,
-    this.agent_code,
-    this.agent_id,
-    this.app_version,
-    this.is_deleted,
-    this.board_name,
-    this.serial_number,
+    this.agentCode,
+    this.agentId,
+    this.appVersion,
+    this.isDeleted,
+    this.boardName,
+    this.serialNumber,
   });
 
-  //from JSON convert
+  // Creates a device record from a JSON map.
   factory AgentsDevice.fromJson(Map<String, dynamic> json) {
     return AgentsDevice(
       id: json['id'],
-      user_id: json['user_id'],
-      mac_address: json['mac_address'],
-      created_at: json['created_at'],
-      updated_at: json['updated_at'],
-      last_connected_at: json['last_connected_at'],
-      auto_update: json['auto_update'],
+      userId: json['user_id'],
+      macAddress: json['mac_address'],
+      createdAt: json['created_at'],
+      updatedAt: json['updated_at'],
+      lastConnectedAt: json['last_connected_at'],
+      autoUpdate: json['auto_update'],
       board: json['board'],
       alias: json['alias'],
-      agent_code: json['agent_code'],
-      agent_id: json['agent_id'],
-      app_version: json['app_version'],
-      is_deleted: json['is_deleted'],
-      board_name: json['board_name'],
-      serial_number: json['serial_number'],
+      agentCode: json['agent_code'],
+      agentId: json['agent_id'],
+      appVersion: json['app_version'],
+      isDeleted: json['is_deleted'],
+      boardName: json['board_name'],
+      serialNumber: json['serial_number'],
     );
   }
 
-  //convertas JSON
+  // Converts this device record to a JSON map.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['id'] = id;
-    data['user_id'] = user_id;
-    data['mac_address'] = mac_address;
-    data['created_at'] = created_at;
-    data['updated_at'] = updated_at;
-    data['last_connected_at'] = last_connected_at;
-    data['auto_update'] = auto_update;
+    data['user_id'] = userId;
+    data['mac_address'] = macAddress;
+    data['created_at'] = createdAt;
+    data['updated_at'] = updatedAt;
+    data['last_connected_at'] = lastConnectedAt;
+    data['auto_update'] = autoUpdate;
     data['board'] = board;
     data['alias'] = alias;
-    data['agent_code'] = agent_code;
-    data['agent_id'] = agent_id;
-    data['app_version'] = app_version;
-    data['is_deleted'] = is_deleted;
-    data['board_name'] = board_name;
-    data['serial_number'] = serial_number;
+    data['agent_code'] = agentCode;
+    data['agent_id'] = agentId;
+    data['app_version'] = appVersion;
+    data['is_deleted'] = isDeleted;
+    data['board_name'] = boardName;
+    data['serial_number'] = serialNumber;
     return data;
   }
 }

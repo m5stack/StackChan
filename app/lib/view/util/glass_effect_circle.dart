@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 import 'package:flutter/cupertino.dart';
 
-//translated comment
+/// A circular frosted-glass surface that blurs whatever is behind it.
 class GlassEffectCircle extends StatelessWidget {
   const GlassEffectCircle({super.key, this.padding, this.child});
 

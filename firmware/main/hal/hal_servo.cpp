@@ -23,18 +23,20 @@ struct ServoConfig_t {
     std::string settingNs;
     std::string settingZeroPositionKey;
     bool enablePwmMode = false;
+    bool enableStallProtection = false;
 };
 
 class ScsServo : public Servo {
 public:
     static inline const std::string _tag = "ScsServo";
 
-    ScsServo(const ServoConfig_t& config) : _config(config)
+    ScsServo(const ServoConfig_t& config) : _config(config), _runtime_raw_pos_limit(config.rawPosLimit)
     {
     }
 
     void init() override
     {
+        reset_runtime_limits();
         set_angle_limit(_config.angleLimit);
         get_zero_pos_from_nvs();
         Servo::init();
@@ -72,9 +74,13 @@ public:
     void set_angle_impl(int angle) override
     {
         int mapped_angle = _zero_pos + angle * 16 / 5 / 10;  // 一步对应 0.3125度, 0.3125 = 5/16
-        mapped_angle     = uitk::clamp(mapped_angle, _config.rawPosLimit.x, _config.rawPosLimit.y);
+        mapped_angle     = uitk::clamp(mapped_angle, _runtime_raw_pos_limit.x, _runtime_raw_pos_limit.y);
 
         // mclog::tagInfo(_tag, "id: {} mapped angle: {}", _id, mapped_angle);
+
+        if (update_stall_protection(mapped_angle)) {
+            return;
+        }
 
         check_mode(Mode::Position);
         _scs_bus.WritePos(_config.id, mapped_angle, 20, 0);
@@ -83,8 +89,15 @@ public:
     int getCurrentAngle() override
     {
         int current_pos = _scs_bus.ReadPos(_config.id);
-        int angle       = (current_pos - _zero_pos) * 5 * 10 / 16;
-        angle           = uitk::clamp(angle, getAngleLimit().x, getAngleLimit().y);
+        if (!is_raw_pos_valid(current_pos)) {
+            int fallback_angle = uitk::clamp(Servo::getCurrentAngle(), getAngleLimit().x, getAngleLimit().y);
+            mclog::tagWarn(_tag, "id: {} ignore invalid current pos: {}, fallback angle: {}", _config.id, current_pos,
+                           fallback_angle);
+            return fallback_angle;
+        }
+
+        int angle = raw_pos_to_angle(current_pos);
+        angle     = uitk::clamp(angle, getAngleLimit().x, getAngleLimit().y);
         // mclog::tagInfo(_tag, "id: {} current pos: {} angle: {}", _id, current_pos, angle);
         return angle;
     }
@@ -112,7 +125,15 @@ public:
 
     void setCurrentAngleAsZero() override
     {
-        _zero_pos = _scs_bus.ReadPos(_config.id);
+        int current_pos = _scs_bus.ReadPos(_config.id);
+        if (!is_raw_pos_valid(current_pos)) {
+            mclog::tagWarn(_tag, "id: {} ignore invalid zero calibration pos: {}, keep zero pos: {}", _config.id,
+                           current_pos, _zero_pos);
+            return;
+        }
+
+        _zero_pos = current_pos;
+        reset_runtime_limits();
 
         Settings settings(_config.settingNs, true);
         settings.SetInt(_config.settingZeroPositionKey, _zero_pos);
@@ -123,6 +144,7 @@ public:
     void resetZeroCalibration() override
     {
         _zero_pos = _config.defaultZeroPos;
+        reset_runtime_limits();
 
         Settings settings(_config.settingNs, true);
         settings.SetInt(_config.settingZeroPositionKey, _zero_pos);
@@ -148,8 +170,152 @@ private:
     enum class Mode { Position = 0, PWM = 1 };
 
     ServoConfig_t _config;
+    Vector2i _runtime_raw_pos_limit;
     int _zero_pos      = 0;
     Mode _current_mode = Mode::Position;
+
+    static constexpr uint32_t kStallFeedbackIntervalMs = 50;
+    static constexpr int kStallMinTargetDeltaRaw       = 8;
+    static constexpr int kStallMaxPositionDeltaRaw     = 1;
+    static constexpr int kStallCurrentRiseThreshold    = 80;
+    static constexpr int kStallLoadRiseThreshold       = 150;
+    static constexpr int kStallCurrentAbsThreshold     = 350;
+    static constexpr int kStallLoadAbsThreshold        = 650;
+    static constexpr int kStallConfirmSamples          = 2;
+
+    uint32_t _last_stall_check_tick = 0;
+    int _last_stall_raw_pos         = 0;
+    int _last_stall_current_abs     = 0;
+    int _last_stall_load_abs        = 0;
+    int _last_stall_direction       = 0;
+    int _stall_confirm_count        = 0;
+    bool _last_stall_feedback_valid = false;
+
+    static int abs_int(int value)
+    {
+        return value < 0 ? -value : value;
+    }
+
+    bool is_raw_pos_valid(int raw_pos) const
+    {
+        return raw_pos >= _config.rawPosLimit.x && raw_pos <= _config.rawPosLimit.y;
+    }
+
+    int raw_pos_to_angle(int raw_pos) const
+    {
+        return (raw_pos - _zero_pos) * 5 * 10 / 16;
+    }
+
+    void reset_runtime_limits()
+    {
+        _runtime_raw_pos_limit = _config.rawPosLimit;
+        set_angle_limit(_config.angleLimit);
+        reset_stall_detection();
+    }
+
+    void reset_stall_detection()
+    {
+        _last_stall_feedback_valid = false;
+        _last_stall_direction      = 0;
+        _stall_confirm_count       = 0;
+    }
+
+    bool update_stall_protection(int target_raw_pos)
+    {
+        if (!_config.enableStallProtection) {
+            return false;
+        }
+
+        const uint32_t now = GetHAL().millis();
+        if (now - _last_stall_check_tick < kStallFeedbackIntervalMs) {
+            return false;
+        }
+        _last_stall_check_tick = now;
+
+        if (_scs_bus.FeedBack(_config.id) < 0) {
+            reset_stall_detection();
+            return false;
+        }
+
+        const int current_raw_pos = _scs_bus.ReadPos(-1);
+        const int current_abs     = abs_int(_scs_bus.ReadCurrent(-1));
+        const int load_abs        = abs_int(_scs_bus.ReadLoad(-1));
+
+        if (!is_raw_pos_valid(current_raw_pos)) {
+            reset_stall_detection();
+            return false;
+        }
+
+        const int target_delta = target_raw_pos - current_raw_pos;
+        if (abs_int(target_delta) < kStallMinTargetDeltaRaw) {
+            reset_stall_detection();
+            return false;
+        }
+
+        const int direction = target_delta > 0 ? 1 : -1;
+        if (_last_stall_feedback_valid && direction == _last_stall_direction) {
+            const int pos_delta = abs_int(current_raw_pos - _last_stall_raw_pos);
+            const bool position_stuck = pos_delta <= kStallMaxPositionDeltaRaw;
+            const bool current_spike  = current_abs >= kStallCurrentAbsThreshold ||
+                                       current_abs - _last_stall_current_abs >= kStallCurrentRiseThreshold;
+            const bool load_spike = load_abs >= kStallLoadAbsThreshold ||
+                                    load_abs - _last_stall_load_abs >= kStallLoadRiseThreshold;
+
+            if (position_stuck && (current_spike || load_spike)) {
+                _stall_confirm_count++;
+            } else if (pos_delta > kStallMaxPositionDeltaRaw) {
+                _stall_confirm_count = 0; 
+            }
+        } else {
+            _stall_confirm_count = 0;
+        }
+
+        _last_stall_raw_pos         = current_raw_pos;
+        _last_stall_current_abs     = current_abs;
+        _last_stall_load_abs        = load_abs;
+        _last_stall_direction       = direction;
+        _last_stall_feedback_valid = true;
+
+        if (_stall_confirm_count < kStallConfirmSamples) {
+            return false;
+        }
+
+        handle_stall(current_raw_pos, direction, current_abs, load_abs);
+        return true;
+    }
+
+    void handle_stall(int raw_pos, int direction, int current_abs, int load_abs)
+    {
+        int angle = raw_pos_to_angle(raw_pos);
+        angle     = uitk::clamp(angle, _config.angleLimit.x, _config.angleLimit.y);
+
+        auto angle_limit = getAngleLimit();
+        if (direction > 0) {
+            if (raw_pos < _runtime_raw_pos_limit.y) {
+                _runtime_raw_pos_limit.y = raw_pos;
+            }
+            if (angle < angle_limit.y) {
+                angle_limit.y = angle;
+            }
+        } else {
+            if (raw_pos > _runtime_raw_pos_limit.x) {
+                _runtime_raw_pos_limit.x = raw_pos;
+            }
+            if (angle > angle_limit.x) {
+                angle_limit.x = angle;
+            }
+        }
+        set_angle_limit(angle_limit);
+        stop_motion_at_angle(angle);
+        reset_stall_detection();
+
+        check_mode(Mode::Position);
+        _scs_bus.WritePos(_config.id, raw_pos, 20, 0);
+
+        mclog::tagWarn(_tag,
+                       "id: {} stall detected, raw: {}, angle: {}, dir: {}, current: {}, load: {}, limit: [{}, {}]",
+                       _config.id, raw_pos, angle, direction, current_abs, load_abs, angle_limit.x, angle_limit.y);
+    }
 
     void check_mode(Mode targetMode)
     {
@@ -184,6 +350,7 @@ void Hal::servo_init()
     pitch_servo_config.rawPosLimit            = Vector2i(0, 1000);
     pitch_servo_config.settingNs              = "servo";
     pitch_servo_config.settingZeroPositionKey = "zero_pos_2";
+    pitch_servo_config.enableStallProtection  = true;
 
     auto yaw_servo   = std::make_unique<ScsServo>(yaw_servo_config);
     auto pitch_servo = std::make_unique<ScsServo>(pitch_servo_config);

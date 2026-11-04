@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-///licenseentityClass
+/// A product license with its serial number, key, and activation state.
 
 
 class License {
@@ -35,7 +35,7 @@ class License {
     this.macAddress,
   });
 
-  ///JSON to License object
+  /// Creates a license from a JSON map.
   factory License.fromJson(Map<String, dynamic> json) => License(
     id: json['id'] as int?,
     productId: json['product_id'] as int?,
@@ -51,7 +51,7 @@ class License {
     macAddress: json['mac_address'],
   );
 
-  ///objectto JSON
+  /// Converts this license to a JSON map.
   Map<String, dynamic> toJson() => {
     'id': id,
     'product_id': productId,

@@ -1,6 +1,6 @@
 dependencies:
   espressif/cmake_utilities:
-    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    component_hash: 05165f30922b422b4b90c08845e6d449329b97370fbd06309803d8cb539d79e3
     dependencies:
     - name: idf
       require: private
@@ -8,23 +8,23 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.5.3
+    version: 1.1.1
   espressif/esp-now:
-    component_hash: 56f902e978ec0b70528ad30a45265b56bf2b91653d13e0badc78159f39f41ece
+    component_hash: 217f4e2c1672bcc71e5890fb3659528bbce5f1a8a995b1668fec9374acbd0f45
     dependencies:
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
       require: private
-      version: 0.*
+      version: '>=0.5.3'
     - name: idf
       require: private
       version: '>=4.4'
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 2.5.2
+    version: 2.5.3
   espressif/i2c_bus:
-    component_hash: 4e990dc11734316186b489b362c61d41f23f79d58bc169795cec215e528cba14
+    component_hash: 483112c1619c54c38d0b734fb25f1678733267858a77b7af2f48cc7db6dbbd84
     dependencies:
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
@@ -36,7 +36,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.5.0
+    version: 1.5.2
   idf:
     source:
       type: idf
@@ -49,29 +49,29 @@ dependencies:
       type: service
     version: 8.4.0
   m5stack/m5gfx:
-    component_hash: 4c420c89ae7bfe33231dab80b784f4508591279b2a3a935ac849dddb1942d0d5
+    component_hash: 96695547f4403f0864a637325b63b37276233999fcbdd5e485f4e71fd2210020
     dependencies: []
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.2.17
+    version: 0.2.23
   m5stack/m5unified:
-    component_hash: 1c75bb80654da6c7fcdd11ef7a1cb9b7d6db2e98f96612a4babf12b5e9bc7196
+    component_hash: 363c05d034f103471dcbe76e5e0773ecc0fe263212930259867212341b1e48a4
     dependencies:
     - name: m5stack/m5gfx
       registry_url: https://components.espressif.com
       require: private
-      version: ^0.2.17
+      version: '>=0.2.22'
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 0.2.11
+    version: 0.2.17
 direct_dependencies:
 - espressif/esp-now
 - espressif/i2c_bus
 - idf
 - lvgl/lvgl
 - m5stack/m5unified
-manifest_hash: 1a633f7edf3e64c57d1f921f15913b2bf6deda0e71113957a364b6552fa37e9b
+manifest_hash: dcf5a8b9158ceba6656057f11794d186f6222be421c6b2023bdeee009adce7e8
 target: esp32
 version: 2.0.0

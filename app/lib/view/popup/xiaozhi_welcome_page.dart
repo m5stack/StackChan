@@ -3,9 +3,9 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:get/get.dart';
-import 'package:pull_down_button/pull_down_button.dart';
 import 'package:stack_chan/model/XiaoZhi/agent.dart';
 import 'package:stack_chan/util/extension.dart';
 import 'package:stack_chan/util/music_util.dart';
@@ -16,8 +16,8 @@ import '../../model/XiaoZhi/XiaoZhi_model.dart';
 import '../../model/XiaoZhi/agent_create.dart';
 import '../../model/XiaoZhi/common_mcp_tool.dart';
 import '../../model/XiaoZhi/tts_list.dart';
-import '../../util/XiaoZhi_util.dart';
 import '../../util/mac_address_validator.dart';
+import '../../util/xiao_zhi_util.dart';
 import '../../util/value_constant.dart';
 
 class XiaoZhiWelcomePage extends StatefulWidget {
@@ -30,12 +30,13 @@ class XiaoZhiWelcomePage extends StatefulWidget {
 }
 
 class XiaoZhiEditAgentModel extends GetxController {
+  static const String _defaultAgentName = "StackChan AI Agent";
+
   Agent? agent;
 
   final RxBool isLoading = false.obs;
 
   late TextEditingController agentNameController;
-  late TextEditingController assistantNameController;
   late TextEditingController characterController;
   late TextEditingController memoryController;
 
@@ -62,25 +63,25 @@ class XiaoZhiEditAgentModel extends GetxController {
 
   Future<void> initPageData(bool isWelCome) async {
     agentNameController = TextEditingController();
-    assistantNameController = TextEditingController();
     characterController = TextEditingController();
     memoryController = TextEditingController();
     ever(selectedLanguage, (lang) => _updateTtsVoiceList(lang));
     await loadCommonMcpTools();
     await loadTtsList();
     await loadModelList();
+    final isFirstBoundDevice = await _isFirstBoundDevice(isWelCome);
     final devices = await XiaoZhiUtil.shared.getDevice(
       AppState.shared.deviceMac,
     );
 
     if (devices.isNotEmpty) {
-      if (devices.first.agent_id != null) {
+      if (devices.first.agentId != null) {
         if (isWelCome) {
           final originallyAgent = await XiaoZhiUtil.shared.getAgentDetail(
-            devices.first.agent_id!,
+            devices.first.agentId!,
           );
 
-          //fromtemplateGet
+          // Fetch agent templates to initialize a new agent.
           final agentTemplatesList = await XiaoZhiUtil.shared
               .agentTemplatesList(1, 10);
 
@@ -88,66 +89,57 @@ class XiaoZhiEditAgentModel extends GetxController {
             final template = agentTemplatesList.first;
             agent = Agent(
               id: originallyAgent?.id,
-              user_name: template.user_name,
-              agent_name: template.agent_name,
-              assistant_name: template.assistant_name,
-              llm_model: template.llm_model,
-              tts_voice: getTtsVoice("en", template.tts_voices ?? []),
-              tts_speech_speed: template.tts_speech_speed,
-              tts_pitch: template.tts_pitch,
-              asr_speed: template.asr_speed,
+              userName: template.userName,
+              agentName: getContext(template.agentName, _defaultAgentName),
+              llmModel: template.llmModel,
+              ttsVoice: getTtsVoice("en", template.ttsVoices ?? []),
+              ttsSpeechSpeed: template.ttsSpeechSpeed,
+              ttsPitch: template.ttsPitch,
+              asrSpeed: template.asrSpeed,
               language: "en",
               character: template.character,
               memory: "",
-              memory_type: "SHORT_TERM",
-              knowledge_base_ids: template.knowledge_base_ids,
+              memoryType: "SHORT_TERM",
+              knowledgeBaseIds: template.knowledgeBaseIds,
             );
-            fillEditData(agent!);
+            fillEditData(agent!, preferQwen: isFirstBoundDevice);
           } else {
             agent = originallyAgent;
-            fillEditData(agent!);
+            if (agent != null) {
+              fillEditData(agent!, preferQwen: isFirstBoundDevice);
+            } else {
+              setDefaultCreateData(preferQwen: isFirstBoundDevice);
+            }
           }
         } else {
-          //update
+          // Refresh the existing agent's details.
           agent = await XiaoZhiUtil.shared.getAgentDetail(
-            devices.first.agent_id!,
+            devices.first.agentId!,
           );
-          fillEditData(agent!);
+          if (agent != null) {
+            fillEditData(agent!);
+          } else {
+            setDefaultCreateData();
+          }
         }
       } else {
-        ///hasactivateagent,Needactivateagent
-        //2. generatelicense
-        final generateLicense = await XiaoZhiUtil.shared.generateLicense(
-          AppState.shared.deviceMac,
-        );
-        if (generateLicense == null || generateLicense.serialNumber == null) {
-                    AppState.shared.showToast("Failed to generate device license.");
-          return;
-        }
-
-        //3. activatedevice
-        final serialNumber = generateLicense.serialNumber!;
-        final mac = MacAddressValidator.formatMac(AppState.shared.deviceMac);
-        if (mac == null) {
-          AppState.shared.showToast("Failed to format device MAC address.");
-          return;
-        }
-        bool activateResult = await XiaoZhiUtil.shared.agentsDevicesActivate(
-          serialNumber,
-          mac,
-        );
-        if (!activateResult) {
-                    AppState.shared.showToast("Device cloud activation failed.");
-          return;
-        }
-
-        //activatedevicesuccess
-        initPageData(isWelCome);
+        setDefaultCreateData(preferQwen: isFirstBoundDevice);
       }
     } else {
-      setDefaultCreateData();
+      setDefaultCreateData(preferQwen: isFirstBoundDevice);
     }
     update();
+  }
+
+  Future<bool> _isFirstBoundDevice(bool isWelCome) async {
+    if (!isWelCome) return false;
+    await AppState.shared.getDevices(force: true);
+    final boundDevices = AppState.shared.devices;
+    if (boundDevices.length != 1) return false;
+    return MacAddressValidator.areEqual(
+      boundDevices.first.mac,
+      AppState.shared.deviceMac,
+    );
   }
 
   String getTtsVoice(String language, List<String> ttsVoices) {
@@ -174,10 +166,7 @@ class XiaoZhiEditAgentModel extends GetxController {
     if (ttsData?.ttsVoices != null) {
       languageList.value = ttsData!.ttsVoices!.keys.toList();
     }
-    if (languageList.isNotEmpty && selectedLanguage.isEmpty) {
-      selectedLanguage.value = languageList.first;
-    }
-    _updateTtsVoiceList(selectedLanguage.value);
+    _selectDefaultTtsVoice(preferredLanguage: selectedLanguage.value);
   }
 
   void _updateTtsVoiceList(String lang) {
@@ -189,6 +178,112 @@ class XiaoZhiEditAgentModel extends GetxController {
     ttsList.value = ttsData!.ttsVoices![lang] ?? [];
     selectedTtsVoice.value = ttsList.isNotEmpty ? ttsList.first : null;
     update();
+  }
+
+  /// Selects a voice for page initialization when no voice has been chosen.
+  /// The order is the current language, English, then the first available
+  /// voice in the complete TTS map.
+  void _selectDefaultTtsVoice({String? preferredLanguage, String? voiceId}) {
+    final voicesByLanguage = ttsData?.ttsVoices;
+    if (voicesByLanguage == null || voicesByLanguage.isEmpty) {
+      ttsList.clear();
+      selectedTtsVoice.value = null;
+      return;
+    }
+
+    String? resolvedLanguage;
+    TTsVoice? resolvedVoice;
+
+    final preferredVoices = _voicesForLanguage(
+      voicesByLanguage,
+      preferredLanguage,
+    );
+    if (voiceId != null && voiceId.isNotEmpty) {
+      resolvedVoice = preferredVoices.firstWhereOrNull(
+        (voice) => voice.voiceId == voiceId,
+      );
+      if (resolvedVoice == null) {
+        for (final entry in voicesByLanguage.entries) {
+          resolvedVoice = entry.value.firstWhereOrNull(
+            (voice) => voice.voiceId == voiceId,
+          );
+          if (resolvedVoice != null) {
+            resolvedLanguage = entry.key;
+            break;
+          }
+        }
+      }
+    }
+    if (resolvedVoice != null) {
+      resolvedLanguage = _languageForVoice(voicesByLanguage, resolvedVoice);
+    } else if (preferredVoices.isNotEmpty) {
+      resolvedLanguage = _languageKey(voicesByLanguage, preferredLanguage);
+      resolvedVoice = preferredVoices.first;
+    }
+
+    if (resolvedVoice == null) {
+      final englishKey = _languageKey(voicesByLanguage, "en");
+      final englishVoices = _voicesForLanguage(voicesByLanguage, englishKey);
+      if (englishVoices.isNotEmpty) {
+        resolvedLanguage = englishKey;
+        resolvedVoice = englishVoices.first;
+      }
+    }
+
+    if (resolvedVoice == null) {
+      for (final entry in voicesByLanguage.entries) {
+        if (entry.value.isNotEmpty) {
+          resolvedLanguage = entry.key;
+          resolvedVoice = entry.value.first;
+          break;
+        }
+      }
+    }
+
+    if (resolvedVoice == null) {
+      ttsList.clear();
+      selectedTtsVoice.value = null;
+      return;
+    }
+
+    if (resolvedLanguage != null &&
+        selectedLanguage.value != resolvedLanguage) {
+      selectedLanguage.value = resolvedLanguage;
+    }
+    ttsList.value = voicesByLanguage[resolvedLanguage] ?? [resolvedVoice];
+    selectedTtsVoice.value = resolvedVoice;
+    update();
+  }
+
+  List<TTsVoice> _voicesForLanguage(
+    Map<String, List<TTsVoice>> voicesByLanguage,
+    String? language,
+  ) {
+    final key = _languageKey(voicesByLanguage, language);
+    return key == null ? const [] : voicesByLanguage[key] ?? const [];
+  }
+
+  String? _languageKey(
+    Map<String, List<TTsVoice>> voicesByLanguage,
+    String? language,
+  ) {
+    if (language == null || language.isEmpty) return null;
+    for (final key in voicesByLanguage.keys) {
+      if (key == language || key.toLowerCase() == language.toLowerCase()) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  String? _languageForVoice(
+    Map<String, List<TTsVoice>> voicesByLanguage,
+    TTsVoice voice,
+  ) {
+    for (final entry in voicesByLanguage.entries) {
+      if (entry.value.contains(voice)) return entry.key;
+    }
+    return null;
   }
 
   Future<void> loadModelList() async {
@@ -212,71 +307,72 @@ class XiaoZhiEditAgentModel extends GetxController {
     }
   }
 
-  void fillEditData(Agent agent) {
-    agentNameController.text = getContext(
-      agent.agent_name,
-      "StackChan AI Agent",
-    );
-    assistantNameController.text = getContext(
-      agent.assistant_name,
-      "StackChan",
-    );
+  void fillEditData(Agent agent, {bool preferQwen = false}) {
+    agentNameController.text = getContext(agent.agentName, _defaultAgentName);
     characterController.text = agent.character ?? "";
     memoryController.text = agent.memory ?? "";
-    if (languageList.contains(agent.language)) {
-      selectedLanguage.value = agent.language!;
-    } else if (languageList.isNotEmpty) {
-      selectedLanguage.value = languageList.first;
+    final preferredLanguage = languageList.contains(agent.language)
+        ? agent.language
+        : null;
+    if (preferredLanguage != null) {
+      selectedLanguage.value = preferredLanguage;
     }
 
-    ttsSpeed.value = agent.tts_speech_speed ?? "normal";
-    ttsPitch.value = agent.tts_pitch ?? 0;
-    asrSpeed.value = agent.asr_speed ?? "normal";
-    memoryType.value = agent.memory_type ?? "SHORT_TERM";
+    ttsSpeed.value = agent.ttsSpeechSpeed ?? "normal";
+    ttsPitch.value = agent.ttsPitch ?? 0;
+    asrSpeed.value = agent.asrSpeed ?? "normal";
+    memoryType.value = agent.memoryType ?? "SHORT_TERM";
 
-    if (agent.llm_model != null && agent.llm_model!.isNotEmpty) {
-      selectedModel.value = modelList.firstWhereOrNull(
-        (m) => m.name == agent.llm_model,
-      );
-    } else {
-      for (var i in modelList) {
-        if (i.name != null) {
-          if (i.name!.toLowerCase() == "qwen") {
-            selectedModel.value = i;
-            update();
-            break;
-          } else if (i.name!.toLowerCase().contains("qwen")) {
-            selectedModel.value = i;
-            update();
-            break;
-          }
-        }
-      }
-    }
+    selectedModel.value = _selectModel(agent.llmModel, preferQwen: preferQwen);
 
-    if (agent.tts_voice != null) {
-      Future.delayed(const Duration(milliseconds: 100), () {
-        selectedTtsVoice.value = ttsList.firstWhereOrNull(
-          (t) => t.voiceId == agent.tts_voice,
-        );
-        update();
-      });
-    }
+    _selectDefaultTtsVoice(
+      preferredLanguage: preferredLanguage,
+      voiceId: agent.ttsVoice,
+    );
 
-    if (agent.mcp_endpoints != null) {
-      selectedMcpEndpoints.addAll(agent.mcp_endpoints!);
+    if (agent.mcpEndpoints != null) {
+      selectedMcpEndpoints.addAll(agent.mcpEndpoints!);
     }
     update();
   }
 
-  void setDefaultCreateData() {
+  ModelData? _selectModel(String? modelName, {bool preferQwen = false}) {
+    if (preferQwen) {
+      final qwenModel = _findQwenModel();
+      if (qwenModel != null) return qwenModel;
+    }
+
+    if (modelName != null && modelName.isNotEmpty) {
+      final matchedModel = modelList.firstWhereOrNull(
+        (m) => m.name == modelName,
+      );
+      if (matchedModel != null) return matchedModel;
+    }
+
+    return _findQwenModel() ?? (modelList.isNotEmpty ? modelList.first : null);
+  }
+
+  ModelData? _findQwenModel() {
+    ModelData? fallback;
+    for (final model in modelList) {
+      final name = model.name?.toLowerCase() ?? "";
+      final description = model.description?.toLowerCase() ?? "";
+      if (name == "qwen") return model;
+      if (fallback == null &&
+          (name.contains("qwen") || description.contains("qwen"))) {
+        fallback = model;
+      }
+    }
+    return fallback;
+  }
+
+  void setDefaultCreateData({bool preferQwen = false}) {
     agentNameController.text = "My AI Agent";
-    assistantNameController.text = "StackChan";
     ttsSpeed.value = "normal";
     ttsPitch.value = 0;
     asrSpeed.value = "normal";
     memoryType.value = "SHORT_TERM";
-    if (modelList.isNotEmpty) selectedModel.value = modelList.first;
+    selectedModel.value = _selectModel(null, preferQwen: preferQwen);
     update();
   }
 
@@ -289,10 +385,6 @@ class XiaoZhiEditAgentModel extends GetxController {
   }
 
   Future<bool> submitAgent() async {
-    if (assistantNameController.text.trim().isEmpty) {
-      AppState.shared.showToast("Please input assistant assistant name.");
-      return false;
-    }
     if (selectedModel.value == null) {
       AppState.shared.showToast("Please select an LLM Model.");
       return false;
@@ -302,44 +394,55 @@ class XiaoZhiEditAgentModel extends GetxController {
       return false;
     }
     isLoading.value = true;
-    final agentParams = AgentCreate(
-      agent_name: agent?.agent_name ?? "StackChan AI Agent",
-      assistant_name: assistantNameController.text.trim(),
-      llm_model: selectedModel.value!.name!,
-      tts_voice: selectedTtsVoice.value!.voiceId!,
-      tts_speech_speed: ttsSpeed.value,
-      tts_pitch: ttsPitch.value,
-      asr_speed: asrSpeed.value,
-      language: selectedLanguage.value,
-      character: characterController.text.trim(),
-      memory: memoryController.text.trim(),
-      memory_type: memoryType.value,
-      mcp_endpoints: null,
-      product_mcp_endpoints: null,
-    );
-    bool result = false;
-    if (agent != null) {
-      result = await XiaoZhiUtil.shared.updateAgent(agent!.id!, agentParams);
-    } else {
-      final agentId = await XiaoZhiUtil.shared.createAgent(agentParams);
-      result = agentId != null;
-    }
-
-    isLoading.value = false;
-    if (result) {
-      AppState.shared.showToast(
-        agent != null
-            ? "Agent edited successfully"
-            : "Agent created successfully",
+    try {
+      final agentParams = AgentCreate(
+        agentName: agent?.agentName ?? _defaultAgentName,
+        llmModel: selectedModel.value!.name!,
+        ttsVoice: selectedTtsVoice.value!.voiceId!,
+        ttsSpeechSpeed: ttsSpeed.value,
+        ttsPitch: ttsPitch.value,
+        asrSpeed: asrSpeed.value,
+        language: selectedLanguage.value,
+        character: characterController.text.trim(),
+        memory: memoryController.text.trim(),
+        memoryType: memoryType.value,
+        mcpEndpoints: null,
+        productMcpEndpoints: null,
       );
+      bool result = false;
+      if (agent != null) {
+        result = await XiaoZhiUtil.shared.updateAgent(agent!.id!, agentParams);
+      } else {
+        final agentId = await XiaoZhiUtil.shared.createAgent(agentParams);
+        result = agentId != null;
+      }
+
+      if (result) {
+        AppState.shared.showToast(
+          agent != null
+              ? "Agent edited successfully"
+              : "Agent created successfully",
+        );
+      } else {
+        AppState.shared.showToast(
+          agent != null ? "Failed to edit agent" : "Failed to create agent",
+        );
+      }
+      return result;
+    } catch (e) {
+      debugPrint("submitAgent error: $e");
+      AppState.shared.showToast(
+        agent != null ? "Failed to edit agent" : "Failed to create agent",
+      );
+      return false;
+    } finally {
+      isLoading.value = false;
     }
-    return result;
   }
 
   @override
   void onClose() {
     agentNameController.dispose();
-    assistantNameController.dispose();
     characterController.dispose();
     memoryController.dispose();
     super.onClose();
@@ -398,51 +501,50 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     MusicUtil.shared.stopMusic();
     model.onClose();
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
       ),
-      child: GestureDetector(
-        onTap: () {
-          if (mounted) {
-            FocusScope.of(context).unfocus();
-          }
-        },
-        behavior: .opaque,
-        child: Column(
-          children: [
-            Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  CupertinoSliverNavigationBar(
-                    largeTitle: Text("Agent Setting"),
-                    trailing: widget.isWelCome != true
-                        ? CupertinoButton(
-                            padding: .zero,
-                            child: Icon(
-                              CupertinoIcons.xmark_circle_fill,
-                              size: 25,
-                              color: CupertinoColors.separator.resolveFrom(
-                                context,
-                              ),
-                            ),
-                            onPressed: () {
-                              CupertinoSheetRoute.popSheet(context);
-                            },
-                          )
-                        : SizedBox.shrink(),
-                  ),
-                  SliverList.list(
+      child: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                CupertinoSliverNavigationBar(
+                  backgroundColor:
+                      ThemeSetting.cupertinoNavigationBarBackgroundColor(
+                        context,
+                      ),
+                  border: ThemeSetting.cupertinoNavigationBarBorder(context),
+                  padding: ThemeSetting.navigationBarPadding,
+                  leading: widget.isWelCome != true
+                      ? const SizedBox.shrink()
+                      : null,
+                  largeTitle: const Text("Agent Setting"),
+                  stretch: true,
+                  trailing: widget.isWelCome != true
+                      ? CupertinoButton(
+                          sizeStyle: .medium,
+                          onPressed: () {
+                            Navigator.maybePop(context);
+                          },
+                          child: const Icon(CupertinoIcons.xmark),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                SliverPadding(
+                  padding: .only(left: padding.left, right: padding.right),
+                  sliver: SliverList.list(
                     children: [
                       Image.asset(
                         "assets/lateral_image.png",
@@ -450,50 +552,18 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         height: 120,
                         fit: BoxFit.contain,
                       ),
-                      SizedBox(height: 15),
+                      const SizedBox(height: 15),
 
-                      //info
                       CupertinoListSection.insetGrouped(
-                        header: Row(
-                          mainAxisSize: .min,
-                          spacing: 10,
-                          children: [
-                            Text("Assistant Name"),
-                            Text(
-                              "This is what Agent calls itself",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: CupertinoColors.separator.resolveFrom(
-                                  context,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        children: [
-                          CupertinoListTile(
-                            padding: .only(left: 10, right: 10),
-                            title: CupertinoTextField(
-                              maxLength: 30,
-                              decoration: BoxDecoration(),
-                              controller: model.assistantNameController,
-                              placeholder: "Enter assistant name",
-                              clearButtonMode: OverlayVisibilityMode.editing,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      //languageset
-                      CupertinoListSection.insetGrouped(
-                        header: Text("Language"),
+                        header: const Text("Language"),
                         children: [
                           Obx(
                             () => buildSelectItem(
+                              context,
                               title: getLanguagesTitle(
                                 model.selectedLanguage.value,
                               ),
-                              value: Icon(
+                              value: const Icon(
                                 CupertinoIcons.right_chevron,
                                 size: 16,
                               ),
@@ -512,17 +582,44 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         ],
                       ),
 
-                      //LLMmodel
+                      // Language
+                      // CupertinoListSection.insetGrouped(
+                      //   header: Text("Language"),
+                      //   children: [
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title: getLanguagesTitle(
+                      //           model.selectedLanguage.value,
+                      //         ),
+                      //         value: Icon(
+                      //           CupertinoIcons.right_chevron,
+                      //           size: 16,
+                      //         ),
+                      //         items: model.languageList
+                      //             .map((value) => getLanguagesTitle(value))
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.selectedLanguage.value =
+                      //               model.languageList[index];
+                      //         },
+                      //         selectedValue: getLanguagesTitle(
+                      //           model.selectedLanguage.value,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                       CupertinoListSection.insetGrouped(
-                        header: Text("LLM Model"),
+                        header: const Text("LLM Model"),
                         children: [
                           Obx(
                             () => buildSelectItem(
+                              context,
                               title:
                                   model.selectedModel.value?.description
                                       .regularExpressionSubstitution() ??
                                   "Select model",
-                              value: Icon(
+                              value: const Icon(
                                 CupertinoIcons.right_chevron,
                                 size: 16,
                               ),
@@ -547,22 +644,59 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                           ),
                         ],
                       ),
-                      //TTSset
+
+                      // LLM model
+                      // CupertinoListSection.insetGrouped(
+                      //   header: Text("LLM Model"),
+                      //   children: [
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title:
+                      //             model.selectedModel.value?.description
+                      //                 .regularExpressionSubstitution() ??
+                      //             "Select model",
+                      //         value: Icon(
+                      //           CupertinoIcons.right_chevron,
+                      //           size: 16,
+                      //         ),
+                      //         items: model.modelList
+                      //             .map(
+                      //               (e) =>
+                      //                   e.description
+                      //                       .regularExpressionSubstitution() ??
+                      //                   "",
+                      //             )
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.selectedModel.value =
+                      //               model.modelList[index];
+                      //         },
+                      //         selectedValue: model
+                      //             .selectedModel
+                      //             .value
+                      //             ?.description
+                      //             .regularExpressionSubstitution(),
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                       CupertinoListSection.insetGrouped(
-                        header: Text("Voice Settings"),
+                        header: const Text("Voice Settings"),
                         children: [
-                          //voice tone
-                          ttsVoiceWidget(),
-                          //translated comment
+                          ttsVoiceWidget(context),
                           Obx(
                             () => buildSelectItem(
+                              context,
                               title: "Speed :",
                               value: Row(
                                 mainAxisSize: .min,
                                 spacing: 15,
                                 children: [
                                   Text(getSpeedText(model.ttsSpeed.value)),
-                                  Icon(CupertinoIcons.right_chevron, size: 16),
+                                  const Icon(
+                                    CupertinoIcons.right_chevron,
+                                    size: 16,
+                                  ),
                                 ],
                               ),
                               items: model.speedList
@@ -574,16 +708,19 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                               selectedValue: getSpeedText(model.ttsSpeed.value),
                             ),
                           ),
-                          //translated comment
                           Obx(
                             () => buildSelectItem(
+                              context,
                               title: "Pitch :",
                               value: Row(
                                 mainAxisSize: .min,
                                 spacing: 15,
                                 children: [
                                   Text(model.ttsPitch.value.toString()),
-                                  Icon(CupertinoIcons.right_chevron, size: 16),
+                                  const Icon(
+                                    CupertinoIcons.right_chevron,
+                                    size: 16,
+                                  ),
                                 ],
                               ),
                               items: model.pitchList
@@ -595,16 +732,19 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                               selectedValue: model.ttsPitch.value.toString(),
                             ),
                           ),
-                          //ASR
                           Obx(
                             () => buildSelectItem(
+                              context,
                               title: "ASR Speed :",
                               value: Row(
                                 mainAxisSize: .min,
                                 spacing: 15,
                                 children: [
                                   Text(getSpeedText(model.asrSpeed.value)),
-                                  Icon(CupertinoIcons.right_chevron, size: 16),
+                                  const Icon(
+                                    CupertinoIcons.right_chevron,
+                                    size: 16,
+                                  ),
                                 ],
                               ),
                               items: model.speedList
@@ -619,39 +759,139 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         ],
                       ),
 
-                      //with
+                      // TTS settings
+                      // CupertinoListSection.insetGrouped(
+                      //   header: Text("Voice Settings"),
+                      //   children: [
+                      //     // Voice tone
+                      //     ttsVoiceWidget(),
+                      //     // Speech speed
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title: "Speed :",
+                      //         value: Row(
+                      //           mainAxisSize: .min,
+                      //           spacing: 15,
+                      //           children: [
+                      //             Text(getSpeedText(model.ttsSpeed.value)),
+                      //             Icon(CupertinoIcons.right_chevron, size: 16),
+                      //           ],
+                      //         ),
+                      //         items: model.speedList
+                      //             .map((e) => getSpeedText(e))
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.ttsSpeed.value = model.speedList[index];
+                      //         },
+                      //         selectedValue: getSpeedText(model.ttsSpeed.value),
+                      //       ),
+                      //     ),
+                      //     // Pitch
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title: "Pitch :",
+                      //         value: Row(
+                      //           mainAxisSize: .min,
+                      //           spacing: 15,
+                      //           children: [
+                      //             Text(model.ttsPitch.value.toString()),
+                      //             Icon(CupertinoIcons.right_chevron, size: 16),
+                      //           ],
+                      //         ),
+                      //         items: model.pitchList
+                      //             .map((e) => e.toString())
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.ttsPitch.value = model.pitchList[index];
+                      //         },
+                      //         selectedValue: model.ttsPitch.value.toString(),
+                      //       ),
+                      //     ),
+                      //     // ASR speed
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title: "ASR Speed :",
+                      //         value: Row(
+                      //           mainAxisSize: .min,
+                      //           spacing: 15,
+                      //           children: [
+                      //             Text(getSpeedText(model.asrSpeed.value)),
+                      //             Icon(CupertinoIcons.right_chevron, size: 16),
+                      //           ],
+                      //         ),
+                      //         items: model.speedList
+                      //             .map((e) => getSpeedText(e))
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.asrSpeed.value = model.speedList[index];
+                      //         },
+                      //         selectedValue: getSpeedText(model.asrSpeed.value),
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                       CupertinoListSection.insetGrouped(
-                        header: Text("Personality"),
+                        header: const Text("Personality"),
                         children: [
                           CupertinoListTile(
-                            padding: .all(15),
+                            padding: const .all(15),
                             title: CupertinoTextField(
-                              padding: .all(15),
+                              padding: const .all(15),
+                              enableInlinePrediction: true,
+                              enableSuggestions: true,
                               controller: model.characterController,
                               placeholder: "Set agent character",
                               maxLines: 10,
                               clearButtonMode: OverlayVisibilityMode.editing,
                               decoration: BoxDecoration(
-                                color: CupertinoColors.systemGroupedBackground
+                                color: CupertinoColors.tertiarySystemFill
                                     .resolveFrom(context),
-                                borderRadius: .circular(15),
+                                borderRadius: .circular(10),
                               ),
                             ),
                           ),
                         ],
                       ),
+
+                      // Character and memory
+                      // CupertinoListSection.insetGrouped(
+                      //   header: Text("Personality"),
+                      //   children: [
+                      //     CupertinoListTile(
+                      //       padding: .all(15),
+                      //       title: CupertinoTextField(
+                      //         padding: .all(15),
+                      //         enableInlinePrediction: true,
+                      //         enableSuggestions: true,
+                      //         controller: model.characterController,
+                      //         placeholder: "Set agent character",
+                      //         maxLines: 10,
+                      //         clearButtonMode: OverlayVisibilityMode.editing,
+                      //         decoration: BoxDecoration(
+                      //           color: CupertinoColors.systemGroupedBackground
+                      //               .resolveFrom(context),
+                      //           borderRadius: .circular(15),
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                       CupertinoListSection.insetGrouped(
-                        header: Text("Memory"),
+                        header: const Text("Memory"),
                         children: [
                           Obx(
                             () => buildSelectItem(
-                              title: "",
+                              context,
+                              title: "Status :",
                               value: Row(
                                 mainAxisSize: .min,
                                 spacing: 15,
                                 children: [
                                   Text(getMemoryText(model.memoryType.value)),
-                                  Icon(CupertinoIcons.right_chevron, size: 16),
+                                  const Icon(
+                                    CupertinoIcons.right_chevron,
+                                    size: 16,
+                                  ),
                                 ],
                               ),
                               items: model.memoryTypeList
@@ -667,16 +907,17 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                             ),
                           ),
                           CupertinoListTile(
-                            padding: .all(15),
+                            padding: const .all(15),
                             title: CupertinoTextField(
                               controller: model.memoryController,
                               placeholder: "Set memory content",
+                              enableInlinePrediction: true,
                               maxLines: 10,
-                              padding: .all(15),
+                              padding: const .all(15),
                               decoration: BoxDecoration(
-                                color: CupertinoColors.systemGroupedBackground
+                                color: CupertinoColors.tertiarySystemFill
                                     .resolveFrom(context),
-                                borderRadius: .circular(15),
+                                borderRadius: .circular(10),
                               ),
                               clearButtonMode: OverlayVisibilityMode.editing,
                             ),
@@ -684,16 +925,61 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                         ],
                       ),
 
+                      // CupertinoListSection.insetGrouped(
+                      //   header: Text("Memory"),
+                      //   children: [
+                      //     Obx(
+                      //       () => buildSelectItem(
+                      //         title: "Status :",
+                      //         value: Row(
+                      //           mainAxisSize: .min,
+                      //           spacing: 15,
+                      //           children: [
+                      //             Text(getMemoryText(model.memoryType.value)),
+                      //             Icon(CupertinoIcons.right_chevron, size: 16),
+                      //           ],
+                      //         ),
+                      //         items: model.memoryTypeList
+                      //             .map((e) => getMemoryText(e))
+                      //             .toList(),
+                      //         onTapIndex: (index) {
+                      //           model.memoryType.value =
+                      //               model.memoryTypeList[index];
+                      //         },
+                      //         selectedValue: getMemoryText(
+                      //           model.memoryType.value,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //     CupertinoListTile(
+                      //       padding: .all(15),
+                      //       title: CupertinoTextField(
+                      //         controller: model.memoryController,
+                      //         placeholder: "Set memory content",
+                      //         enableInlinePrediction: true,
+                      //         maxLines: 10,
+                      //         padding: .all(15),
+                      //         decoration: BoxDecoration(
+                      //           color: CupertinoColors.systemGroupedBackground
+                      //               .resolveFrom(context),
+                      //           borderRadius: .circular(15),
+                      //         ),
+                      //         clearButtonMode: OverlayVisibilityMode.editing,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+
                       // MCP Tools
                       // CupertinoListSection.insetGrouped(
                       //   header: Text("MCP Tools"),
                       //   children: model.commonMcpTools.isNotEmpty
                       //       ? model.commonMcpTools.map((tool) {
                       //           final isSelected = model.selectedMcpEndpoints
-                      //               .contains(tool.endpoint_id);
+                      //               .contains(tool.endpointId);
                       //           return CupertinoListTile(
                       //             onTap: () {
-                      //               model.toggleMcpTool(tool.endpoint_id);
+                      //               model.toggleMcpTool(tool.endpointId);
                       //               setState(() {});
                       //             },
                       //             title: Text(tool.name ?? ""),
@@ -715,194 +1001,371 @@ class _XiaoZhiWelcomePageState extends State<XiaoZhiWelcomePage> {
                       //           ),
                       //         ],
                       // ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+
+          // Bottom button
+          Padding(
+            padding: .only(
+              left: 20 + padding.left,
+              right: 20 + padding.right,
+              top: 20,
+              bottom: MediaQuery.paddingOf(context).bottom + 20,
+            ),
+            child: Obx(
+              () => model.isLoading.value
+                  ? const CupertinoActivityIndicator(radius: 16)
+                  : widget.isWelCome == true
+                  ? Row(
+                      spacing: 15,
+                      children: [
+                        Expanded(
+                          child: CupertinoButton.tinted(
+                            child: Center(
+                              child: Text(
+                                "Skip",
+                                style: TextStyle(
+                                  color: CupertinoTheme.of(context)
+                                      .primaryColor,
+                                ),
+                              ),
+                            ),
+                            onPressed: () {
+                              if (mounted) {
+                                FocusScope.of(context).unfocus();
+                              }
+                              Navigator.of(context).push(
+                                CupertinoPageRoute(
+                                  builder: (context) {
+                                    return const DeviceWifiConfig(
+                                      isWelCome: true,
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: CupertinoButton.filled(
+                            child: const Center(
+                              child: Text(
+                                "Continue",
+                                style: TextStyle(color: CupertinoColors.white),
+                              ),
+                            ),
+                            onPressed: () async {
+                              if (mounted) {
+                                FocusScope.of(context).unfocus();
+                              }
+                              final res = await model.submitAgent();
+                              if (res && mounted) {
+                                Navigator.push(
+                                  this.context,
+                                  CupertinoPageRoute(
+                                    builder: (_) =>
+                                        const DeviceWifiConfig(isWelCome: true),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  : CupertinoButton.filled(
+                      child: const Center(
+                        child: Text(
+                          "Save",
+                          style: TextStyle(color: CupertinoColors.white),
+                        ),
+                      ),
+                      onPressed: () async {
+                        if (mounted) {
+                          FocusScope.of(context).unfocus();
+                        }
+                        final result = await model.submitAgent();
+                        if (result && mounted) {
+                          showCupertinoDialog(
+                            barrierDismissible: false,
+                            context: this.context,
+                            builder: (context) {
+                              return CupertinoAlertDialog(
+                                title: const Text(
+                                  "AI agent config has been saved successfully, and will be active after manually restarting the device.",
+                                ),
+                                actions: [
+                                  CupertinoDialogAction(
+                                    onPressed: () {
+                                      Navigator.maybePop(context);
+                                      Navigator.maybePop(this.context);
+                                    },
+                                    isDefaultAction: true,
+                                    child: const Text("Confirm"),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+                      },
+                    ),
+
+              // CupertinoButton.filled(
+              //         child: SizedBox(
+              //           width: .infinity,
+              //           child: Center(child: Text("Save")),
+              //         ),
+              //         onPressed: () async {
+              //           if (mounted) {
+              //             FocusScope.of(context).unfocus();
+              //           }
+              //           final result = await model.submitAgent();
+              //           if (result && mounted) {
+              //             showCupertinoDialog(
+              //               barrierDismissible: false,
+              //               context: this.context,
+              //               builder: (context) {
+              //                 return CupertinoAlertDialog(
+              //                   title: Text(
+              //                     "AI agent config has been saved successfully, and will be active after manually restarting the device.",
+              //                   ),
+              //                   actions: [
+              //                     CupertinoDialogAction(
+              //                       onPressed: () {
+              //                         Navigator.maybePop(context);
+              //                         Navigator.maybePop(this.context);
+              //                       },
+              //                       isDefaultAction: true,
+              //                       child: Text("Confirm"),
+              //                     ),
+              //                   ],
+              //                 );
+              //               },
+              //             );
+              //           }
+              //         },
+              //       ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget ttsVoiceWidget(BuildContext context) {
+    final padding = MediaQuery.viewPaddingOf(context);
+    return CupertinoMenuAnchor(
+      constraints: const BoxConstraints.tightFor(width: 300),
+      consumeOutsideTaps: true,
+      overlayPadding: .only(
+        bottom: padding.bottom,
+        left: padding.left,
+        right: padding.right,
+        top:
+            padding.top +
+            (MediaQuery.sizeOf(context).height / 10) +
+            kMinInteractiveDimensionCupertino,
+      ),
+      menuChildren: model.ttsList
+          .map(
+            (e) => CupertinoMenuItem(
+              onPressed: () {
+                model.selectedTtsVoice.value = e;
+                MusicUtil.shared.playUrlMusicOnce(
+                  e.voiceDemo,
+                  completion: () {
+                    setState(() {});
+                  },
+                );
+              },
+              leading: model.selectedTtsVoice.value?.voiceId == e.voiceId
+                  ? const Icon(CupertinoIcons.check_mark)
+                  : const SizedBox.shrink(),
+              child: Row(
+                children: [
+                  Expanded(child: Text(e.voiceName ?? "")),
+                  e.voiceDemo != null
+                      ? const Icon(CupertinoIcons.speaker_2)
+                      : const SizedBox.shrink(),
                 ],
               ),
             ),
-
-            //Bottombutton
-            Padding(
-              padding: .only(
-                left: 15,
-                right: 15,
-                top: 15,
-                bottom: MediaQuery.paddingOf(context).bottom + 15,
-              ),
-              child: Obx(
-                () => model.isLoading.value
-                    ? CupertinoActivityIndicator(radius: 16)
-                    : widget.isWelCome == true
-                    ? Row(
-                        spacing: 15,
-                        children: [
-                          Expanded(
-                            child: CupertinoButton.tinted(
-                              child: Text("Skip"),
-                              onPressed: () {
-                                if (mounted) {
-                                  FocusScope.of(context).unfocus();
-                                }
-                                Navigator.of(context).push(
-                                  CupertinoPageRoute(
-                                    builder: (context) {
-                                      return DeviceWifiConfig(isWelCome: true);
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          Expanded(
-                            child: CupertinoButton.filled(
-                              child: Text("Continue"),
-                              onPressed: () async {
-                                if (mounted) {
-                                  FocusScope.of(context).unfocus();
-                                }
-                                final res = await model.submitAgent();
-                                if (res && mounted) {
-                                  Navigator.push(
-                                    this.context,
-                                    CupertinoPageRoute(
-                                      builder: (_) =>
-                                          DeviceWifiConfig(isWelCome: true),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      )
-                    : CupertinoButton.filled(
-                        child: SizedBox(
-                          width: .infinity,
-                          child: Center(child: Text("Save")),
-                        ),
-                        onPressed: () async {
-                          if (mounted) {
-                            FocusScope.of(context).unfocus();
-                          }
-                          final result = await model.submitAgent();
-                          if (result && mounted) {
-                            showCupertinoDialog(
-                              barrierDismissible: false,
-                              context: this.context,
-                              builder: (context) {
-                                return CupertinoAlertDialog(
-                                  title: Text(
-                                    "AI agent config has been saved successfully, and will be active after manually restarting the device.",
-                                  ),
-                                  actions: [
-                                    CupertinoDialogAction(
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        Navigator.pop(this.context);
-                                      },
-                                      isDefaultAction: true,
-                                      child: Text("Confirm"),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          }
-                        },
-                      ),
-              ),
-            ),
+          )
+          .toList(),
+      builder: (context, controller, child) => CupertinoListTile(
+        onTap: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+        title: const Text("Voice :"),
+        trailing: Row(
+          mainAxisSize: .min,
+          spacing: 15,
+          children: [
+            Text(model.selectedTtsVoice.value?.voiceName ?? "Select voice"),
+            const Icon(CupertinoIcons.right_chevron, size: 16),
           ],
         ),
       ),
     );
+
+    // return PullDownButton(
+    //   useRootNavigator: false,
+    //   itemBuilder: (context) {
+    //     final List<PullDownMenuEntry> pullDownMenuItems = model.ttsList
+    //         .map<PullDownMenuEntry>(
+    //           (e) => PullDownMenuItem.selectable(
+    //             onTap: () {
+    //               model.selectedTtsVoice.value = e;
+    //             },
+    //             title: e.voiceName ?? "",
+    //             selected: model.selectedTtsVoice.value?.voiceId == e.voiceId,
+    //             iconWidget: e.voiceDemo != null
+    //                 ? CupertinoButton(
+    //                     padding: .zero,
+    //                     child: Icon(CupertinoIcons.speaker_2),
+    //                     onPressed: () {
+    //                       MusicUtil.shared.playUrlMusicOnce(
+    //                         e.voiceDemo,
+    //                         completion: () {
+    //                           setState(() {});
+    //                         },
+    //                       );
+    //                     },
+    //                   )
+    //                 : null,
+    //           ),
+    //         )
+    //         .toList();
+    //     if (pullDownMenuItems.length > 8) {
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //     }
+    //     return pullDownMenuItems;
+    //   },
+    //   buttonBuilder: (context, showMenu) => CupertinoButton(
+    //     padding: EdgeInsets.zero,
+    //     foregroundColor: CupertinoColors.systemGrey.resolveFrom(context),
+    //     minimumSize: .zero,
+    //     onPressed: showMenu,
+    //     pressedOpacity: 1,
+    //     child: CupertinoListTile(
+    //       title: Text("Voice :"),
+    //       trailing: Row(
+    //         mainAxisSize: .min,
+    //         spacing: 15,
+    //         children: [
+    //           Text(model.selectedTtsVoice.value?.voiceName ?? "Select voice"),
+    //           Icon(CupertinoIcons.right_chevron, size: 16),
+    //         ],
+    //       ),
+    //       leading: null,
+    //     ),
+    //   ),
+    // );
   }
 
-  Widget ttsVoiceWidget() {
-    return PullDownButton(
-      useRootNavigator: true,
-      itemBuilder: (context) => model.ttsList
-          .map(
-            (e) => PullDownMenuItem.selectable(
-              onTap: () {
-                model.selectedTtsVoice.value = e;
-              },
-              title: e.voiceName ?? "",
-              selected: model.selectedTtsVoice.value?.voiceId == e.voiceId,
-              iconWidget: e.voiceDemo != null
-                  ? CupertinoButton(
-                      padding: .zero,
-                      child: Icon(CupertinoIcons.speaker_2),
-                      onPressed: () {
-                        MusicUtil.shared.playUrlMusicOnce(
-                          e.voiceDemo,
-                          completion: () {
-                            setState(() {});
-                          },
-                        );
-                      },
-                    )
-                  : null,
-            ),
-          )
-          .toList(),
-      buttonBuilder: (context, showMenu) => CupertinoButton(
-        padding: EdgeInsets.zero,
-        foregroundColor: CupertinoColors.systemGrey.resolveFrom(context),
-        minimumSize: .zero,
-        onPressed: showMenu,
-        pressedOpacity: 1,
-        child: CupertinoListTile(
-          title: Text("Voice :"),
-          trailing: Row(
-            mainAxisSize: .min,
-            spacing: 15,
-            children: [
-              Text(model.selectedTtsVoice.value?.voiceName ?? "Select voice"),
-              Icon(CupertinoIcons.right_chevron, size: 16),
-            ],
-          ),
-          leading: null,
-        ),
-      ),
-    );
-  }
-
-  Widget buildSelectItem({
+  Widget buildSelectItem(
+    BuildContext context, {
     required String title,
     required Widget value,
     required List<String> items,
     required Function(int) onTapIndex,
     required String? selectedValue,
   }) {
-    return PullDownButton(
-      useRootNavigator: true,
-      itemBuilder: (context) => items.indexed
+    final padding = MediaQuery.viewPaddingOf(context);
+    return CupertinoMenuAnchor(
+      constraints: const BoxConstraints(maxWidth: 300),
+      consumeOutsideTaps: true,
+      overlayPadding: .only(
+        bottom: padding.bottom,
+        left: padding.left,
+        right: padding.right,
+        top:
+            padding.top +
+            (MediaQuery.sizeOf(context).height / 10) +
+            kMinInteractiveDimensionCupertino,
+      ),
+      menuChildren: items.indexed
           .map(
-            (item) => PullDownMenuItem.selectable(
-              onTap: () {
+            (item) => CupertinoMenuItem(
+              onPressed: () {
                 onTapIndex(item.$1);
               },
-              title: item.$2,
-              selected: item.$2 == selectedValue,
+              leading: item.$2 == selectedValue
+                  ? const Icon(CupertinoIcons.check_mark)
+                  : null,
+              child: Text(item.$2),
             ),
           )
           .toList(),
-      buttonBuilder: (context, showMenu) {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          foregroundColor: CupertinoColors.systemGrey.resolveFrom(context),
-          minimumSize: .zero,
-          onPressed: showMenu,
-          pressedOpacity: 1,
-          child: CupertinoListTile(
-            title: Text(title),
-            trailing: value,
-            leading: null,
-          ),
-        );
-      },
+      builder: (context, controller, child) => CupertinoListTile(
+        title: Text(title),
+        trailing: value,
+        onTap: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
     );
+
+    // return PullDownButton(
+    //   useRootNavigator: false,
+    //   itemBuilder: (context) {
+    //     final List<PullDownMenuEntry> pullDownMenuItems = items.indexed
+    //         .map<PullDownMenuEntry>(
+    //           (item) => PullDownMenuItem.selectable(
+    //             onTap: () {
+    //               onTapIndex(item.$1);
+    //             },
+    //             title: item.$2,
+    //             selected: item.$2 == selectedValue,
+    //           ),
+    //         )
+    //         .toList();
+    //     if (pullDownMenuItems.length > 8) {
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //       pullDownMenuItems.insert(0, PullDownMenuDivider.large());
+    //     }
+    //     return pullDownMenuItems;
+    //   },
+    //   buttonBuilder: (context, showMenu) {
+    //     return CupertinoButton(
+    //       padding: EdgeInsets.zero,
+    //       foregroundColor: CupertinoColors.systemGrey.resolveFrom(context),
+    //       minimumSize: .zero,
+    //       onPressed: showMenu,
+    //       pressedOpacity: 1,
+    //       child: CupertinoListTile(
+    //         title: Text(title),
+    //         trailing: value,
+    //         leading: null,
+    //       ),
+    //     );
+    //   },
+    // );
   }
 }

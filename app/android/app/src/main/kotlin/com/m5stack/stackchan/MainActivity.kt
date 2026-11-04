@@ -10,8 +10,8 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
-import android.util.Log
 import androidx.annotation.RequiresPermission
+import com.m5stack.stackchan.bluetooth.NativeBluetoothBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BasicMessageChannel
@@ -27,25 +27,31 @@ class MainActivity : FlutterActivity() {
     private lateinit var channel: MethodChannel
     private lateinit var audioPlayChannel: BasicMessageChannel<ByteBuffer>
     private lateinit var recordChannel: EventChannel
+    private var bluetoothBridge: NativeBluetoothBridge? = null
 
     private val SAMPLE_RATE = 16000
     private val CHANNEL_CONFIG = AudioFormat.CHANNEL_OUT_MONO
     private val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     private var audioTrack: AudioTrack? = null
+    private var audioManager: AudioManager? = null
 
     private val RECORD_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
     private var audioRecord: AudioRecord? = null
     private val isRecording = AtomicBoolean(false)
+    private val recordingLock = Any()
+    private val isAudioEventPending = AtomicBoolean(false)
     private var recordBufferSize = 0
+    @Volatile
     private var eventSink: EventChannel.EventSink? = null
+
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+        bluetoothBridge = NativeBluetoothBridge(this, messenger).also { it.setup() }
 
-        // translated comment
+        // Register the method channel
         channel = MethodChannel(
             messenger,
             "com.m5stack.stackchan/native"
@@ -75,6 +81,7 @@ class MainActivity : FlutterActivity() {
                 stopRecording()
             }
         })
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         initAudioPlayer()
         initAudioRecorder()
     }
@@ -90,15 +97,30 @@ class MainActivity : FlutterActivity() {
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun initAudioRecorder() {
-        recordBufferSize =
+        val bufferSize =
             AudioRecord.getMinBufferSize(SAMPLE_RATE, RECORD_CHANNEL_CONFIG, AUDIO_FORMAT)
-        audioRecord = AudioRecord(
+        if (bufferSize <= 0) {
+            recordBufferSize = 0
+            audioRecord = null
+            return
+        }
+
+        val recorder = AudioRecord(
             android.media.MediaRecorder.AudioSource.MIC,
             SAMPLE_RATE,
             RECORD_CHANNEL_CONFIG,
             AUDIO_FORMAT,
-            recordBufferSize
+            bufferSize
         )
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            recorder.release()
+            audioRecord = null
+            recordBufferSize = 0
+            return
+        }
+
+        audioRecord = recorder
+        recordBufferSize = bufferSize
     }
 
     private fun playAudio(buffer: ByteBuffer) {
@@ -110,41 +132,89 @@ class MainActivity : FlutterActivity() {
         audioTrack?.write(data, 0, data.size)
     }
 
-    // ====================== 1 ======================
+    // ====================== Core fix 1: recording lifecycle ======================
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun startRecording() {
-        if (isRecording.get()) return
+        val recorder: AudioRecord
+        val bufferSize: Int
+        synchronized(recordingLock) {
+            if (isRecording.get()) return
 
-        if (audioRecord == null || audioRecord?.state == AudioRecord.STATE_UNINITIALIZED) {
-            initAudioRecorder()
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                audioRecord?.release()
+                audioRecord = null
+                initAudioRecorder()
+            }
+
+            recorder = audioRecord ?: return
+            try {
+                recorder.startRecording()
+            } catch (_: IllegalStateException) {
+                return
+            }
+
+            if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                return
+            }
+
+            isRecording.set(true)
+            bufferSize = recordBufferSize
+            audioManager?.let { manager ->
+                manager.mode = AudioManager.MODE_IN_COMMUNICATION
+                manager.isSpeakerphoneOn = true
+            }
         }
 
-        if (audioRecord?.state == AudioRecord.STATE_INITIALIZED) {
-            audioRecord?.startRecording()
-            isRecording.set(true)
-
-            Thread {
-                val buffer = ByteArray(recordBufferSize)
-                while (isRecording.get()) {
-                    val readSize = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-                    if (readSize > 0) {
-                        val data = buffer.copyOf(readSize)
-                        // translated comment
-                        runOnUiThread {
+        Thread {
+            val buffer = ByteArray(bufferSize)
+            while (isRecording.get()) {
+                val readSize = try {
+                    recorder.read(buffer, 0, buffer.size)
+                } catch (_: IllegalStateException) {
+                    break
+                }
+                if (readSize > 0) {
+                    // EventChannel posts to Flutter's main queue. Keep at most one frame queued
+                    // so a slow or absent Dart subscriber cannot exhaust the process heap.
+                    if (eventSink == null || !isAudioEventPending.compareAndSet(false, true)) {
+                        continue
+                    }
+                    val data = buffer.copyOf(readSize)
+                    runOnUiThread {
+                        try {
                             eventSink?.success(data)
+                        } finally {
+                            isAudioEventPending.set(false)
                         }
                     }
                 }
-            }.start()
-        }
+            }
+        }.start()
     }
 
     private fun stopRecording() {
-        isRecording.set(false)
-        audioRecord?.stop()
+        synchronized(recordingLock) {
+            isRecording.set(false)
+            audioManager?.let { manager ->
+                manager.isSpeakerphoneOn = false
+                manager.mode = AudioManager.MODE_NORMAL
+            }
+            val recorder = audioRecord ?: return
+            if (recorder.state != AudioRecord.STATE_INITIALIZED ||
+                recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING
+            ) {
+                return
+            }
+
+            try {
+                recorder.stop()
+            } catch (_: IllegalStateException) {
+                // The recorder can become invalid when the audio service is torn down.
+            }
+        }
     }
 
-    // ====================== 2 ======================
+    // ====================== Core fix 2: method channel handling ======================
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun methodCallHandler(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -152,12 +222,12 @@ class MainActivity : FlutterActivity() {
                 if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
                     audioTrack?.pause()
                 }
-                result.success(null) // translated comment
+                result.success(null) // Always reply to the pending call
             }
 
             "startRecording" -> {
                 startRecording()
-                result.success(null)
+                result.success(isRecording.get())
             }
 
             "stopRecording" -> {
@@ -165,17 +235,21 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
             }
 
-            else -> result.notImplemented() // translated comment
+            else -> result.notImplemented() // Unsupported method
         }
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
         stopRecording()
-        audioRecord?.release()
-        audioRecord = null
+        synchronized(recordingLock) {
+            audioRecord?.release()
+            audioRecord = null
+        }
+        bluetoothBridge?.dispose()
+        bluetoothBridge = null
+        super.onDestroy()
     }
 }

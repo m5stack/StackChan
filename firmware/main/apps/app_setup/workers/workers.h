@@ -8,6 +8,7 @@
 #include <smooth_lvgl.hpp>
 #include <uitk/short_namespace.hpp>
 #include <hal/hal.h>
+#include <hal/utils/network_diagnostics/network_diagnostics.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -34,6 +35,22 @@ public:
 
 protected:
     bool _is_done = false;
+};
+
+class NetworkTestWorker : public WorkerBase {
+public:
+    NetworkTestWorker();
+    ~NetworkTestWorker();
+    void update() override;
+
+private:
+    network_diagnostics::NetworkDiagnostics _diagnostics;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _title, _wifi, _xiaozhi, _m5stack;
+    std::unique_ptr<uitk::lvgl_cpp::Button> _retry, _back;
+    std::string _last_wifi, _last_xiaozhi, _last_m5stack;
+    bool _retry_clicked = false;
+    bool _back_clicked  = false;
 };
 
 /**
@@ -341,9 +358,12 @@ private:
 
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel;
     std::unique_ptr<uitk::lvgl_cpp::Container> _panel_general;
+    std::unique_ptr<uitk::lvgl_cpp::Container> _panel_startup;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_title;
     std::unique_ptr<uitk::lvgl_cpp::Label> _label_idle_motion_value;
     std::unique_ptr<uitk::lvgl_cpp::Slider> _slider_idle_motion;
+    std::unique_ptr<uitk::lvgl_cpp::Label> _label_startup_title;
+    std::unique_ptr<uitk::lvgl_cpp::Switch> _switch_start_ai_on_boot;
     std::unique_ptr<uitk::lvgl_cpp::Button> _btn_confirm;
 
     XiaozhiConfig_t _config;
@@ -376,7 +396,7 @@ private:
  */
 class FactoryResetWorker : public WorkerBase {
 public:
-    FactoryResetWorker(std::function<void()> beforeResetAction = {});
+    FactoryResetWorker(std::function<bool()> beforeResetAction = {});
     ~FactoryResetWorker();
     void update() override;
 
@@ -390,7 +410,7 @@ private:
     int _confirm_count = 0;
     bool _cancel_flag  = false;
     bool _confirm_flag = false;
-    std::function<void()> _before_reset_action;
+    std::function<bool()> _before_reset_action;
 
     void update_ui();
 };

@@ -3,12 +3,13 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
@@ -24,7 +25,7 @@ import '../../util/value_constant.dart';
 class AddMusic extends StatefulWidget {
   const AddMusic({super.key, required this.onResult});
 
-  final Function(String url) onResult;
+  final FutureOr<void> Function(String url) onResult;
 
   @override
   State<StatefulWidget> createState() => _AddMusicState();
@@ -44,15 +45,14 @@ class _AddMusicState extends State<AddMusic> {
 
   @override
   void dispose() {
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
-  void _completeSelection(String url) {
-    widget.onResult(url);
-    Navigator.pop(context);
+  Future<void> _completeSelection(String url) async {
+    await widget.onResult(url);
+    if (mounted) {
+      Navigator.maybePop(context);
+    }
   }
 
   void _checkLink() {
@@ -101,27 +101,15 @@ class _AddMusicState extends State<AddMusic> {
 
   Future<void> _pickLocalFile() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['mp3', 'wav', 'm4a'],
         dialogTitle: "Select audio file",
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (file == null) return;
 
-      final file = result.files.first;
-      Uint8List? fileData;
-
-      if (file.path != null) {
-        fileData = File(file.path!).readAsBytesSync();
-      } else {
-        fileData = file.bytes;
-      }
-
-      if (fileData == null) {
-        AppState.shared.showToast("No file data was found");
-        return;
-      }
+      final Uint8List fileData = await file.readAsBytes();
       final fileName = _generateUUIDFileName(file.name);
       await _uploadFile(fileData, fileName);
     } catch (e) {
@@ -155,7 +143,7 @@ class _AddMusicState extends State<AddMusic> {
           String? url = responseData.data?.path;
           if (url != null) {
             final fileUrl = Urls.getFileUrl() + url;
-            _completeSelection(fileUrl);
+            await _completeSelection(fileUrl);
           } else {
             AppState.shared.showToast("Upload failed: File path is empty");
           }
@@ -180,101 +168,122 @@ class _AddMusicState extends State<AddMusic> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
+    final padding = MediaQuery.paddingOf(context);
 
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
       ),
-      navigationBar: CupertinoNavigationBar.large(
-        largeTitle: Text("Add Music"),
-        trailing: CupertinoButton(
-          sizeStyle: .medium,
-          child: Icon(CupertinoIcons.xmark),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      child: ListView(
-        children: [
-          CupertinoListSection.insetGrouped(
-            header: Text("URL"),
-            children: [
-              CupertinoListTile(
-                leading: SvgPicture.asset(
-                  "assets/music.note.svg",
-                  colorFilter: .mode(theme.primaryColor, .srcIn),
-                  width: 15,
-                  height: 15,
-                ),
-                trailing: Row(
-                  mainAxisSize: .min,
+      child: CustomScrollView(
+        slivers: [
+          CupertinoSliverNavigationBar(
+            stretch: true,
+            backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+              context,
+            ),
+            border: ThemeSetting.cupertinoNavigationBarBorder(context),
+            padding: ThemeSetting.navigationBarPadding,
+            largeTitle: const Text("Add Music"),
+            leading: const SizedBox.shrink(),
+            trailing: CupertinoButton(
+              sizeStyle: .medium,
+              onPressed: () {
+                Navigator.maybePop(context);
+              },
+              child: const Icon(CupertinoIcons.xmark),
+            ),
+          ),
+          SliverPadding(
+            padding: .only(left: padding.left, right: padding.right),
+            sliver: SliverList.list(
+              children: [
+                CupertinoListSection.insetGrouped(
+                  header: const Text("URL"),
                   children: [
-                    SizedBox(
-                      width: 250,
-                      child: CupertinoTextField(
-                        onChanged: (value) {
-                          musicURL = value;
-                        },
-                        placeholder: "Enter the music link",
-                        textAlign: .end,
-                        decoration: BoxDecoration(),
-                      ),
-                    ),
-                    CupertinoButton(
-                      padding: .zero,
-                      minimumSize: .zero,
-                      child: SvgPicture.asset(
-                        "assets/checkmark.svg",
+                    CupertinoListTile(
+                      leading: SvgPicture.asset(
+                        "assets/music.note.svg",
                         colorFilter: .mode(theme.primaryColor, .srcIn),
                         width: 15,
                         height: 15,
                       ),
-                      onPressed: () {
-                        _checkLink();
-                      },
+                      title: Row(
+                        children: [
+                          const Spacer(),
+                          SizedBox(
+                            width: 220,
+                            child: CupertinoTextField(
+                              onChanged: (value) {
+                                musicURL = value;
+                              },
+                              placeholder: "Enter the music link",
+                              textAlign: .end,
+                              decoration: const BoxDecoration(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: CupertinoButton(
+                        sizeStyle: .small,
+                        padding: .zero,
+                        minimumSize: .zero,
+                        child: SvgPicture.asset(
+                          "assets/checkmark.svg",
+                          colorFilter: .mode(theme.primaryColor, .srcIn),
+                          width: 15,
+                          height: 15,
+                        ),
+                        onPressed: () {
+                          _checkLink();
+                        },
+                      ),
                     ),
                   ],
                 ),
-                title: SizedBox.shrink(),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: Text("File"),
-            children: [
-              CupertinoListTile(
-                onTap: () => _pickLocalFile(),
-                title: Text("Select local music files"),
-                leading: SvgPicture.asset(
-                  "assets/music.note.svg",
-                  colorFilter: .mode(theme.primaryColor, .srcIn),
-                  width: 15,
-                  height: 15,
+                CupertinoListSection.insetGrouped(
+                  header: const Text("File"),
+                  children: [
+                    CupertinoListTile(
+                      onTap: () => _pickLocalFile(),
+                      title: const Text("Select local music files"),
+                      leading: SvgPicture.asset(
+                        "assets/music.note.svg",
+                        colorFilter: .mode(theme.primaryColor, .srcIn),
+                        width: 15,
+                        height: 15,
+                      ),
+                      trailing: SvgPicture.asset(
+                        "assets/chevron.right.svg",
+                        colorFilter: const .mode(
+                          CupertinoColors.secondaryLabel,
+                          .srcIn,
+                        ),
+                        width: 15,
+                        height: 15,
+                      ),
+                    ),
+                  ],
                 ),
-                trailing: SvgPicture.asset(
-                  "assets/chevron.right.svg",
-                  colorFilter: .mode(CupertinoColors.secondaryLabel, .srcIn),
-                  width: 15,
-                  height: 15,
+                CupertinoListSection.insetGrouped(
+                  header: const Text("Prefabricated"),
+                  children: _musicList.indexed.map((entry) {
+                    final value = entry.$2;
+                    return CupertinoListTile(
+                      leading: SvgPicture.asset(
+                        "assets/music.note.svg",
+                        colorFilter: .mode(theme.primaryColor, .srcIn),
+                        width: 15,
+                        height: 15,
+                      ),
+                      title: Text(value.name),
+                      onTap: () {
+                        _completeSelection(value.url);
+                      },
+                    );
+                  }).toList(),
                 ),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: Text("Prefabricated"),
-            children: _musicList.map((value) {
-              return CupertinoListTile(
-                leading: SvgPicture.asset(
-                  "assets/music.note.svg",
-                  colorFilter: .mode(theme.primaryColor, .srcIn),
-                  width: 15,
-                  height: 15,
-                ),
-                title: Text(value.name),
-                onTap: () {
-                  _completeSelection(value.url);
-                },
-              );
-            }).toList(),
+              ],
+            ),
           ),
         ],
       ),

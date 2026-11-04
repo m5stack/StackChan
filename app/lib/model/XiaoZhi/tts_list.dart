@@ -4,23 +4,23 @@ SPDX-License-Identifier: MIT
 */
 
 class TTsList {
-  //languagelist
+  // Languages supported by the TTS service.
   List<String> languages;
 
-  //coreModify:anylanguage -> correspondinglist,supportalllanguagetype
+  // Voices grouped by language key; unknown keys are kept as-is.
   Map<String, List<TTsVoice>>? ttsVoices;
 
-  //Constructorfunction(NullsafedefaultValue)
+  // Creates a TTS catalog; languages default to an empty list.
   TTsList({this.languages = const [], this.ttsVoices});
 
-  //JSON tomodel
+  // Creates a TTS catalog from a JSON map.
   factory TTsList.fromJson(Map<String, dynamic> json) {
-    //parselanguagelist
+    // Parse the language list.
     final languageList = json['languages'] is List
         ? List<String>.from(json['languages'].map((x) => x.toString()))
         : <String>[];
 
-    //parsedynamiclanguage Map(core:autoadaptalllanguage key)
+    // Parse the dynamic map of voices keyed by language.
     Map<String, List<TTsVoice>>? voiceMap;
     if (json['tts_voices'] != null) {
       voiceMap = {};
@@ -37,7 +37,7 @@ class TTsList {
     return TTsList(languages: languageList, ttsVoices: voiceMap);
   }
 
-  //modelto JSON
+  // Converts this catalog to a JSON map.
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
     data['languages'] = languages;
@@ -68,7 +68,7 @@ class TTsVoice {
     this.voiceDemo,
   });
 
-  //JSON tomodel
+  // Creates a voice from a JSON map.
   factory TTsVoice.fromJson(Map<String, dynamic> json) {
     return TTsVoice(
       top: json['top'] as bool?,
@@ -80,7 +80,7 @@ class TTsVoice {
     );
   }
 
-  //modelto JSON
+  // Converts this voice to a JSON map.
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
     data['top'] = top;

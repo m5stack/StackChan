@@ -102,7 +102,7 @@ class DanceData {
     String? id,
   }) : id = id ?? _uuid.v4();
 
-  /// Swift init(from decoder:)
+  /// Equivalent to Swift's `init(from decoder:)`.
   factory DanceData.fromJson(Map<String, dynamic> json) {
     return DanceData(
       leftEye: ExpressionItem.fromJson(json['leftEye']),
@@ -129,7 +129,7 @@ class DanceData {
     };
   }
 
-  /// Swift copy()
+  /// Equivalent to Swift's `copy()`.
   DanceData copy() {
     return DanceData(
       leftEye: leftEye.copy(),

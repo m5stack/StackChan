@@ -3,7 +3,8 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -39,22 +40,38 @@ class _WebPageState extends State<WebPage> {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
       navigationBar: CupertinoNavigationBar(
-        padding: .only(start: 8, end: 8),
+        backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+          context,
+        ),
+        border: ThemeSetting.cupertinoNavigationBarBorder(context),
+        padding: ThemeSetting.navigationBarPadding,
         middle: Obx(() => Text(title.value, maxLines: 1, overflow: .ellipsis)),
-        leading: CupertinoNavigationBarBackButton(
-          previousPageTitle: widget.previousPageTitle,
+        leading: CupertinoButton(
+          sizeStyle: .medium,
+          onPressed: () {
+            Navigator.maybePop(context);
+          },
+          child: const Icon(CupertinoIcons.back),
         ),
         trailing: CupertinoButton(
-          padding: .zero,
-          child: Icon(CupertinoIcons.refresh),
+          sizeStyle: .medium,
           onPressed: () {
             controller.reload();
           },
+          child: const Icon(CupertinoIcons.refresh),
         ),
       ),
-      child: WebViewWidget(controller: controller),
+      child: Padding(
+        padding: .only(left: padding.left, right: padding.right),
+        child: WebViewWidget(controller: controller),
+      ),
     );
   }
 }

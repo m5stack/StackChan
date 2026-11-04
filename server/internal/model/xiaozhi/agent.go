@@ -51,6 +51,20 @@ type AgentTemplate struct {
 	TtsVoiceName     string   `json:"tts_voice_name"`
 }
 
+type TTSVoice struct {
+	Top       bool   `json:"top"`
+	VoiceID   string `json:"voice_id"`
+	VoiceName string `json:"voice_name"`
+	Language  string `json:"language"`
+	CreatedAt string `json:"created_at"`
+	VoiceDemo string `json:"voice_demo"`
+}
+
+type TTSList struct {
+	Languages []string              `json:"languages"`
+	TTSVoices map[string][]TTSVoice `json:"tts_voices"`
+}
+
 type AgentConfig struct {
 	AgentName           string   `json:"agent_name"`
 	AssistantName       string   `json:"assistant_name"`

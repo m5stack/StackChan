@@ -17,9 +17,20 @@ static const std::string_view _setting_ns              = "account";
 static const std::string_view _setting_username_key    = "username";
 static const std::string_view _setting_device_name_key = "device_name";
 
-static const std::string_view _get_user_account_info_url    = "http://47.113.125.164:12800/stackChan/device/user";
-static const std::string_view _get_device_info_url          = "http://47.113.125.164:12800/stackChan/device/info";
-static const std::string_view _unbind_user_account_info_url = "http://47.113.125.164:12800/stackChan/device/unbind";
+static std::string get_user_account_info_url()
+{
+    return secret_logic::get_server_url() + "/stackChan/device/user";
+}
+
+static std::string get_device_info_url()
+{
+    return secret_logic::get_server_url() + "/stackChan/device/info";
+}
+
+static std::string get_unbind_user_account_info_url()
+{
+    return secret_logic::get_server_url() + "/stackChan/device/unbind";
+}
 
 static bool request_authorized_get(std::string_view token, std::string_view url, std::string &response,
                                    std::function<void(std::string_view)> onLog)
@@ -36,20 +47,21 @@ static bool request_authorized_get(std::string_view token, std::string_view url,
 
     http->SetHeader("Authorization", std::string(token));
     if (!http->Open("GET", std::string(url))) {
-        mclog::tagError(_tag, "failed to open http request: {}", url);
+        mclog::tagError(_tag, "failed to open account HTTP request");
         onLog("Failed to connect to server");
         return false;
     }
 
-    int status_code = http->GetStatusCode();
+    const auto status     = http->GetStatusCode();
+    const int status_code = status.value_or(-1);
     if (status_code != 200) {
-        mclog::tagError(_tag, "http get failed, status code: {}, url: {}", status_code, url);
+        mclog::tagError(_tag, "account HTTP GET failed, status code: {}", status_code);
         onLog("HTTP Request Failed");
         return false;
     }
 
     response = http->ReadAll();
-    mclog::tagInfo(_tag, "response from {}: {}", url, response);
+    mclog::tagInfo(_tag, "account HTTP response received: {} bytes", response.size());
     return true;
 }
 
@@ -58,7 +70,8 @@ static bool fetch_username(std::string_view token, std::string &username, std::f
     onLog("Updating user account info...");
 
     std::string response;
-    if (!request_authorized_get(token, _get_user_account_info_url, response, onLog)) {
+    const std::string url = get_user_account_info_url();
+    if (!request_authorized_get(token, url, response, onLog)) {
         return false;
     }
 
@@ -101,7 +114,8 @@ static bool fetch_device_name(std::string_view token, std::string &deviceName,
     onLog("Updating device info...");
 
     std::string response;
-    if (!request_authorized_get(token, _get_device_info_url, response, onLog)) {
+    const std::string url = get_device_info_url();
+    if (!request_authorized_get(token, url, response, onLog)) {
         return false;
     }
 
@@ -169,7 +183,7 @@ bool Hal::updateAccountInfo(std::function<void(std::string_view)> onLog)
     settings.SetString(_setting_username_key.data(), username);
     settings.SetString(_setting_device_name_key.data(), device_name);
 
-    mclog::tagInfo(_tag, "account updated: username={}, device_name={}", username, device_name);
+    mclog::tagInfo(_tag, "account updated");
     onLog(std::string("Account updated: ") + username);
     return true;
 }
@@ -193,13 +207,14 @@ bool Hal::unbindAccount(std::function<void(std::string_view)> onLog)
     mclog::tagInfo(_tag, "requesting to unbind account...");
     onLog("Unbinding account...");
 
-    if (!http->Open("POST", std::string(_unbind_user_account_info_url))) {
+    if (!http->Open("POST", get_unbind_user_account_info_url())) {
         mclog::tagError(_tag, "failed to open http request");
         onLog("Failed to connect to server");
         return false;
     }
 
-    int status_code = http->GetStatusCode();
+    const auto status     = http->GetStatusCode();
+    const int status_code = status.value_or(-1);
     if (status_code != 200) {
         mclog::tagError(_tag, "http post failed, status code: {}", status_code);
         onLog("HTTP Request Failed");
@@ -207,7 +222,7 @@ bool Hal::unbindAccount(std::function<void(std::string_view)> onLog)
     }
 
     std::string response = http->ReadAll();
-    mclog::tagInfo(_tag, "response: {}", response);
+    mclog::tagInfo(_tag, "unbind HTTP response received: {} bytes", response.size());
 
     cJSON *root = cJSON_Parse(response.c_str());
     if (!root) {

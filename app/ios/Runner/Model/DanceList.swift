@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 //  Dance.swift
 //  StackChan
 //
-// Created by on 2026/1/16.
+//  Created on 2026/1/16.
 //
 
 import Foundation
@@ -45,10 +45,12 @@ struct DanceData : Codable,Identifiable {
     
     static func from(jsonString: String) -> DanceData? {
         guard !jsonString.isEmpty else {
-                        return nil
+            print("JSON string is empty")
+            return nil
         }
         guard let jsonData = jsonString.data(using: .utf8) else {
-                        return nil
+            print("Failed to convert string to UTF-8 data")
+            return nil
         }
         
         do {

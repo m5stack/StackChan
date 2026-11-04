@@ -22,3 +22,18 @@ type Device struct {
 	Imei         string `json:"imei"`
 	Online       bool   `json:"online"`
 }
+
+type GenerateLicense struct {
+	ProductName      string `json:"product_name"`
+	BoardName        string `json:"board_name"`
+	SerialNumber     string `json:"serial_number"`
+	LicenseKey       string `json:"license_key"`
+	LicenseAlgorithm string `json:"license_algorithm"`
+	CreatedAt        string `json:"created_at"`
+}
+
+type AgentsDevicesActivate struct {
+	MacAddress   string `json:"macAddress"`
+	SerialNumber string `json:"serialNumber"`
+	AgentID      int    `json:"agentId"`
+}

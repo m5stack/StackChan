@@ -1,5 +1,7 @@
-// SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-// SPDX-License-Identifier: MIT
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 import 'dart:convert';
 
@@ -154,7 +156,7 @@ class RgbData {
     rightRgbDuration = (json['rightRgbDuration'] ?? 0.0).toDouble();
   }
 
-  //Serializeas JSON
+  // Converts this RGB state to a JSON map.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['leftRgbColor'] = leftRgbColor;

@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-///responsemodel
+/// Response wrapper for the MCP endpoint list.
 class EndpointsResponse {
   final List<Endpoint> endpoints;
 
@@ -20,7 +20,7 @@ class EndpointsResponse {
   }
 }
 
-///singleendpointinfo
+/// A single MCP endpoint and its runtime statistics.
 class Endpoint {
   final String endpointId;
   final int connectionCount;
@@ -64,7 +64,7 @@ class Endpoint {
   }
 }
 
-///toolinfo
+/// A tool exposed by an endpoint.
 class Tool {
   final String name;
   final String description;
@@ -85,7 +85,7 @@ class Tool {
   }
 }
 
-///input schema
+/// JSON schema describing a tool's input parameters.
 class InputSchema {
   final String type;
   final Map<String, dynamic>? properties;
