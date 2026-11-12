@@ -16,3 +16,8 @@ target_include_directories(motion_math_test PRIVATE
 target_compile_features(motion_math_test PRIVATE cxx_std_17)
 
 add_test(NAME motion_math_test COMMAND $<TARGET_FILE:motion_math_test>)
+
+add_executable(agent_tasks_model_test agent_tasks_model_test.cpp)
+target_include_directories(agent_tasks_model_test PRIVATE ../main)
+target_compile_features(agent_tasks_model_test PRIVATE cxx_std_17)
+add_test(NAME agent_tasks_model_test COMMAND $<TARGET_FILE:agent_tasks_model_test>)

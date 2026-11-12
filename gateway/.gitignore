@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Environment / secrets
+.env
+.env.local
+*.local
+
+# Captures (user photos)
+captures/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.zip
+build/
+dist/
+
+# Bundled native binaries. The publish workflow builds `opus.dll` on
+# a Windows runner via vcpkg (verified against a pinned SHA256) and
+# drops it under `stackchan_mcp/_libs/` before running `uv build`.
+# Local Windows development can mirror that by either building opus
+# via vcpkg locally, downloading the same DLL from a release
+# artifact, or installing system libopus and copying into `_libs/`.
+# On Linux / macOS the system package manager already provides
+# libopus and this path stays empty. `SOURCES.md` is tracked so the
+# bundling documentation lives alongside the code that consumes it.
+stackchan_mcp/_libs/opus.dll

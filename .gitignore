@@ -1,2 +1,17 @@
 .DS_Store
 .idea/
+firmware/main/apps/app_agent_tasks/agent_tasks_local_defaults.h
+firmware/build-host-tests/
+
+# 本机网关环境、运行记录和构建缓存
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+captures/
+/user-defaults.toml

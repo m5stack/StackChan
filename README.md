@@ -1,3 +1,19 @@
+# StackChan · Agent 待办看板
+
+基于 M5Stack 官方固件扩展：在独立 `AGENT TASKS` 菜单中，左侧显示 Codex、右侧显示 Claude 的状态、阶段与待办，支持进行中优先排序、转圈图标和动态省略号。
+
+- [中文安装与使用说明](docs/agent-tasks-setup.zh-CN.md)
+- [验证记录与已知限制](docs/agent-tasks-validation.zh-CN.md)
+- `firmware/`：官方 ESP-IDF / Mooncake 固件及看板 App。
+- `gateway/`：独立 Python MCP 网关与 Agent 适配器，读取本机会话状态，经 MCP 更新快照。
+- `scripts/`：macOS 常驻服务安装与本机固件默认配置脚本。
+
+设备通过 Wi-Fi HTTP 拉取快照；网关的其它 WebSocket 设备控制功能面向其上游替代固件，本项目官方固件不提供那些设备控制功能。公开源码不含个人令牌。网关源码及第三方许可见 [gateway/LICENSE](gateway/LICENSE) 与 [gateway/LICENSE-THIRD-PARTY](gateway/LICENSE-THIRD-PARTY)。
+
+![双栏看板预览（设计示意）](docs/design/agent-tasks-official-preview.png)
+
+以下保留官方项目介绍。
+
 # StackChan Open-Source
 
 <img src="https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/K151_stack_chan_main_pictures_01.webp" width="60%">

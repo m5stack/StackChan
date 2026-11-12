@@ -42,6 +42,7 @@ extern "C" void app_main(void)
         hal_toggles::register_app_id(hal_toggles::App::Ezdata, GetMooncake().installApp(std::make_unique<AppEzdata>()));
         hal_toggles::register_app_id(hal_toggles::App::Dance, GetMooncake().installApp(std::make_unique<AppDance>()));
         GetMooncake().installApp(std::make_unique<AppSetup>());
+        GetMooncake().installApp(std::make_unique<AppAgentTasks>());
 
         // Main loop
         while (1) {
