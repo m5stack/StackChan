@@ -1,0 +1,159 @@
+[project]
+name = "stackchan-mcp"
+version = "0.20.0"
+description = "Two-faced MCP gateway for StackChan (xiaozhi-esp32): bridges stdio MCP clients to the ESP32 over WebSocket + HTTP."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+# `LICENSE-THIRD-PARTY` carries the BSD-3-Clause + Xiph notice for the
+# native libopus binary bundled into the `win_amd64` wheel. The file is
+# always shipped (sdist and every wheel variant) so license scanners
+# pointed at any distribution form can see it, even though the binary
+# itself is only present in the `win_amd64` wheel.
+license-files = ["LICENSE", "LICENSE-THIRD-PARTY"]
+authors = [
+    { name = "kisaragi-mochi" },
+]
+keywords = ["mcp", "stackchan", "esp32", "xiaozhi", "robotics", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Communications",
+    "Topic :: System :: Hardware",
+]
+dependencies = [
+    "websockets>=12",
+    "pydantic>=2",
+    "python-dotenv",
+    "PyYAML>=6",
+    "platformdirs>=4.0,<5.0",
+    "tomli>=2.0,<3.0; python_version < '3.11'",
+    # The stdio server captures the active ServerSession via a subclassed
+    # Server.run() loop because the public MCP SDK does not yet expose a
+    # stable hook for server-side notifications. That subclass relies on
+    # `Server._experimental_handlers` and `Server._handle_message`, which
+    # are private members. We pin to the verified 1.x line and gate access
+    # behind a startup compatibility guard (see stdio_server.py) so a
+    # future SDK release cannot silently break the gateway via PyPI
+    # auto-resolution. Bump the upper bound after verifying the next
+    # major line.
+    "mcp>=1.27,<2.0",
+    "aiohttp>=3",
+    "zeroconf>=0.149",
+]
+
+[project.optional-dependencies]
+# Phase 4 TTS — see Issue #70.
+# Concrete engines (VOICEVOX, Irodori) consume these libraries:
+#   * httpx     — VOICEVOX / Irodori HTTP engine client
+#   * opuslib   — Opus encoding for the device's audio decoder
+# `tts-voicevox` is a no-op alias provided so users can declare intent
+# explicitly; the VOICEVOX engine itself is an external HTTP process and
+# adds no Python dependencies of its own.
+tts = [
+    "httpx>=0.27",
+    "opuslib>=3",
+]
+tts-voicevox = [
+    "stackchan-mcp[tts]",
+]
+# Irodori is an external HTTP synthesis service that returns MP3 (see
+# Issue #286). On top of the base `[tts]` extra (httpx + opuslib) it adds
+# `miniaudio` to decode the MP3 response to PCM. miniaudio is a small,
+# self-contained C extension (MIT) with prebuilt wheels for Windows,
+# macOS (x86_64 + arm64), and Linux, so it installs without a system
+# audio library — unlike a ffmpeg/libav binding — which keeps the
+# Windows wheel path (and the CI windows-smoke job) simple.
+tts-irodori = [
+    "stackchan-mcp[tts]",
+    "miniaudio>=1.59",
+]
+# ElevenLabs is a cloud HTTP synthesis service that returns MP3. Same
+# dependency shape as Irodori: the base `[tts]` extra (httpx + opuslib)
+# plus `miniaudio` to decode the MP3 response to PCM.
+tts-elevenlabs = [
+    "stackchan-mcp[tts]",
+    "miniaudio>=1.59",
+]
+# Fish Audio is a hosted HTTP synthesis service. It can return 16-bit mono
+# PCM/WAV at 16 kHz — the device's own rate — so unlike Irodori it needs no
+# decoder and unlike Edge TTS no ffmpeg. This is therefore a no-op alias over
+# `[tts]` (httpx + opuslib), provided so users can declare intent explicitly.
+tts-fish-audio = [
+    "stackchan-mcp[tts]",
+]
+
+# Phase 4 STT — see Issue #91.
+# The base `stt` extra carries `opuslib` for decoding the device's
+# inbound Opus frames. Concrete engines live behind their own extras
+# so users only pull in the heavy ML dependencies they actually need.
+#   * faster-whisper — local Whisper via CTranslate2 (default, MIT)
+#   * openai         — OpenAI Whisper API client (cloud)
+stt = [
+    "opuslib>=3",
+]
+stt-faster-whisper = [
+    "stackchan-mcp[stt]",
+    "faster-whisper>=1.0",
+]
+stt-openai = [
+    "stackchan-mcp[stt]",
+    "openai>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kisaragi-mochi/stackchan-mcp"
+Repository = "https://github.com/kisaragi-mochi/stackchan-mcp"
+Issues = "https://github.com/kisaragi-mochi/stackchan-mcp/issues"
+
+[project.scripts]
+stackchan-mcp = "stackchan_mcp.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff>=0.15.12",
+]
+
+# ruff 0.17 widened the default rule set (I001, UP, BLE, ...), which turned
+# the gateway lint from clean into 216 findings. Pin the lint rules to the
+# previous default so the dependency upgrade does not change CI results.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Bundle the native libopus binary into the Windows wheel so that
+# `pip install stackchan-mcp[tts]` (or `[stt]`) works out-of-the-box
+# on Windows. The DLL is loaded at import time via
+# `os.add_dll_directory()` in `stackchan_mcp/__init__.py`. See
+# `stackchan_mcp/_libs/SOURCES.md` for provenance and license.
+#
+# Build-time contract: `opus.dll` is NOT tracked in git. The publish
+# workflow builds it from upstream Opus source via vcpkg on a Windows
+# runner (verified against a pinned SHA256), drops it under
+# `stackchan_mcp/_libs/`, then runs `uv build` which produces the
+# `win_amd64` wheel. Builds on non-Windows runners do not place a
+# DLL under `_libs/`, so the sdist and the `py3-none-any` wheel
+# produced on those runners ship without the binary. Glob patterns
+# below match `opus.dll` if and only if it exists at build time, so
+# the same pyproject config covers both wheel variants without an
+# unmatched-pattern error on the non-Windows runner.
+[tool.hatch.build.targets.wheel]
+packages = ["stackchan_mcp"]
+artifacts = [
+    "stackchan_mcp/_libs/opus.dll",
+    "stackchan_mcp/_libs/SOURCES.md",
+    "stackchan_mcp/notify.example.yml",
+]

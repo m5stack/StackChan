@@ -1,0 +1,8 @@
+{
+  "fixture_kind": "generated_protocol_schema_shape",
+  "captured_from_desktop": false,
+  "protocol_notification": "turn/plan/updated",
+  "threadId": "fixture-thread-id",
+  "turnId": "fixture-turn-id",
+  "plan": []
+}

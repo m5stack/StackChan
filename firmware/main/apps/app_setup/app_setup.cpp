@@ -5,6 +5,7 @@
  */
 #include "app_setup.h"
 #include "workers/feature_toggle.h"
+#include "../app_agent_tasks/agent_tasks_setup_worker.h"
 #include <hal/hal.h>
 #include <mooncake.h>
 #include <mooncake_log.h>
@@ -145,7 +146,12 @@ void AppSetup::onOpen()
         },
         {
             "Apps",
-            {{"App visibility",
+            {{"Agent 看板",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<agent_tasks::SetupWorker>();
+              }},
+             {"App visibility",
               [&]() {
                   _destroy_menu = true;
                   _worker       = std::make_unique<FeatureToggleWorker>();
