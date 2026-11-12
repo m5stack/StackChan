@@ -32,6 +32,22 @@ struct Snapshot {
     AgentView claude;
 };
 
+struct CompletionProgress {
+    size_t completed = 0;
+    size_t total = 0;
+    unsigned percent = 0;
+};
+
+inline CompletionProgress completion_progress(const AgentView& view) {
+    CompletionProgress progress;
+    progress.total = view.tasks.size();
+    for (const auto& task : view.tasks)
+        if (task.status == TaskStatus::Completed) ++progress.completed;
+    if (progress.total)
+        progress.percent = static_cast<unsigned>((progress.completed * 100 + progress.total / 2) / progress.total);
+    return progress;
+}
+
 inline bool valid_utf8(const std::string& value) {
     for (size_t i = 0; i < value.size();) {
         const auto a = static_cast<unsigned char>(value[i]);

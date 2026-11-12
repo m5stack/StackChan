@@ -145,6 +145,7 @@ void Hal::xiaozhi_board_init()
 static void _stackchan_update_task(void* param)
 {
     bool is_setup_done = false;
+    uint32_t last_avatar_update = 0;
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -153,11 +154,14 @@ static void _stackchan_update_task(void* param)
 
         LvglLockGuard lock;
 
-        if (!hal_bridge::is_xiaozhi_idle()) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+        // Keep touch/home navigation responsive during speech. Throttle only
+        // avatar work, never sleep with LVGL locked or slow gesture sampling.
+        const auto now = GetHAL().millis();
+        const uint32_t avatar_interval = hal_bridge::is_xiaozhi_idle() ? 20 : 120;
+        if (now - last_avatar_update >= avatar_interval) {
+            GetStackChan().update();
+            last_avatar_update = now;
         }
-
-        GetStackChan().update();
 
         if (!hal_bridge::is_xiaozhi_ready()) {
             continue;

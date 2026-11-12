@@ -18,9 +18,18 @@ DashboardView::DashboardView() {
         columns_[i]->setBorderWidth(0); columns_[i]->setPadding(6, 5, 5, 5);
         lv_obj_remove_flag(columns_[i]->get(), LV_OBJ_FLAG_SCROLLABLE);
         title_[i] = std::make_unique<Label>(columns_[i]->get());
-        title_[i]->setTextFont(&lv_font_montserrat_16); title_[i]->setTextColor(accent);
+        title_[i]->setTextFont(&lv_font_montserrat_14); title_[i]->setTextColor(accent);
         title_[i]->setText(i ? LV_SYMBOL_EDIT "  CLAUDE" : LV_SYMBOL_KEYBOARD "  CODEX");
         title_[i]->setPos(0, 0);
+        title_[i]->setSize(104, 20);
+        title_[i]->setLongMode(LV_LABEL_LONG_MODE_DOTS);
+        progress_[i] = std::make_unique<Label>(columns_[i]->get());
+        progress_[i]->setTextFont(&lv_font_montserrat_14);
+        progress_[i]->setTextColor(accent);
+        progress_[i]->setSize(38, 20);
+        progress_[i]->setPos(104, 0);
+        progress_[i]->setText("--%");
+        lv_obj_set_style_text_align(progress_[i]->get(), LV_TEXT_ALIGN_RIGHT, 0);
         state_[i] = std::make_unique<Label>(columns_[i]->get());
         state_[i]->setTextFont(&agent_tasks_cjk_14); state_[i]->setTextColor(lv_color_hex(0xE4EBEF));
         state_[i]->setSize(120, 21); state_[i]->setLongMode(LV_LABEL_LONG_MODE_DOTS);
@@ -63,10 +72,16 @@ DashboardView::DashboardView() {
 }
 
 void DashboardView::update_column(int index, const AgentView& view, bool configured, bool connected) {
+    const auto completion = completion_progress(view);
+    const std::string percent = completion.total ? std::to_string(completion.percent) + "%" : "--%";
+    if (rendered_progress_[index] != percent) {
+        rendered_progress_[index] = percent;
+        progress_[index]->setText(percent);
+    }
     const bool live = configured && connected && view.online && !view.stale;
     const bool working = live && view.status == AgentStatus::Working;
     const bool waiting = live && view.status == AgentStatus::Waiting;
-    const auto phase = (lv_tick_get() / 400) % 4;
+    const auto phase = static_cast<int>((lv_tick_get() / 600) % 4);
     if (spinning_[index] != working) {
         spinning_[index] = working;
         if (working) {
@@ -92,7 +107,11 @@ void DashboardView::update_column(int index, const AgentView& view, bool configu
     // A light pulse draws attention to active rows without moving the text.
     for (size_t j = 0; j < std::min(view.tasks.size(), kMaxTasks); ++j) {
         const bool active = working && view.tasks[j].status == TaskStatus::InProgress;
-        markers_[index][j]->setOpa(active && phase >= 2 ? LV_OPA_50 : LV_OPA_COVER);
+        const int opacity = active && phase >= 2 ? LV_OPA_50 : LV_OPA_COVER;
+        if (rendered_marker_opacity_[index][j] != opacity) {
+            markers_[index][j]->setOpa(opacity);
+            rendered_marker_opacity_[index][j] = opacity;
+        }
     }
     std::string signature = view.tasks.empty() ? "empty" : "tasks";
     for (const auto& task : view.tasks)
@@ -106,6 +125,7 @@ void DashboardView::update_column(int index, const AgentView& view, bool configu
         if (view.tasks.empty()) {
             markers_[index][j]->setText(LV_SYMBOL_MINUS);
             markers_[index][j]->setOpa(LV_OPA_COVER);
+            rendered_marker_opacity_[index][j] = LV_OPA_COVER;
             tasks_[index][j]->setText("暂无待办任务");
             tasks_[index][j]->setTextColor(lv_color_hex(0xE2E8EB));
         } else {

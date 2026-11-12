@@ -1,6 +1,6 @@
 # StackChan · Agent 待办看板
 
-基于 M5Stack 官方固件扩展：在独立 `AGENT TASKS` 菜单中，左侧显示 Codex、右侧显示 Claude 的状态、阶段与待办，支持进行中优先排序、转圈图标和动态省略号。
+基于 M5Stack 官方固件扩展：在独立 `AGENT TASKS` 菜单中，左侧显示 Codex、右侧显示 Claude 的状态、阶段与待办，顶部独立显示完成百分比，支持进行中优先排序、转圈图标和动态省略号。
 
 - [中文安装与使用说明](docs/agent-tasks-setup.zh-CN.md)
 - [验证记录与已知限制](docs/agent-tasks-validation.zh-CN.md)

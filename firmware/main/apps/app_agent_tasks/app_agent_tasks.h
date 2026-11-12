@@ -14,4 +14,5 @@ private:
     agent_tasks::Poller poller_;
     std::unique_ptr<agent_tasks::DashboardView> view_;
     uint32_t last_update_ = 0;
+    uint32_t last_data_update_ = 0;
 };
