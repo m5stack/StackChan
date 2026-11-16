@@ -7,7 +7,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flex_color_picker/flex_color_picker.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/sliver_cupertino_list_section.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:stack_chan/app_state.dart';
@@ -33,16 +35,16 @@ class Dance extends StatefulWidget {
 }
 
 class DanceModel extends GetxController {
-  RxInt selectedDance = RxInt(0); //currentSelectedDanceindex
-  Rx<DanceList> danceInfo = Rx(DanceList()); //danceData
-  RxInt dancePlayIndex = RxInt(-1); //inplayindex（forhighlight）
-  RxBool isRun = RxBool(false); //whetherinwholeplay
-  RxBool isLoop = RxBool(false); //new：loopplaymode
+  RxInt selectedDance = RxInt(0); // Index of the selected dance frame
+  Rx<DanceList> danceInfo = Rx(DanceList()); // Dance data currently being edited
+  RxInt dancePlayIndex = RxInt(-1); // Index of the frame being played (for highlighting)
+  RxBool isRun = RxBool(false); // Whether the whole dance is playing
+  RxBool isLoop = RxBool(false); // Loop playback toggle
 
-  //playControl related
-  Timer? playTimer; //wholeplaytimer（mode）
-  List<Future<void>?> bluetoothPlayTasks = []; //Bluetoothplaytasklist
-  RxBool isPlayingSingle = RxBool(false); //whetherinplay
+  // Playback control
+  Timer? playTimer; // Timer for whole-dance playback (network mode)
+  List<Future<void>?> bluetoothPlayTasks = []; // Pending Bluetooth playback tasks
+  RxBool isPlayingSingle = RxBool(false); // Whether a single frame is playing
 }
 
 class _DanceState extends State<Dance> {
@@ -58,13 +60,13 @@ class _DanceState extends State<Dance> {
   @override
   void dispose() {
     model.isRun.value = false;
-    model.isLoop.value = false; //disposewhenresetloopstate
+    model.isLoop.value = false; // Reset loop state when disposed
     model.onClose();
-    stopDance(); //disposewhenstopplay
+    stopDance(); // Force playback to stop when disposed
     super.dispose();
   }
 
-  ///savedancedatatoserviceSide / End
+  /// Saves the current dance data to the backend.
   void saveDance() async {
     Map<String, dynamic> map = {
       ValueConstant.id: model.danceInfo.value.id,
@@ -81,7 +83,7 @@ class _DanceState extends State<Dance> {
     }
   }
 
-  ///fromserviceSide / Endrefreshdancedata
+  /// Refreshes the dance data from the backend.
   Future<void> getDanceList() async {
     final Map<String, dynamic> map = {
       ValueConstant.id: model.danceInfo.value.id,
@@ -100,14 +102,14 @@ class _DanceState extends State<Dance> {
     }
   }
 
-  ///playselectedSingle framedance
+  /// Plays the selected frame once.
   void startDanceOne() {
-    //stopCurrentlyinperformwholeplay
+    // Stop any whole-dance playback in progress
     if (model.isRun.value) {
       stopDance();
       model.isRun.value = false;
     }
-    //Single frameplayinThendirectreturn
+    // Single-frame playback already stopped everything; nothing more to do
     if (model.isPlayingSingle.value) return;
 
     final danceDataList = model.danceInfo.value.danceData;
@@ -116,41 +118,42 @@ class _DanceState extends State<Dance> {
       return;
     }
 
-    //verifyselectedindexhasEffectiveness
+    // Clamp the selected index to the valid range
     final int selectedIndex = model.selectedDance.value.clamp(
       0,
       danceDataList.length - 1,
     );
     final DanceData currentData = danceDataList[selectedIndex];
 
-    //updateplaystate
+    // Update the playback state
     model.isPlayingSingle.value = true;
-    model.dancePlayIndex.value = selectedIndex; //highlightcurrentplay
+    model.dancePlayIndex.value = selectedIndex; // Highlight the frame being played
 
-    ///Single frameplaycorelogic
+    /// Core single-frame playback logic.
     Future<void> playSingleFrame() async {
       try {
         if (AppState.shared.deviceControlMode == 0) {
-          //NetworkControlmode:sendSingle frameJSONdata
+          // Network mode: send the frame as JSON
           final jsonString = jsonEncode([currentData.toJson()]);
           AppState.shared.sendWebSocketMessage(
             .dance,
             data: jsonString.toUint8List(),
           );
-          //Waitcurrent frameplayduration
+          // Wait for the frame duration
           await Future.delayed(Duration(milliseconds: currentData.durationMs));
         } else if (AppState.shared.deviceControlMode == 1) {
-          //BluetoothControlmode:directsendFramedatatoBluetoothdevice
+          // Bluetooth mode: send the frame directly to the device
           await BlueUtil.shared.sendDanceData(currentData);
-          //Delay(+70ms forAligneddeviceresponselogic)
+          // Extra delay to stay in sync with the device's response
           await Future.delayed(
             Duration(milliseconds: currentData.durationMs + 70),
           );
         }
       } catch (e) {
-                Get.snackbar("错误", "播放失败: $e", snackPosition: SnackPosition.BOTTOM);
+        debugPrint("Single framePlayFailed: $e");
+        Get.snackbar("错误", "播放失败: $e", snackPosition: SnackPosition.BOTTOM);
       } finally {
-        //playcompleteafterresetstate
+        // Reset the state once playback completes
         model.isPlayingSingle.value = false;
         model.dancePlayIndex.value = -1;
       }
@@ -159,9 +162,9 @@ class _DanceState extends State<Dance> {
     playSingleFrame();
   }
 
-  ///playwholedance（supportloop）
+  /// Plays the whole dance, optionally looping.
   void startDance() {
-    //stopallCurrentlyinperformplay
+    // Stop anything currently playing
     stopDance();
 
     final danceDataList = model.danceInfo.value.danceData;
@@ -171,32 +174,32 @@ class _DanceState extends State<Dance> {
       return;
     }
 
-    //playAssociatedmusic(ifhas)
+    // Start the associated music, if any
     if (model.danceInfo.value.musicUrl != null &&
         model.danceInfo.value.musicUrl!.isNotEmpty) {
-      MusicUtil.shared.stopMusic(); //stoporiginalhasmusic
+      MusicUtil.shared.stopMusic(); // Stop any music that is already playing
       MusicUtil.shared.playMusic(
         model.danceInfo.value.musicInfo,
         isLoop: model.isLoop.value,
-      ); //musicsyncloop
+      ); // Keep the music in sync with the loop setting
     }
 
-    //wrapwholeplaylogic(forloopCall)
+    // Wrap the playback logic so it can call itself when looping
     void playFullDance() {
-      if (!model.isRun.value) return; //stopexit
+      if (!model.isRun.value) return; // Exit if playback was stopped
 
       if (AppState.shared.deviceControlMode == 0) {
-        //NetworkControlmode:1One-timesendalldancedata
+        // Network mode: send all dance data in one message
         final jsonString = jsonEncode(DanceData.listToJson(danceDataList));
         AppState.shared.sendWebSocketMessage(
           .dance,
           data: jsonString.toUint8List(),
         );
 
-        //Recordplaystarttime,forPrecise / AccuratelycalculateAlreadyplayduration
+        // Record the start time to track elapsed playback time accurately
         final startTime = DateTime.now();
 
-        //timerupdateplayFrameindex(forUIhighlight)
+        // Timer that advances the frame index for UI highlighting
         model.playTimer = Timer.periodic(const Duration(milliseconds: 50), (
           timer,
         ) {
@@ -205,10 +208,10 @@ class _DanceState extends State<Dance> {
             return;
           }
 
-          //Precise / AccuratelycalculateAlreadyplayduration(avoidtimerDeviation)
+          // Compute elapsed time precisely to avoid timer drift
           final elapsedMs = DateTime.now().difference(startTime).inMilliseconds;
 
-          //calculatecurrentplaytoFrame
+          // Determine the frame that should be playing now
           int currentIndex = -1;
           int accumulatedDuration = 0;
           for (int i = 0; i < danceDataList.length; i++) {
@@ -223,13 +226,13 @@ class _DanceState extends State<Dance> {
           if (currentIndex != -1) {
             model.dancePlayIndex.value = currentIndex;
           } else {
-            //playcomplete
+            // Playback finished
             model.dancePlayIndex.value = -1;
             timer.cancel();
 
-            //ifenableloop,Thenreplay
+            // Restart when looping is enabled
             if (model.isLoop.value && model.isRun.value) {
-              //replaymusic,Maintain / Keepsync
+              // Restart the music and keep it in sync
               if (model.danceInfo.value.musicUrl != null &&
                   model.danceInfo.value.musicUrl!.isNotEmpty) {
                 MusicUtil.shared.stopMusic();
@@ -248,33 +251,34 @@ class _DanceState extends State<Dance> {
           }
         });
       } else if (AppState.shared.deviceControlMode == 1) {
-        //BluetoothControlmode:frame by framesenddata(supportloop)
+        // Bluetooth mode: send frames one by one, looping when enabled
         Future<void> playAllFrames() async {
           for (int i = 0; i < danceDataList.length; i++) {
-            //checkwhetherNeedstopplay
+            // Stop if playback was cancelled
             if (!model.isRun.value) break;
 
             final DanceData currentData = danceDataList[i];
-            model.dancePlayIndex.value = i; //highlightcurrent frame
+            model.dancePlayIndex.value = i; // Highlight the current frame
 
             try {
-              //sendBluetoothdata
+              // Send the frame over Bluetooth
               await BlueUtil.shared.sendDanceData(currentData);
-              //WaitFrameduration(+70ms forAligneddeviceresponse)
+              // Wait for the frame duration plus device response time
               await Future.delayed(
                 Duration(milliseconds: currentData.durationMs + 70),
               );
             } catch (e) {
-                            break;
+              debugPrint("BluetoothPlayFrame $i Failed: $e");
+              break;
             }
           }
 
-          //playcompleteafterhandle
+          // Handle completion of playback
           model.dancePlayIndex.value = -1;
           if (model.isRun.value) {
-            //loopmodeThenreplay
+            // Replay when loop mode is on
             if (model.isLoop.value) {
-              //replaymusic,Maintain / Keepsync
+              // Restart the music and keep it in sync
               if (model.danceInfo.value.musicUrl != null &&
                   model.danceInfo.value.musicUrl!.isNotEmpty) {
                 MusicUtil.shared.stopMusic();
@@ -293,39 +297,59 @@ class _DanceState extends State<Dance> {
           }
         }
 
-        //willtaskaddlist(For easycancel)
+        // Track the task so it can be cancelled
         final task = playAllFrames();
         model.bluetoothPlayTasks.add(task);
         task.whenComplete(() => model.bluetoothPlayTasks.remove(task));
       }
     }
 
-    //startfirstplay
+    // Start the first pass
     playFullDance();
   }
 
-  ///stopallplay
+  /// Stops all playback.
   void stopDance() {
-    //stopmusic
+    // Stop the music
     MusicUtil.shared.stopMusic();
 
-    //resetplaystate
+    unawaited(_sendOriginDanceData());
+
+    // Reset the playback state
     model.isPlayingSingle.value = false;
     model.dancePlayIndex.value = -1;
 
-    //canceltimer
+    // Cancel the playback timer
     model.playTimer?.cancel();
     model.playTimer = null;
 
-    //cancelallBluetoothplaytask
+    // Cancel all pending Bluetooth playback tasks
     for (var task in model.bluetoothPlayTasks) {
       task?.ignore();
     }
     model.bluetoothPlayTasks.clear();
   }
 
+  Future<void> _sendOriginDanceData() async {
+    final originData = DanceData.init();
+    try {
+      if (AppState.shared.deviceControlMode == 0) {
+        final jsonString = jsonEncode([originData.toJson()]);
+        AppState.shared.sendWebSocketMessage(
+          .dance,
+          data: jsonString.toUint8List(),
+        );
+      } else if (AppState.shared.deviceControlMode == 1) {
+        await BlueUtil.shared.sendDanceData(originData);
+      }
+    } catch (e) {
+      debugPrint("send origin dance data failed: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenPadding = ThemeSetting.screenPadding(context);
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
@@ -333,6 +357,11 @@ class _DanceState extends State<Dance> {
       child: CustomScrollView(
         slivers: [
           CupertinoSliverNavigationBar(
+            backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+              context,
+            ),
+            border: ThemeSetting.cupertinoNavigationBarBorder(context),
+            padding: ThemeSetting.navigationBarPadding,
             largeTitle: Obx(
               () => Text(model.danceInfo.value.danceName ?? "Dance"),
             ),
@@ -341,11 +370,11 @@ class _DanceState extends State<Dance> {
               children: [
                 Obx(
                   () => CupertinoButton(
-                    padding: const EdgeInsets.all(12),
+                    sizeStyle: .medium,
                     child: SvgPicture.asset(
                       model.isLoop.value
-                          ? "assets/repeat.fill.svg" //loopenableicon
-                          : "assets/repeat.svg", //loopcloseicon
+                          ? "assets/repeat.fill.svg" // Loop enabled icon
+                          : "assets/repeat.svg", // Loop disabled icon
                       colorFilter: ColorFilter.mode(
                         model.isLoop.value
                             ? CupertinoTheme.of(context).primaryColor
@@ -354,9 +383,9 @@ class _DanceState extends State<Dance> {
                       ),
                     ),
                     onPressed: () {
-                      //switchloopstate
+                      // Toggle loop mode
                       model.isLoop.value = !model.isLoop.value;
-                      //ifCurrentlyinplay,updatemusicloopstate
+                      // Update the music loop setting if playback is active
                       if (model.isRun.value &&
                           model.danceInfo.value.musicUrl?.isNotEmpty == true) {
                         MusicUtil.shared.setMusicLoop(model.isLoop.value);
@@ -364,9 +393,9 @@ class _DanceState extends State<Dance> {
                     },
                   ),
                 ),
-                //wholeplay/stopbutton
+                // Play/stop button for the whole dance
                 CupertinoButton(
-                  padding: const EdgeInsets.all(12),
+                  sizeStyle: .medium,
                   child: Obx(
                     () => SvgPicture.asset(
                       model.isRun.value
@@ -390,68 +419,63 @@ class _DanceState extends State<Dance> {
               ],
             ),
           ),
-          //DownPullrefresh
+          // Pull to refresh
           CupertinoSliverRefreshControl(onRefresh: getDanceList),
-          //dancelist
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(25),
-                child: Container(
-                  color: CupertinoColors.tertiarySystemBackground.resolveFrom(
-                    context,
-                  ),
-                  child: Obx(
-                    () => model.danceInfo.value.danceData.isNotEmpty
-                        ? ListView.separated(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) =>
-                                danceItemView(context, index),
-                            itemCount: model.danceInfo.value.danceData.length,
-                            separatorBuilder: (context, index) => Padding(
-                              padding: const EdgeInsets.only(left: 15),
-                              child: Container(
-                                color: CupertinoColors.separator.resolveFrom(
-                                  context,
-                                ),
-                                width: double.infinity,
-                                height: 0.5,
-                              ),
-                            ),
-                          )
-                        : CupertinoListTile(
-                            onTap: () {
-                              model.danceInfo.value.danceData.add(
-                                DanceData(
-                                  leftEye: ExpressionItem(weight: 100),
-                                  rightEye: ExpressionItem(weight: 100),
-                                  mouth: ExpressionItem(weight: 0),
-                                  yawServo: MotionDataItem(),
-                                  pitchServo: MotionDataItem(),
-                                  durationMs: 200,
-                                ),
-                              );
-                              model.danceInfo.refresh();
-                              saveDance();
-                            },
-                            title: Center(
-                              child: Icon(CupertinoIcons.add_circled),
-                            ),
-                          ),
-                  ),
-                ),
-              ),
+          // Dance list
+          SliverPadding(
+            padding: .only(
+              left: screenPadding.left,
+              right: screenPadding.right,
+              bottom: screenPadding.bottom + 10,
             ),
+            sliver: Obx(() {
+              if (model.danceInfo.value.danceData.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: CupertinoListSection.insetGrouped(
+                    children: [
+                      CupertinoListTile(
+                        onTap: () {
+                          model.danceInfo.value.danceData.add(
+                            DanceData(
+                              leftEye: ExpressionItem(weight: 100),
+                              rightEye: ExpressionItem(weight: 100),
+                              mouth: ExpressionItem(weight: 0),
+                              yawServo: MotionDataItem(),
+                              pitchServo: MotionDataItem(),
+                              durationMs: 200,
+                            ),
+                          );
+                          model.danceInfo.refresh();
+                          saveDance();
+                        },
+                        title: const Center(
+                          child: Icon(CupertinoIcons.add_circled),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                return SliverCupertinoListSectionInsetGrouped(
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.secondarySystemGroupedBackground
+                        .resolveFrom(context),
+                    borderRadius: .circular(ThemeSetting.cardRadius),
+                  ),
+                  itemBuilder: (context, index) {
+                    return danceItemView(context, index);
+                  },
+                  itemCount: model.danceInfo.value.danceData.length,
+                );
+              }
+            }),
           ),
         ],
       ),
     );
   }
 
-  ///danceFramelistItem(NoModify,keeporiginallogic)
+  /// A single dance frame row; logic kept unchanged.
   Widget danceItemView(BuildContext context, int index) {
     TextStyle titleStyle = TextStyle(
       color: CupertinoColors.label.resolveFrom(context),
@@ -479,13 +503,13 @@ class _DanceState extends State<Dance> {
                 child: Row(
                   mainAxisSize: .max,
                   children: [
-                    Spacer(),
+                    const Spacer(),
                     CupertinoButton(
+                      sizeStyle: .small,
                       padding: EdgeInsets.zero,
-                      minimumSize: .zero,
-                      child: const Icon(
+                      child: Icon(
                         CupertinoIcons.minus_circle,
-                        color: CupertinoColors.separator,
+                        color: CupertinoColors.separator.resolveFrom(context),
                       ),
                       onPressed: () {
                         model.danceInfo.value.danceData.removeAt(index);
@@ -493,12 +517,12 @@ class _DanceState extends State<Dance> {
                         saveDance();
                       },
                     ),
-                    Spacer(),
+                    const Spacer(),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      minimumSize: .zero,
+                      sizeStyle: .small,
                       onPressed: () {
-                        //Duplicate / Copycurrent frame
+                        // Duplicate the current frame
                         final currentData = model
                             .danceInfo
                             .value
@@ -518,7 +542,7 @@ class _DanceState extends State<Dance> {
                       },
                       child: const Icon(CupertinoIcons.plus_circle),
                     ),
-                    Spacer(),
+                    const Spacer(),
                   ],
                 ),
               ),
@@ -541,7 +565,7 @@ class _DanceState extends State<Dance> {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -550,7 +574,7 @@ class _DanceState extends State<Dance> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      //orientationAngleshow
+                      // Orientation angle readout
                       Row(
                         children: [
                           Text("Orientation", style: titleStyle),
@@ -563,13 +587,14 @@ class _DanceState extends State<Dance> {
                           ),
                         ],
                       ),
-                      //orientationControl joystick
+                      // Orientation joystick
                       LayoutBuilder(
                         builder: (context, constraints) {
                           return Container(
                             height: constraints.maxWidth / 2,
                             decoration: BoxDecoration(
-                              color: CupertinoColors.systemGroupedBackground
+                              color: CupertinoColors
+                                  .tertiarySystemGroupedBackground
                                   .resolveFrom(context),
                               borderRadius: BorderRadius.circular(25),
                             ),
@@ -630,18 +655,14 @@ class _DanceState extends State<Dance> {
                           );
                         },
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                      //LeftSidelight stripcolorselect
+                      // Left light strip color picker
                       Row(
                         children: [
                           Text("Light strip left color", style: titleStyle),
                           const Spacer(),
                           CupertinoButton(
-                            borderRadius: BorderRadius.circular(50),
-                            color: CupertinoColors.systemGroupedBackground
-                                .resolveFrom(context),
-                            minimumSize: Size.zero,
                             padding: const EdgeInsets.all(5),
                             child: Obx(
                               () => Container(
@@ -667,18 +688,14 @@ class _DanceState extends State<Dance> {
                         ],
                       ),
 
-                      //rightlight stripcolorselect
-                      SizedBox(height: 10),
+                      // Right light strip color picker
+                      const SizedBox(height: 10),
 
                       Row(
                         children: [
                           Text("Light strip right color", style: titleStyle),
                           const Spacer(),
                           CupertinoButton(
-                            borderRadius: BorderRadius.circular(50),
-                            color: CupertinoColors.systemGroupedBackground
-                                .resolveFrom(context),
-                            minimumSize: Size.zero,
                             padding: const EdgeInsets.all(5),
                             child: Obx(
                               () => Container(
@@ -704,7 +721,7 @@ class _DanceState extends State<Dance> {
                         ],
                       ),
 
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           Text("Exercise duration", style: titleStyle),
@@ -717,8 +734,8 @@ class _DanceState extends State<Dance> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 10),
-                      //durationAdjustment sliderBlock
+                      const SizedBox(height: 10),
+                      // Duration slider
                       SizedBox(
                         width: double.infinity,
                         child: CupertinoSlider(
@@ -763,7 +780,7 @@ class _DanceState extends State<Dance> {
     return Color(int.parse('FF$hex', radix: 16));
   }
 
-  //colorselectControllerpopup(NoModify,keeporiginallogic)
+  // Color picker popup; logic kept unchanged.
   Future<bool> colorPickerDialog(bool isLeft, DanceData danceData) async {
     Color initialColor = isLeft
         ? hexToColor(danceData.leftRgbColor)
@@ -803,7 +820,7 @@ class _DanceState extends State<Dance> {
         )
         .then((value) {
           if (value == true) {
-            saveDance(); //colorselectcompleteaftersavedata
+            saveDance(); // Persist the selected color
           }
           return value;
         });

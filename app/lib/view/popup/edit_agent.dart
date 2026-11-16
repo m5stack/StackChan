@@ -3,7 +3,8 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:get/get.dart';
 import 'package:stack_chan/app_state.dart';
 import 'package:stack_chan/model/XiaoZhi/agent.dart';
@@ -13,10 +14,10 @@ import 'package:stack_chan/util/value_constant.dart';
 
 import '../../model/XiaoZhi/agent_create.dart';
 import '../../model/XiaoZhi/common_mcp_tool.dart';
-import '../../util/XiaoZhi_util.dart';
+import '../../util/xiao_zhi_util.dart';
 import 'agent_configuration.dart';
 
-//EditorCreate agent
+// Create or edit an AI agent.
 class EditAgent extends StatefulWidget {
   const EditAgent({super.key, this.agent});
 
@@ -35,13 +36,12 @@ class EditAgentModel extends GetxController {
   final RxBool isLoading = false.obs;
 
   late TextEditingController agentNameController;
-  late TextEditingController assistantNameController;
   late TextEditingController characterController;
   late TextEditingController memoryController;
 
   final Rxn<ModelData> selectedModel = Rxn();
   final Rxn<TTsVoice> selectedTtsVoice = Rxn();
-  final RxString selectedLanguage = "".obs; //，dynamic
+  final RxString selectedLanguage = "".obs; // Empty until the TTS response arrives
   final RxString ttsSpeed = "normal".obs;
   final RxInt ttsPitch = 0.obs;
   final RxString asrSpeed = "normal".obs;
@@ -62,15 +62,14 @@ class EditAgentModel extends GetxController {
 
   void initPageData() async {
     agentNameController = TextEditingController();
-    assistantNameController = TextEditingController();
     characterController = TextEditingController();
     memoryController = TextEditingController();
 
-    //listenlanguageswitch → autorefreshvoice tone
+    // Reload the voice tones whenever the language changes.
     ever(selectedLanguage, (lang) => _updateTtsVoiceList(lang));
 
     await loadCommonMcpTools();
-    await loadTtsList(); //loadTTS → autogeneratelanguagelist
+    await loadTtsList(); // TTS data determines the available languages
     await loadModelList();
 
     if (agent != null) {
@@ -82,25 +81,25 @@ class EditAgentModel extends GetxController {
     }
   }
 
-  //loadTTSdata + generatedynamiclanguagelist
+  // Load TTS data and build the language list from it.
   Future<void> loadTtsList() async {
     ttsData = await XiaoZhiUtil.shared.getTtsList();
 
-    //✅ key：from ttsVoices  key generatelanguagelist
+    // The language list is derived from the ttsVoices keys.
     if (ttsData?.ttsVoices != null) {
       languageList.value = ttsData!.ttsVoices!.keys.toList();
     }
 
-    //initdefaultlanguage
+    // Default to the first available language.
     if (languageList.isNotEmpty && selectedLanguage.isEmpty) {
       selectedLanguage.value = languageList.first;
     }
 
-    //updatevoice tone
+    // Refresh the voice tones for the selected language.
     _updateTtsVoiceList(selectedLanguage.value);
   }
 
-  //switchlanguage → switchvoice tone
+  // Reload the voice tones when the language changes.
   void _updateTtsVoiceList(String lang) {
     if (ttsData?.ttsVoices == null || lang.isEmpty) {
       ttsList.clear();
@@ -123,47 +122,45 @@ class EditAgentModel extends GetxController {
   }
 
   void fillEditData(Agent agent) {
-    agentNameController.text = agent.agent_name ?? "";
-    assistantNameController.text = agent.assistant_name ?? "";
+    agentNameController.text = agent.agentName ?? "";
     characterController.text = agent.character ?? "";
     memoryController.text = agent.memory ?? "";
 
-    //Editmode:languagemustexistdynamiclistin
+    // In edit mode the language must exist in the dynamic list.
     if (languageList.contains(agent.language)) {
       selectedLanguage.value = agent.language!;
     } else if (languageList.isNotEmpty) {
       selectedLanguage.value = languageList.first;
     }
 
-    ttsSpeed.value = agent.tts_speech_speed ?? "normal";
-    ttsPitch.value = agent.tts_pitch ?? 0;
-    asrSpeed.value = agent.asr_speed ?? "normal";
-    memoryType.value = agent.memory_type ?? "SHORT_TERM";
+    ttsSpeed.value = agent.ttsSpeechSpeed ?? "normal";
+    ttsPitch.value = agent.ttsPitch ?? 0;
+    asrSpeed.value = agent.asrSpeed ?? "normal";
+    memoryType.value = agent.memoryType ?? "SHORT_TERM";
 
-    if (agent.llm_model != null) {
+    if (agent.llmModel != null) {
       selectedModel.value = modelList.firstWhereOrNull(
-        (m) => m.name == agent.llm_model,
+        (m) => m.name == agent.llmModel,
       );
     }
 
-    if (agent.tts_voice != null) {
+    if (agent.ttsVoice != null) {
       Future.delayed(const Duration(milliseconds: 100), () {
         selectedTtsVoice.value = ttsList.firstWhereOrNull(
-          (t) => t.voiceId == agent.tts_voice,
+          (t) => t.voiceId == agent.ttsVoice,
         );
         update();
       });
     }
 
-    if (agent.mcp_endpoints != null) {
-      selectedMcpEndpoints.addAll(agent.mcp_endpoints!);
+    if (agent.mcpEndpoints != null) {
+      selectedMcpEndpoints.addAll(agent.mcpEndpoints!);
     }
     update();
   }
 
   void setDefaultCreateData() {
     agentNameController.text = "My AI Agent";
-    assistantNameController.text = "StackChan";
     ttsSpeed.value = "normal";
     ttsPitch.value = 0;
     asrSpeed.value = "normal";
@@ -197,19 +194,18 @@ class EditAgentModel extends GetxController {
     isLoading.value = true;
 
     final agentParams = AgentCreate(
-      agent_name: agentNameController.text.trim(),
-      assistant_name: assistantNameController.text.trim(),
-      llm_model: selectedModel.value!.name!,
-      tts_voice: selectedTtsVoice.value!.voiceId!,
-      tts_speech_speed: ttsSpeed.value,
-      tts_pitch: ttsPitch.value,
-      asr_speed: asrSpeed.value,
+      agentName: agentNameController.text.trim(),
+      llmModel: selectedModel.value!.name!,
+      ttsVoice: selectedTtsVoice.value!.voiceId!,
+      ttsSpeechSpeed: ttsSpeed.value,
+      ttsPitch: ttsPitch.value,
+      asrSpeed: asrSpeed.value,
       language: selectedLanguage.value,
       character: characterController.text.trim(),
       memory: memoryController.text.trim(),
-      memory_type: memoryType.value,
-      mcp_endpoints: selectedMcpEndpoints,
-      product_mcp_endpoints: [],
+      memoryType: memoryType.value,
+      mcpEndpoints: selectedMcpEndpoints,
+      productMcpEndpoints: [],
     );
 
     bool result = false;
@@ -222,9 +218,11 @@ class EditAgentModel extends GetxController {
 
     isLoading.value = false;
     if (result) {
-      AppState.shared.showToast(isEdit.value
-          ? "Agent edited successfully"
-          : "Agent created successfully");
+      AppState.shared.showToast(
+        isEdit.value
+            ? "Agent edited successfully"
+            : "Agent created successfully",
+      );
     }
     return result;
   }
@@ -232,7 +230,6 @@ class EditAgentModel extends GetxController {
   @override
   void onClose() {
     agentNameController.dispose();
-    assistantNameController.dispose();
     characterController.dispose();
     memoryController.dispose();
     super.onClose();
@@ -263,72 +260,70 @@ class _EditAgentState extends State<EditAgent> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     model.onClose();
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
       navigationBar: CupertinoNavigationBar.large(
+        backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+          context,
+        ),
+        border: ThemeSetting.cupertinoNavigationBarBorder(context),
+        padding: ThemeSetting.navigationBarPadding,
         largeTitle: Obx(
           () => Text(
             model.isEdit.value
-                ? (agentConfigurationModel.currentBindAgent.value?.agent_name ??
-                      "Edit Agent") //error
-                : "Create AI Agent", //translated comment
+                ? (agentConfigurationModel.currentBindAgent.value?.agentName ??
+                      "Edit Agent")
+                : "Create AI Agent",
           ),
         ),
-        leading: CupertinoNavigationBarBackButton(),
-        backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+        leading: CupertinoButton(
+          sizeStyle: .medium,
+          onPressed: () => Navigator.maybePop(context),
+          child: const Icon(CupertinoIcons.back),
+        ),
         trailing: Obx(
           () => model.isLoading.value
               ? const CupertinoActivityIndicator(radius: 10)
               : CupertinoButton(
-                  padding: EdgeInsets.zero,
+                  sizeStyle: .medium,
                   onPressed: () async {
                     final result = await model.submitAgent();
                     if (result && mounted) {
-                      Navigator.pop(this.context);
+                      Navigator.maybePop(this.context);
                     }
                   },
                   child: const Icon(CupertinoIcons.check_mark),
                 ),
         ),
       ),
-      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
       child: Obx(
         () => model.isLoading.value
             ? const Center(child: CupertinoActivityIndicator())
             : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 20,
+                padding: .only(
+                  left: padding.left + 20,
+                  right: padding.right + 20,
+                  top: 20,
+                  bottom: 20,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    //1. info
-                    _buildSectionTitle("Basic Information"),
-                    // _buildInputItem(
-                    //   title: "Agent Name",
-                    //   controller: model.agentNameController,
-                    //   placeholder:
-                    //"Please enter the name of the AI Agent.", // System1
-                    // ),
-                    _buildInputItem(
-                      title: "Assistant Name", //translated comment
-                      controller: model.assistantNameController,
-                      placeholder:
-                          "Please enter the assistant's name (e.g. StackChan).",
-                    ),
-                    //2. modelconfig
-                    _buildSectionTitle("Model Configuration"), //standard
+                    // Model configuration
+                    _buildSectionTitle("Model Configuration"),
                     _buildSelectItem(
-                      title: "LLM Model", //（Large Language Model）
+                      title: "LLM Model",
                       value: model.selectedModel.value?.name ?? "Please select",
                       onTap: showModelPicker,
                     ),
@@ -337,55 +332,54 @@ class _EditAgentState extends State<EditAgent> {
                       value: getLanguagesTitle(model.selectedLanguage.value),
                       onTap: showLanguagePicker,
                     ),
-                    //3. config
-                    _buildSectionTitle("Voice Configuration"), //standard
+                    // Voice configuration
+                    _buildSectionTitle("Voice Configuration"),
                     _buildSelectItem(
-                      title: "Voice Tone", //Timbre，
+                      title: "Voice Tone",
                       value:
                           model.selectedTtsVoice.value?.voiceName ??
                           "Please select",
                       onTap: showTtsPicker,
                     ),
                     _buildSelectItem(
-                      title: "TTS Speech Speed", //isTTS
+                      title: "TTS Speech Speed",
                       value: model.ttsSpeed.value,
                       onTap: showSpeedPicker,
                     ),
                     _buildSelectItem(
-                      title: "TTS Pitch", //isTTS
+                      title: "TTS Pitch",
                       value: model.ttsPitch.value.toString(),
                       onTap: showPitchPicker,
                     ),
                     _buildSelectItem(
-                      title: "ASR Speed", //（Automatic Speech Recognition）
+                      title: "ASR Speed",
                       value: model.asrSpeed.value,
                       onTap: showAsrSpeedPicker,
                     ),
-                    //4. characterconfig
-                    _buildSectionTitle("Character Configuration"), //standard
+                    // Character configuration
+                    _buildSectionTitle("Character Configuration"),
                     _buildInputItem(
                       title: "Character Description",
                       controller: model.characterController,
-                      placeholder:
-                          "Please provide the character description (max 2000 characters).",
-                      //(words→characters)
+                      placeholder: "Please provide the character description (max 2000 characters).",
+                      // The 2000-character limit counts characters, not words.
                       maxLines: 4,
                     ),
                     _buildInputItem(
-                      title: "Short-term Memory Content", //translated comment
+                      title: "Short-term Memory Content",
                       controller: model.memoryController,
                       placeholder:
                           "Please enter the short-term memory content.",
                       maxLines: 3,
                     ),
                     _buildSelectItem(
-                      title: "Memory Type", //standard
+                      title: "Memory Type",
                       value: model.memoryType.value == "SHORT_TERM"
-                          ? "Short-term Memory" //standard
-                          : "Disabled", //Shut down，UI
+                          ? "Short-term Memory"
+                          : "Disabled",
                       onTap: showMemoryTypePicker,
                     ),
-                    //5. MCPtoolconfig(Partoptimize)
+                    // MCP tool configuration (currently disabled).
                     // _buildSectionTitle("MCP Tools (Optional)"),
                     // model.commonMcpTools.isEmpty
                     //     ? const Center(child: Text("No available MCP tools"))
@@ -446,7 +440,7 @@ class _EditAgentState extends State<EditAgent> {
           .toList(),
       initialIndex: initialIndex.clamp(0, model.languageList.length - 1),
       onSelected: (index) {
-        //fix:AssignValue languageKEY(zh/en),And / WhileNotisshowname!
+        // Assign the language key (e.g. zh/en), not its display name.
         model.selectedLanguage.value = model.languageList[index];
       },
     );
@@ -510,9 +504,9 @@ class _EditAgentState extends State<EditAgent> {
     required String title,
     required List<String> items,
     required Function(int) onSelected,
-    int initialIndex = 0, //new：selectedindex
+    int initialIndex = 0, // Initial selected index
   }) {
-    //initselectedItemascurrentValue(fixdefaultselectederror)
+    // Seed the pending selection with the current value.
     selectedItem = initialIndex;
     showCupertinoModalPopup(
       context: context,
@@ -527,12 +521,12 @@ class _EditAgentState extends State<EditAgent> {
                 children: [
                   CupertinoButton(
                     child: const Text("Cancel"),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.maybePop(context),
                   ),
                   CupertinoButton(
                     child: const Text("Confirm"),
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.maybePop(context);
                       onSelected(selectedItem);
                     },
                   ),
@@ -558,7 +552,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //title
+  // Section header
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -569,7 +563,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //inputItem
+  // Text input form row
   Widget _buildInputItem({
     required String title,
     required TextEditingController controller,
@@ -603,7 +597,7 @@ class _EditAgentState extends State<EditAgent> {
     );
   }
 
-  //selectItem
+  // Picker form row
   Widget _buildSelectItem({
     required String title,
     required String value,

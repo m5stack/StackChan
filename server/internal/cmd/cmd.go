@@ -8,7 +8,6 @@ package cmd
 import (
 	"context"
 	"net/http"
-	"path/filepath"
 	"stackChan/internal/boot"
 	"stackChan/internal/controller/admin"
 	"stackChan/internal/controller/appstore"
@@ -22,12 +21,12 @@ import (
 	"stackChan/internal/controller/user"
 	"stackChan/internal/controller/xiaozhi"
 	"stackChan/internal/middleware"
+	"stackChan/internal/service"
 	"stackChan/internal/web_socket"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
-	"github.com/gogf/gf/v2/os/gfile"
 )
 
 var (
@@ -46,22 +45,18 @@ var (
 			// heartBeat
 			boot.InitCron()
 
-			///Configuration file access
+			// Public file access
 			s.Group("/file", func(group *ghttp.RouterGroup) {
 				group.GET("/*filepath", func(r *ghttp.Request) {
 					relativePath := r.Get("filepath").String()
-					if relativePath == "" {
+					servedFile, fileInfo, err := service.OpenFileForServing(relativePath)
+					if err != nil {
 						r.Response.WriteHeader(http.StatusNotFound)
 						r.Response.Write("File not found")
 						return
 					}
-					filePath := filepath.Join("file", relativePath)
-					if !gfile.Exists(filePath) {
-						r.Response.WriteHeader(http.StatusNotFound)
-						r.Response.Write("File not found")
-						return
-					}
-					r.Response.ServeFile(filePath)
+					defer servedFile.Close()
+					r.Response.ServeContent(fileInfo.Name(), fileInfo.ModTime(), servedFile)
 				})
 			})
 
@@ -83,7 +78,6 @@ var (
 			// Do not use SetServerRoot, globally only provide frontend entry via /web
 			s.SetServerRoot("web/management")
 
-			s.SetPort(12800)
 			s.Run()
 			return nil
 		},

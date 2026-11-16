@@ -1,22 +1,21 @@
+# SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+# SPDX-License-Identifier: MIT
+
 name: stack_chan
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.1.0+6
+version: 1.2.8+32
 
 environment:
-  sdk: ^3.11.5
+  sdk: 3.13.5
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons:
-  web_socket:
   encrypt:
   pointycastle:
   shared_preferences:
   get:
-  liquid_glass_renderer:
-  flutter_blue_plus:
-  hydro_glass_nav_bar:
   uuid:
   three_js:
   flex_color_picker:
@@ -25,7 +24,6 @@ dependencies:
   google_mlkit_face_detection:
   flutter_slidable:
   opencv_dart:
-  pull_down_button:
   dio:
   mobile_scanner:
   network_info_plus:
@@ -37,19 +35,37 @@ dependencies:
   ffmpeg_kit_flutter_new:
   path:
   intl:
-  file_picker: ^11.0.2
+  file_picker:
   opus_codec_dart:
   opus_codec:
   webview_flutter:
   video_player:
   geolocator:
   package_info_plus:
-
+  liquid_glass_widgets:
+  url_launcher:
+  cupertino_ui:
+  adaptive_platform_ui:
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_native_splash:
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#121212"
+  image: assets/splash_logo.png
+  image_dark: assets/splash_logo.png
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#121212"
+    image: assets/splash_logo_android12.png
+    image_dark: assets/splash_logo_android12.png
+
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/
@@ -57,6 +73,8 @@ flutter:
 hooks:
   user_defines:
     dartcv4:
+      android:
+        opencv_dir: /path/to/opencv-android/sdk/native/jni
       include_modules:
         - imgproc
         - imgcodecs

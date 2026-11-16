@@ -3,11 +3,40 @@ import subprocess
 import json
 
 
+def apply_repo_patch(path, patch_path):
+    # Normalize Windows patch checkouts in memory; Git still handles the
+    # dependency's own checkout line-ending rules.
+    with open(patch_path, "rb") as patch_file:
+        patch_data = patch_file.read().replace(b"\r\n", b"\n")
+
+    command = ["git", "-C", path, "apply"]
+    check_result = subprocess.run(
+        command + ["--check", "-"], input=patch_data, capture_output=True
+    )
+    if check_result.returncode == 0:
+        subprocess.run(command + ["-"], input=patch_data, check=True)
+        print(f"Applied patch {patch_path} to {path}")
+        return
+
+    reverse_result = subprocess.run(
+        command + ["--reverse", "--check", "-"],
+        input=patch_data,
+        capture_output=True,
+    )
+    if reverse_result.returncode == 0:
+        print(f"Patch {patch_path} is already applied to {path}")
+        return
+
+    detail = check_result.stderr.decode(errors="replace").strip()
+    raise RuntimeError(
+        f"Patch {patch_path} cannot be applied to {path} and is not already applied. "
+        f"Resolve the dependency changes before retrying.\n{detail}"
+    )
+
+
 def clone_or_update_repo(
     repo_url, path, ref=None, with_submodules=False, patch_path=None
 ):
-    import os
-
     if not os.path.exists(path):
         subprocess.run(["git", "clone", repo_url, path], check=True)
     else:
@@ -29,15 +58,7 @@ def clone_or_update_repo(
             if os.path.isabs(patch_path)
             else os.path.join(os.getcwd(), patch_path)
         )
-        # 使用 git apply --check 先检测补丁是否能应用，避免报错
-        check_result = subprocess.run(
-            ["git", "-C", path, "apply", "--check", patch_full_path]
-        )
-        if check_result.returncode == 0:
-            subprocess.run(["git", "-C", path, "apply", patch_full_path], check=True)
-            print(f"Applied patch {patch_path} to {path}")
-        else:
-            print(f"Patch {patch_path} cannot be applied cleanly to {path}, skipped.")
+        apply_repo_patch(path, patch_full_path)
 
 
 def fetch_dependencies():

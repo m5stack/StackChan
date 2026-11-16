@@ -21,6 +21,8 @@ public:
     void onClose() override;
 
 private:
+    bool _espnow_ready     = false;
+    int _receive_signal_id = -1;
     bool start_startup_page();
     void start_advanced_page();
 };

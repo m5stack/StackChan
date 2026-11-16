@@ -4,75 +4,71 @@ SPDX-License-Identifier: MIT
 */
 
 class AgentCreate {
-  String? agent_name;
-  String? assistant_name;
-  String? llm_model;
-  String? tts_voice;
-  String? tts_speech_speed;
-  int? tts_pitch;
-  String? asr_speed;
+  String? agentName;
+  String? llmModel;
+  String? ttsVoice;
+  String? ttsSpeechSpeed;
+  int? ttsPitch;
+  String? asrSpeed;
   String? language;
   String? character;
   String? memory;
-  String? memory_type;
-  List<dynamic>? mcp_endpoints;
-  List<dynamic>? product_mcp_endpoints;
+  String? memoryType;
+  List<dynamic>? mcpEndpoints;
+  List<dynamic>? productMcpEndpoints;
 
-  //Constructorfunction
+  // Creates a request payload for creating an agent.
   AgentCreate({
-    this.agent_name,
-    this.assistant_name,
-    this.llm_model,
-    this.tts_voice,
-    this.tts_speech_speed,
-    this.tts_pitch,
-    this.asr_speed,
+    this.agentName,
+    this.llmModel,
+    this.ttsVoice,
+    this.ttsSpeechSpeed,
+    this.ttsPitch,
+    this.asrSpeed,
     this.language,
     this.character,
     this.memory,
-    this.memory_type,
-    this.mcp_endpoints,
-    this.product_mcp_endpoints,
+    this.memoryType,
+    this.mcpEndpoints,
+    this.productMcpEndpoints,
   });
 
-  //from JSON Deserialize(factory Factorymethod)
+  // Creates a payload from a JSON map.
   factory AgentCreate.fromJson(Map<String, dynamic> json) {
     return AgentCreate(
-      agent_name: json['agent_name'] as String?,
-      assistant_name: json['assistant_name'] as String?,
-      llm_model: json['llm_model'] as String?,
-      tts_voice: json['tts_voice'] as String?,
-      tts_speech_speed: json['tts_speech_speed'] as String?,
-      tts_pitch: json['tts_pitch'] as int?,
-      //Count / NumberValuetypeSeparatelyhandle
-      asr_speed: json['asr_speed'] as String?,
+      agentName: json['agent_name'] as String?,
+      llmModel: json['llm_model'] as String?,
+      ttsVoice: json['tts_voice'] as String?,
+      ttsSpeechSpeed: json['tts_speech_speed'] as String?,
+      ttsPitch: json['tts_pitch'] as int?,
+      // The API returns the speech rate as a string.
+      asrSpeed: json['asr_speed'] as String?,
       language: json['language'] as String?,
       character: json['character'] as String?,
       memory: json['memory'] as String?,
-      memory_type: json['memory_type'] as String?,
-      //handledynamicarray,directCast(List<dynamic> Compatible withanyarraytype)
-      mcp_endpoints: json['mcp_endpoints'] as List<dynamic>?,
-      product_mcp_endpoints: json['product_mcp_endpoints'] as List<dynamic>?,
+      memoryType: json['memory_type'] as String?,
+      // Endpoint lists stay as raw JSON arrays.
+      mcpEndpoints: json['mcp_endpoints'] as List<dynamic>?,
+      productMcpEndpoints: json['product_mcp_endpoints'] as List<dynamic>?,
     );
   }
 
-  //Serializeas JSON(return Map<String, dynamic>),onlyContainsNot emptyfield
+  // Converts this payload to a JSON map, omitting unset fields.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    //only whenfieldValueNotas null when,Only thenaddto Map in
-    if (agent_name != null) data['agent_name'] = agent_name;
-    if (assistant_name != null) data['assistant_name'] = assistant_name;
-    if (llm_model != null) data['llm_model'] = llm_model;
-    if (tts_voice != null) data['tts_voice'] = tts_voice;
-    if (tts_speech_speed != null) data['tts_speech_speed'] = tts_speech_speed;
-    if (tts_pitch != null) data['tts_pitch'] = tts_pitch;
-    if (asr_speed != null) data['asr_speed'] = asr_speed;
+    // Only include fields that were set.
+    if (agentName != null) data['agent_name'] = agentName;
+    if (llmModel != null) data['llm_model'] = llmModel;
+    if (ttsVoice != null) data['tts_voice'] = ttsVoice;
+    if (ttsSpeechSpeed != null) data['tts_speech_speed'] = ttsSpeechSpeed;
+    if (ttsPitch != null) data['tts_pitch'] = ttsPitch;
+    if (asrSpeed != null) data['asr_speed'] = asrSpeed;
     if (language != null) data['language'] = language;
     if (character != null) data['character'] = character;
     if (memory != null) data['memory'] = memory;
-    if (memory_type != null) data['memory_type'] = memory_type;
-    data['mcp_endpoints'] = mcp_endpoints;
-    data['product_mcp_endpoints'] = product_mcp_endpoints;
+    if (memoryType != null) data['memory_type'] = memoryType;
+    data['mcp_endpoints'] = mcpEndpoints;
+    data['product_mcp_endpoints'] = productMcpEndpoints;
     return data;
   }
 }

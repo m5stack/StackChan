@@ -6,24 +6,29 @@ SPDX-License-Identifier: MIT
 package utility
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gctx"
 )
 
+type rsaKeySet struct {
+	serverPublic  *rsa.PublicKey
+	serverPrivate *rsa.PrivateKey
+	clientPublic  *rsa.PublicKey
+	clientPrivate *rsa.PrivateKey
+}
+
 var (
-	serverPublicKey  *rsa.PublicKey
-	serverPrivateKey *rsa.PrivateKey
-	clientPublicKey  *rsa.PublicKey
-	clientPrivateKey *rsa.PrivateKey
-	initialized      bool
+	rsaKeys     rsaKeySet
+	initialized bool
 )
 
 func init() {
@@ -38,62 +43,95 @@ func InitRSAKeys() error {
 		return nil
 	}
 
-	var ctx = gctx.New()
-
-	// Read key strings from configuration file
-	serverPublicKeyStr := g.Cfg().MustGet(ctx, "rsa.server.public").String()
-	serverPrivateKeyStr := g.Cfg().MustGet(ctx, "rsa.server.private").String()
-	clientPublicKeyStr := g.Cfg().MustGet(ctx, "rsa.client.public").String()
-	clientPrivateKeyStr := g.Cfg().MustGet(ctx, "rsa.client.private").String()
-
-	// Check if keys are empty
-	if serverPublicKeyStr == "" {
-		return errors.New("server public key not found in config")
-	}
-	if serverPrivateKeyStr == "" {
-		return errors.New("server private key not found in config")
-	}
-	if clientPublicKeyStr == "" {
-		return errors.New("client public key not found in config")
-	}
-	if clientPrivateKeyStr == "" {
-		return errors.New("client private key not found in config")
-	}
-
-	// Parse server public key
-	var err error
-	serverPublicKey, err = parsePublicKey([]byte(serverPublicKeyStr))
+	ctx := gctx.New()
+	keys, err := loadRSAKeySet(ctx)
 	if err != nil {
-		return errors.New("failed to parse server public key: " + err.Error())
+		return err
 	}
 
-	// Parse server private key
-	serverPrivateKey, err = parsePrivateKey([]byte(serverPrivateKeyStr))
-	if err != nil {
-		return errors.New("failed to parse server private key: " + err.Error())
-	}
-
-	// Parse client public key
-	clientPublicKey, err = parsePublicKey([]byte(clientPublicKeyStr))
-	if err != nil {
-		return errors.New("failed to parse client public key: " + err.Error())
-	}
-
-	// Parse client private key
-	clientPrivateKey, err = parsePrivateKey([]byte(clientPrivateKeyStr))
-	if err != nil {
-		return errors.New("failed to parse client private key: " + err.Error())
-	}
-
+	rsaKeys = keys
 	initialized = true
 	return nil
+}
+
+func loadRSAKeySet(ctx context.Context) (rsaKeySet, error) {
+	var (
+		serverPublicPath  = "rsa.server.public"
+		serverPrivatePath = "rsa.server.private"
+		clientPublicPath  = "rsa.client.public"
+		clientPrivatePath = "rsa.client.private"
+		serverPublicPEM   = g.Cfg().MustGet(ctx, serverPublicPath).String()
+		serverPrivatePEM  = g.Cfg().MustGet(ctx, serverPrivatePath).String()
+		clientPublicPEM   = g.Cfg().MustGet(ctx, clientPublicPath).String()
+		clientPrivatePEM  = g.Cfg().MustGet(ctx, clientPrivatePath).String()
+	)
+
+	keyConfigs := [...]struct {
+		path string
+		pem  string
+	}{
+		{path: serverPublicPath, pem: serverPublicPEM},
+		{path: serverPrivatePath, pem: serverPrivatePEM},
+		{path: clientPublicPath, pem: clientPublicPEM},
+		{path: clientPrivatePath, pem: clientPrivatePEM},
+	}
+	for _, keyConfig := range keyConfigs {
+		if keyConfig.pem == "" {
+			return rsaKeySet{}, gerror.Newf("RSA key not found in config: %s", keyConfig.path)
+		}
+	}
+
+	serverPublic, err := parsePublicKey([]byte(serverPublicPEM))
+	if err != nil {
+		return rsaKeySet{}, gerror.Newf("failed to parse %s: %v", serverPublicPath, err)
+	}
+	serverPrivate, err := parsePrivateKey([]byte(serverPrivatePEM))
+	if err != nil {
+		return rsaKeySet{}, gerror.Newf("failed to parse %s: %v", serverPrivatePath, err)
+	}
+	clientPublic, err := parsePublicKey([]byte(clientPublicPEM))
+	if err != nil {
+		return rsaKeySet{}, gerror.Newf("failed to parse %s: %v", clientPublicPath, err)
+	}
+	clientPrivate, err := parsePrivateKey([]byte(clientPrivatePEM))
+	if err != nil {
+		return rsaKeySet{}, gerror.Newf("failed to parse %s: %v", clientPrivatePath, err)
+	}
+
+	if err = validateRSAKeyPair(serverPublic, serverPrivate); err != nil {
+		return rsaKeySet{}, gerror.Newf("invalid server key pair: %v", err)
+	}
+	if err = validateRSAKeyPair(clientPublic, clientPrivate); err != nil {
+		return rsaKeySet{}, gerror.Newf("invalid client key pair: %v", err)
+	}
+
+	return rsaKeySet{
+		serverPublic:  serverPublic,
+		serverPrivate: serverPrivate,
+		clientPublic:  clientPublic,
+		clientPrivate: clientPrivate,
+	}, nil
+}
+
+func validateRSAKeyPair(publicKey *rsa.PublicKey, privateKey *rsa.PrivateKey) error {
+	if publicKey.E != privateKey.PublicKey.E || publicKey.N.Cmp(privateKey.PublicKey.N) != 0 {
+		return gerror.New("public and private keys do not match")
+	}
+	return nil
+}
+
+func getRSAKeySet() (*rsaKeySet, error) {
+	if !initialized {
+		return nil, gerror.New("RSA keys not initialized")
+	}
+	return &rsaKeys, nil
 }
 
 // parsePublicKey Parse public key in PEM format
 func parsePublicKey(pemBytes []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
-		return nil, errors.New("failed to parse PEM block containing public key")
+		return nil, gerror.New("failed to parse PEM block containing public key")
 	}
 
 	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
@@ -101,13 +139,13 @@ func parsePublicKey(pemBytes []byte) (*rsa.PublicKey, error) {
 		// Try parsing PKCS1 format
 		pub, err = x509.ParsePKCS1PublicKey(block.Bytes)
 		if err != nil {
-			return nil, errors.New("failed to parse public key as PKIX or PKCS1: " + err.Error())
+			return nil, gerror.Newf("failed to parse public key as PKIX or PKCS1: %v", err)
 		}
 	}
 
 	rsaPub, ok := pub.(*rsa.PublicKey)
 	if !ok {
-		return nil, errors.New("not an RSA public key")
+		return nil, gerror.New("not an RSA public key")
 	}
 
 	return rsaPub, nil
@@ -117,7 +155,7 @@ func parsePublicKey(pemBytes []byte) (*rsa.PublicKey, error) {
 func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
-		return nil, errors.New("failed to parse PEM block containing private key")
+		return nil, gerror.New("failed to parse PEM block containing private key")
 	}
 
 	var priv *rsa.PrivateKey
@@ -129,12 +167,12 @@ func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 		// Try parsing PKCS8 format
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, errors.New("failed to parse private key as PKCS1 or PKCS8: " + err.Error())
+			return nil, gerror.Newf("failed to parse private key as PKCS1 or PKCS8: %v", err)
 		}
 		var ok bool
 		priv, ok = key.(*rsa.PrivateKey)
 		if !ok {
-			return nil, errors.New("not an RSA private key")
+			return nil, gerror.New("not an RSA private key")
 		}
 	}
 
@@ -143,46 +181,32 @@ func parsePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 
 // RSAEncrypt Encrypt using client public key (used when server sends data to client)
 func RSAEncrypt(plainText []byte) ([]byte, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
-	}
-
-	// Use OAEP padding, SHA256 hash
-	hash := sha256.New()
-	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, clientPublicKey, plainText, nil)
+	keys, err := getRSAKeySet()
 	if err != nil {
 		return nil, err
 	}
-
-	return ciphertext, nil
+	return RSAEncryptWithKey(plainText, keys.clientPublic)
 }
 
 // RSADecrypt Decrypt using server private key (used when server receives client data)
 func RSADecrypt(cipherText []byte) ([]byte, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
-	}
-
-	// Use OAEP padding, SHA256 hash
-	hash := sha256.New()
-	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, serverPrivateKey, cipherText, nil)
+	keys, err := getRSAKeySet()
 	if err != nil {
 		return nil, err
 	}
-
-	return plaintext, nil
+	return RSADecryptWithKey(cipherText, keys.serverPrivate)
 }
 
 // RSAEncryptWithKey Encrypt using specified public key
 func RSAEncryptWithKey(plainText []byte, publicKey *rsa.PublicKey) ([]byte, error) {
 	if publicKey == nil {
-		return nil, errors.New("public key is nil")
+		return nil, gerror.New("public key is nil")
 	}
 
 	hash := sha256.New()
 	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, publicKey, plainText, nil)
 	if err != nil {
-		return nil, err
+		return nil, gerror.Wrap(err, "RSA encryption failed")
 	}
 
 	return ciphertext, nil
@@ -191,13 +215,13 @@ func RSAEncryptWithKey(plainText []byte, publicKey *rsa.PublicKey) ([]byte, erro
 // RSADecryptWithKey Decrypt using specified private key
 func RSADecryptWithKey(cipherText []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
 	if privateKey == nil {
-		return nil, errors.New("private key is nil")
+		return nil, gerror.New("private key is nil")
 	}
 
 	hash := sha256.New()
 	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, privateKey, cipherText, nil)
 	if err != nil {
-		return nil, err
+		return nil, gerror.Wrap(err, "RSA decryption failed")
 	}
 
 	return plaintext, nil
@@ -205,48 +229,52 @@ func RSADecryptWithKey(cipherText []byte, privateKey *rsa.PrivateKey) ([]byte, e
 
 // GetServerPublicKey Get server public key object
 func GetServerPublicKey() (*rsa.PublicKey, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
+	keys, err := getRSAKeySet()
+	if err != nil {
+		return nil, err
 	}
-	return serverPublicKey, nil
+	return keys.serverPublic, nil
 }
 
 // GetServerPrivateKey Get server private key object
 func GetServerPrivateKey() (*rsa.PrivateKey, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
+	keys, err := getRSAKeySet()
+	if err != nil {
+		return nil, err
 	}
-	return serverPrivateKey, nil
+	return keys.serverPrivate, nil
 }
 
 // GetClientPublicKey Get client public key object
 func GetClientPublicKey() (*rsa.PublicKey, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
+	keys, err := getRSAKeySet()
+	if err != nil {
+		return nil, err
 	}
-	return clientPublicKey, nil
+	return keys.clientPublic, nil
 }
 
 // GetClientPrivateKey Get client private key object
 func GetClientPrivateKey() (*rsa.PrivateKey, error) {
-	if !initialized {
-		return nil, errors.New("RSA keys not initialized")
+	keys, err := getRSAKeySet()
+	if err != nil {
+		return nil, err
 	}
-	return clientPrivateKey, nil
+	return keys.clientPrivate, nil
 }
 
 // GetServerPublicKeyPEM Get server public key PEM format string
 func GetServerPublicKeyPEM() (string, error) {
-	if !initialized {
-		return "", errors.New("RSA keys not initialized")
+	if _, err := getRSAKeySet(); err != nil {
+		return "", err
 	}
 	return g.Cfg().MustGet(gctx.New(), "rsa.server.public").String(), nil
 }
 
 // GetClientPublicKeyPEM Get client public key PEM format string
 func GetClientPublicKeyPEM() (string, error) {
-	if !initialized {
-		return "", errors.New("RSA keys not initialized")
+	if _, err := getRSAKeySet(); err != nil {
+		return "", err
 	}
 	return g.Cfg().MustGet(gctx.New(), "rsa.client.public").String(), nil
 }
@@ -258,19 +286,19 @@ func IsInitialized() bool {
 
 func GenerateFourKeys() {
 	// Generate four key pairs and assign to global variables
-	//serverPrivateKey, serverPublicKey = generateKeyPair(2048)
-	clientPrivateKey, clientPublicKey = generateKeyPair(2048)
+	//rsaKeys.serverPrivate, rsaKeys.serverPublic = generateKeyPair(2048)
+	rsaKeys.clientPrivate, rsaKeys.clientPublic = generateKeyPair(2048)
 
 	// Print PEM
 	//fmt.Println("=== Server Private Key ===")
-	//fmt.Println(keyToPEM(serverPrivateKey, true))
+	//fmt.Println(keyToPEM(rsaKeys.serverPrivate, true))
 	//fmt.Println("=== Server Public Key ===")
-	//fmt.Println(keyToPEM(serverPublicKey, false))
+	//fmt.Println(keyToPEM(rsaKeys.serverPublic, false))
 
 	fmt.Println("=== Client Private Key ===")
-	fmt.Println(keyToPEM(clientPrivateKey, true))
+	fmt.Println(keyToPEM(rsaKeys.clientPrivate, true))
 	fmt.Println("=== Client Public Key ===")
-	fmt.Println(keyToPEM(clientPublicKey, false))
+	fmt.Println(keyToPEM(rsaKeys.clientPublic, false))
 
 	// Mark initialization complete
 	initialized = true
@@ -317,7 +345,7 @@ func GenerateROSAKeyPair(bits int) (privateKeyPEM, publicKeyPEM string, err erro
 		Bytes: privBytes,
 	})
 	if privPEM == nil {
-		return "", "", errors.New("failed to encode private key")
+		return "", "", gerror.New("failed to encode private key")
 	}
 	pubBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
@@ -328,7 +356,7 @@ func GenerateROSAKeyPair(bits int) (privateKeyPEM, publicKeyPEM string, err erro
 		Bytes: pubBytes,
 	})
 	if pubPEM == nil {
-		return "", "", errors.New("failed to encode public key")
+		return "", "", gerror.New("failed to encode public key")
 	}
 	return string(privPEM), string(pubPEM), nil
 }

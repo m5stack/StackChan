@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:stack_chan/model/dance_list.dart';
 
@@ -19,10 +19,10 @@ class StackChanArView extends StatefulWidget {
     this.onCallback,
   });
 
-  final int decorate; //ismodel
-  final bool captureScreen; //output
-  final Function(Uint8List)? onFrameCallback; //outputcallback
-  final Function(DanceData)? onCallback; //datacallback
+  final int decorate; // Face decoration mode (0: none, 1: image, 2: emoji)
+  final bool captureScreen; // Whether AR frames are exported
+  final Function(Uint8List)? onFrameCallback; // Receives each exported frame
+  final Function(DanceData)? onCallback; // Receives the detected face data
 
   @override
   State<StatefulWidget> createState() => _StackChanArViewState();
@@ -115,7 +115,7 @@ class _StackChanArViewState extends State<StackChanArView> {
         onPlatformViewCreated: onPlatformViewCreated,
       );
     } else {
-      return Center(child: Text("暂不支持"));
+      return const Center(child: Text("暂不支持"));
     }
   }
 

@@ -7,7 +7,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -22,6 +23,8 @@ import 'package:stack_chan/util/music_util.dart';
 import 'package:stack_chan/util/value_constant.dart';
 import 'package:stack_chan/view/home/dance.dart';
 import 'package:stack_chan/view/home/record_dance.dart';
+
+import '../util/popup.dart';
 
 class DanceListPage extends StatefulWidget {
   const DanceListPage({super.key});
@@ -58,38 +61,56 @@ class _DanceListPageState extends State<DanceListPage> {
       BlueUtil.shared.blueMode = 2;
     }
     getDanceList();
+
+    initPromptWindow();
+  }
+
+  Future<void> initPromptWindow() async {
+    bool? isPromptWindowVisible = await AppState.asyncPrefs.getBool(
+      ValueConstant.dancePromptWindow,
+    );
+    if (isPromptWindowVisible == null || isPromptWindowVisible == false) {
+      await AppState.asyncPrefs.setBool(ValueConstant.dancePromptWindow, true);
+      if (mounted) {
+        AppState.shared.showSwitchDeviceDance(context);
+      }
+    }
   }
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     model.onClose();
     stopPlay();
     if (AppState.shared.deviceControlMode == 1) {
       BlueUtil.shared.blueMode = 1;
     }
     BlueUtil.shared.connectionStateChanged = null;
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenPadding = ThemeSetting.screenPadding(context);
     final primaryColor = CupertinoTheme.of(context).primaryColor;
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
       child: Obx(
         () => CustomScrollView(
           slivers: [
             CupertinoSliverNavigationBar(
-              largeTitle: Text("Dance List"),
+              backgroundColor:
+                  ThemeSetting.cupertinoNavigationBarBackgroundColor(context),
+              border: ThemeSetting.cupertinoNavigationBarBorder(context),
+              padding: ThemeSetting.navigationBarPadding,
+              largeTitle: const Text("Dance List"),
               trailing: Row(
                 mainAxisSize: .min,
                 children: [
                   CupertinoButton(
-                    padding: const EdgeInsets.all(8),
-                    borderRadius: BorderRadius.circular(20),
+                    sizeStyle: .medium,
                     child: Obx(
                       () => SvgPicture.asset(
                         model.isLoopMode.value
@@ -107,13 +128,11 @@ class _DanceListPageState extends State<DanceListPage> {
                       model.isLoopMode.value = !model.isLoopMode.value;
                     },
                   ),
-                  const SizedBox(width: 4),
-                  //Controlmodeswitch - optimizestyle
                   CupertinoButton(
-                    padding: const EdgeInsets.all(10),
-                    minimumSize: .zero,
-                    borderRadius: BorderRadius.circular(16),
-                    color: primaryColor.withValues(alpha: 0.1),
+                    sizeStyle: .medium,
+                    padding: const .all(
+                      ThemeSetting.navigationBarButtonTextPadding,
+                    ),
                     child: Obx(() {
                       if (AppState.shared.deviceControlMode == 0) {
                         return Text(
@@ -163,12 +182,16 @@ class _DanceListPageState extends State<DanceListPage> {
             ),
             CupertinoSliverRefreshControl(onRefresh: getDanceList),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              padding: .only(
+                left: screenPadding.left + 20,
+                right: screenPadding.right + 20,
+                bottom: screenPadding.bottom,
+              ),
               sliver: SliverList.separated(
                 itemCount: model.list.length + 1,
                 itemBuilder: listItem,
                 separatorBuilder: (context, index) =>
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
               ),
             ),
           ],
@@ -201,14 +224,8 @@ class _DanceListPageState extends State<DanceListPage> {
                     CupertinoTextField(
                       controller: controller,
                       maxLength: 25,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: errorMessage.isNotEmpty
-                              ? CupertinoColors.destructiveRed
-                              : CupertinoColors.separator.resolveFrom(context),
-                          width: 0.5,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
+                      decoration: ThemeSetting.dialogTextFieldDecoration(
+                        context,
                       ),
                       placeholder: "Enter dance name",
                       onChanged: (value) {
@@ -238,7 +255,7 @@ class _DanceListPageState extends State<DanceListPage> {
               actions: [
                 CupertinoDialogAction(
                   child: const Text("Cancel"),
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.maybePop(context),
                 ),
                 CupertinoDialogAction(
                   child: const Text("Confirm"),
@@ -250,7 +267,7 @@ class _DanceListPageState extends State<DanceListPage> {
                       return;
                     }
 
-                    //checknamewhetherAlreadyexist
+                    // Reject a name that is already taken.
                     bool nameExists = model.list.any(
                       (item) => item.danceName == text,
                     );
@@ -262,7 +279,7 @@ class _DanceListPageState extends State<DanceListPage> {
                       return;
                     }
 
-                    Navigator.of(context).pop();
+                    Navigator.maybePop(context);
                     addDance(danceList, musicUrl, text);
                   },
                 ),
@@ -275,18 +292,18 @@ class _DanceListPageState extends State<DanceListPage> {
   }
 
   Widget listItem(BuildContext context, int index) {
-    final double itemHeight = 110;
-    final double itemRadius = 20;
+    const double itemHeight = 110;
+    const double itemRadius = ThemeSetting.cardRadius;
     final primaryColor = CupertinoTheme.of(context).primaryColor;
     final textColor = CupertinoColors.label.resolveFrom(context);
     final subTextColor = CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    //after1addbutton - optimizestyle
+    // The last row is the "Add New Dance" button.
     if (index == model.list.length) {
       return Container(
         height: itemHeight,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+          color: CupertinoColors.tertiarySystemBackground.resolveFrom(context),
           borderRadius: BorderRadius.circular(itemRadius),
           boxShadow: [
             BoxShadow(
@@ -298,16 +315,15 @@ class _DanceListPageState extends State<DanceListPage> {
         ),
         child: CupertinoButton(
           padding: EdgeInsets.zero,
-          borderRadius: BorderRadius.circular(itemRadius),
           onPressed: () {
             stopPlay();
-            showCupertinoSheet(
+            showCustomCupertinoSheet(
               context: context,
               useNestedNavigation: true,
-              builder: (context) {
+              scrollableBuilder: (context, scrollController) {
                 return RecordDance(
                   onResult: (danceList, musicUrl, musicName) async {
-                    //Wait 2 Second(s),afterexecute
+                    // Ask the user to name the newly recorded dance.
                     showEditDanceName(danceList, musicUrl, musicName);
 
                     // if (musicName != null &&
@@ -342,7 +358,7 @@ class _DanceListPageState extends State<DanceListPage> {
                     //         actions: [
                     //           CupertinoDialogAction(
                     //             child: const Text("Cancel"),
-                    //             onPressed: () => Navigator.of(context).pop(),
+                    //             onPressed: () => Navigator.maybePop(context),
                     //           ),
                     //           CupertinoDialogAction(
                     //             child: const Text("Confirm"),
@@ -353,7 +369,7 @@ class _DanceListPageState extends State<DanceListPage> {
                     //                 );
                     //                 return;
                     //               }
-                    //               Navigator.of(context).pop();
+                    //               Navigator.maybePop(context);
                     //               addDance(danceList, musicUrl, text);
                     //             },
                     //           ),
@@ -393,21 +409,22 @@ class _DanceListPageState extends State<DanceListPage> {
       );
     } else {
       DanceList dance = model.list[index];
-      //useSlidableImplementLeftmenu
+      // Swipe actions are provided by Slidable.
 
       return Slidable(
         key: Key('dance_${dance.id}'),
-        //Leftconfig
+        // Swipe action pane.
         endActionPane: ActionPane(
           extentRatio: 0.6,
-          motion: const ScrollMotion(), //translated comment
+          motion: const ScrollMotion(), // scroll motion for the actions
           dismissible: DismissiblePane(
             onDismissed: () => deleteDance(dance.id),
           ),
           children: [
-            //Editbutton
+            // Edit action
             SlidableAction(
-              onPressed: (_) => Navigator.of(context).push(
+              onPressed: (_) => Navigator.push(
+                context,
                 CupertinoPageRoute(
                   builder: (context) => Dance(danceInfo: dance),
                 ),
@@ -420,7 +437,7 @@ class _DanceListPageState extends State<DanceListPage> {
               label: 'Edit',
               borderRadius: BorderRadius.circular(itemRadius),
             ),
-            //deletebutton
+            // Delete action
             SlidableAction(
               onPressed: (_) => deleteDance(dance.id),
               backgroundColor: CupertinoColors.systemRed.withValues(alpha: 0.9),
@@ -431,12 +448,12 @@ class _DanceListPageState extends State<DanceListPage> {
             ),
           ],
         ),
-        //listItemMain - optimizestyle
+        // Tappable dance card.
         child: Obx(
           () => Container(
             height: itemHeight,
             decoration: BoxDecoration(
-              //background + Shadow
+              // Gradient background and shadow.
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -465,10 +482,9 @@ class _DanceListPageState extends State<DanceListPage> {
               ),
             ),
             child: dance.isLoading
-                ? Center(child: CupertinoActivityIndicator())
+                ? const Center(child: CupertinoActivityIndicator())
                 : CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    borderRadius: BorderRadius.circular(itemRadius),
                     onPressed: () {
                       if (dance.id != null) {
                         if (dance.id == model.runId.value) {
@@ -487,7 +503,7 @@ class _DanceListPageState extends State<DanceListPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              //dancename
+                              // Dance name.
                               Text(
                                 dance.danceName ?? "Untitled Dance",
                                 style: TextStyle(
@@ -500,7 +516,7 @@ class _DanceListPageState extends State<DanceListPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 8),
-                              //musicinfo
+                              // Music title.
                               if (dance.musicInfo?.title != null)
                                 Row(
                                   children: [
@@ -528,7 +544,7 @@ class _DanceListPageState extends State<DanceListPage> {
                                     ),
                                   ],
                                 ),
-                              //playstatehint
+                              // Shown only for the dance that is playing.
                               if (dance.id == model.runId.value)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6),
@@ -546,7 +562,7 @@ class _DanceListPageState extends State<DanceListPage> {
                             ],
                           ),
                         ),
-                        //musiccover
+                        // Album artwork, when available.
                         if (dance.musicInfo?.artwork != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
@@ -623,11 +639,11 @@ class _DanceListPageState extends State<DanceListPage> {
     isPlaying = true;
     MusicUtil.shared.stopMusic();
 
-    //checkmusicinfoandfilewhetherhas
+    // Reload music info when it is missing or its file is gone.
     var musicInfo = currentDance.musicInfo;
     if (musicInfo == null || !(await File(musicInfo.filePath).exists())) {
       if (currentDance.musicUrl != null && currentDance.musicUrl!.isNotEmpty) {
-        //musicinfoinvalidorfilenot exist，reGet
+        // Stale music info or missing file: fetch it again.
         currentDance.isLoading = true;
         model.list.refresh();
         musicInfo = await MusicUtil.shared.getMusicInfoAsync(
@@ -662,7 +678,7 @@ class _DanceListPageState extends State<DanceListPage> {
         if (isPlaying && model.runId.value == currentPlayId) {
           if (currentLoopMode) {
             isPlaying = false;
-            startPlay(); //async，
+            startPlay(); // Fire and forget; no await needed.
           } else {
             stopPlay();
           }
@@ -707,7 +723,7 @@ class _DanceListPageState extends State<DanceListPage> {
     if (isPlaying && model.runId.value == currentPlayId) {
       if (currentLoopMode) {
         isPlaying = false;
-        startPlay(); //async，
+        startPlay(); // Fire and forget; no await needed.
       } else {
         stopPlay();
       }
@@ -719,6 +735,8 @@ class _DanceListPageState extends State<DanceListPage> {
     model.runId.value = -1;
     MusicUtil.shared.stopMusic();
 
+    unawaited(_sendOriginDanceData());
+
     _playTimer?.cancel();
     _playTimer = null;
 
@@ -726,6 +744,23 @@ class _DanceListPageState extends State<DanceListPage> {
       task?.ignore();
     }
     _bluetoothPlayTasks.clear();
+  }
+
+  Future<void> _sendOriginDanceData() async {
+    final originData = DanceData.init();
+    try {
+      if (AppState.shared.deviceControlMode == 0) {
+        final jsonString = jsonEncode([originData.toJson()]);
+        AppState.shared.sendWebSocketMessage(
+          .dance,
+          data: jsonString.toUint8List(),
+        );
+      } else if (AppState.shared.deviceControlMode == 1) {
+        await BlueUtil.shared.sendDanceData(originData);
+      }
+    } catch (e) {
+      debugPrint("send origin dance data failed: $e");
+    }
   }
 
   Future<void> deleteDance(int? id) async {

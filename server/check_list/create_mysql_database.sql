@@ -1,25 +1,30 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 create table stackChan.app_store
 (
     id           bigint auto_increment
         primary key,
-    app_name     varchar(128)                         not null comment 'App 名称',
-    app_icon_url varchar(512)                         null comment 'App 图标 URL',
-    description  text                                 null comment 'App 描述信息',
-    firmware_url varchar(512)                         null comment '固件 / 安装包下载地址',
-    create_at    datetime   default CURRENT_TIMESTAMP null comment '创建时间',
-    update_at    datetime   default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP comment '更新时间',
-    is_deleted   tinyint(1) default 0                 not null comment '是否删除，0 正常 1 删除'
+    app_name     varchar(128)                         not null comment 'App name',
+    app_icon_url varchar(512)                         null comment 'App icon URL',
+    description  text                                 null comment 'App description',
+    firmware_url varchar(512)                         null comment 'Firmware/installer download URL',
+    create_at    datetime   default CURRENT_TIMESTAMP null comment 'Created at',
+    update_at    datetime   default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP comment 'Updated at',
+    is_deleted   tinyint(1) default 0                 not null comment 'Deleted flag, 0 = normal, 1 = deleted'
 )
-    comment 'App Store 应用列表表';
+    comment 'App Store application list';
 
 create table stackChan.device_dance
 (
     id         bigint auto_increment
         primary key,
-    mac        varchar(17)                        not null comment '设备MAC地址',
-    dance_name varchar(64)                        null comment '舞蹈名称',
+    mac        varchar(17)                        not null comment 'Device MAC address',
+    dance_name varchar(64)                        null comment 'Dance name',
     dance_data json                               not null comment 'MotionData',
-    music_url  varchar(255)                       null comment '舞蹈背景音乐URL',
+    music_url  varchar(255)                       null comment 'Dance background music URL',
     created_at datetime default CURRENT_TIMESTAMP null,
     updated_at datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP
 );
@@ -36,32 +41,32 @@ create index fk_friend_mac_b
 
 create table stackChan.user
 (
-    uid             bigint                                not null comment '用户唯一UID（远程平台主键）'
+    uid             bigint                                not null comment 'Unique user UID (remote platform primary key)'
         primary key,
-    username        varchar(64)                           not null comment '登录用户名',
-    userslug        varchar(64)                           null comment '用户别名',
-    display_name    varchar(64)                           null comment '用户显示名称',
-    icon_text       char                                  null comment '用户图标文字',
-    icon_bg_color   varchar(16)                           null comment '图标背景色',
-    email_confirmed tinyint(1)  default 0                 null comment '邮箱是否验证 0-否 1-是',
-    join_date       bigint                                null comment '注册时间戳(毫秒)',
-    last_online     bigint                                null comment '最后在线时间戳(毫秒)',
-    user_status     varchar(32) default 'online'          null comment '用户在线状态',
-    create_at       datetime    default CURRENT_TIMESTAMP null comment '本地创建时间',
-    update_at       datetime    default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP comment '本地更新时间',
-    is_deleted      tinyint(1)  default 0                 not null comment '是否删除 0-正常 1-删除',
+    username        varchar(64)                           not null comment 'Login username',
+    userslug        varchar(64)                           null comment 'User slug',
+    display_name    varchar(64)                           null comment 'Display name',
+    icon_text       char                                  null comment 'User icon text',
+    icon_bg_color   varchar(16)                           null comment 'Icon background color',
+    email_confirmed tinyint(1)  default 0                 null comment 'Email verified, 0 = no, 1 = yes',
+    join_date       bigint                                null comment 'Registration timestamp (ms)',
+    last_online     bigint                                null comment 'Last online timestamp (ms)',
+    user_status     varchar(32) default 'online'          null comment 'User online status',
+    create_at       datetime    default CURRENT_TIMESTAMP null comment 'Local created at',
+    update_at       datetime    default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP comment 'Local updated at',
+    is_deleted      tinyint(1)  default 0                 not null comment 'Deleted flag, 0 = normal, 1 = deleted',
     constraint idx_username
         unique (username)
 )
-    comment '用户信息表';
+    comment 'User information';
 
 create table stackChan.device
 (
     mac       varchar(17)  not null
         primary key,
     name      varchar(255) null,
-    uid       bigint       null comment '绑定的用户UID',
-    bind_time varchar(32)  null comment '设备绑定时间',
+    uid       bigint       null comment 'Bound user UID',
+    bind_time varchar(32)  null comment 'Device bind time',
     constraint fk_device_user_uid
         foreign key (uid) references stackChan.user (uid)
             on update cascade on delete set null
@@ -74,9 +79,9 @@ create table stackChan.device_pano
 (
     id         bigint auto_increment
         primary key,
-    mac        varchar(17)                        not null comment '设备MAC地址',
-    pano_url   varchar(512)                       not null comment '全景图URL',
-    created_at datetime default CURRENT_TIMESTAMP null comment '创建时间',
+    mac        varchar(17)                        not null comment 'Device MAC address',
+    pano_url   varchar(512)                       not null comment 'Panorama image URL',
+    created_at datetime default CURRENT_TIMESTAMP null comment 'Created at',
     updated_at datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
     constraint fk_pano_mac
         foreign key (mac) references stackChan.device (mac)
@@ -90,10 +95,10 @@ create table stackChan.device_post
 (
     id            bigint auto_increment
         primary key,
-    mac           varchar(17)                        not null comment '发帖设备MAC',
+    mac           varchar(17)                        not null comment 'Posting device MAC',
     content_text  text                               null,
-    content_image varchar(512)                       null comment '图片URL',
-    created_at    datetime default CURRENT_TIMESTAMP null comment '发帖时间',
+    content_image varchar(512)                       null comment 'Image URL',
+    created_at    datetime default CURRENT_TIMESTAMP null comment 'Posted at',
     constraint fk_post_mac
         foreign key (mac) references stackChan.device (mac)
 );
@@ -102,14 +107,13 @@ create table stackChan.device_post_comment
 (
     id         bigint auto_increment
         primary key,
-    post_id    bigint                             not null comment '帖子ID',
-    mac        varchar(17)                        not null comment '评论设备MAC',
+    post_id    bigint                             not null comment 'Post ID',
+    mac        varchar(17)                        not null comment 'Commenting device MAC',
     content    text                               null,
-    created_at datetime default CURRENT_TIMESTAMP null comment '评论时间',
+    created_at datetime default CURRENT_TIMESTAMP null comment 'Commented at',
     constraint fk_comment_mac
         foreign key (mac) references stackChan.device (mac),
     constraint fk_comment_post
         foreign key (post_id) references stackChan.device_post (id)
             on delete cascade
 );
-

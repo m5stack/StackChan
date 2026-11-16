@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
 class GridCoordinateJoystick extends StatefulWidget {
   const GridCoordinateJoystick({
@@ -57,18 +57,18 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
     }
   }
 
-  //in _GridCoordinateJoystickState ClassinModifyDownmethod
+  // in _GridCoordinateJoystickState class
 
   void _updatePoint(Offset localPosition, Size size) {
-    //Get padding Value
+    // Resolve the configured padding
     final padding =
         widget.padding?.resolve(Directionality.of(context)) ?? EdgeInsets.zero;
 
-    //calculateCan(Insideafter)
+    // Size of the actual draggable area (the rect inset by padding)
     double clickableWidth = size.width - padding.left - padding.right;
     double clickableHeight = size.height - padding.top - padding.bottom;
 
-    //willinputlimitin padding rangeInside
+    // Keep the input position inside the padded area
     double clampedX = localPosition.dx.clamp(
       padding.left,
       size.width - padding.right,
@@ -78,13 +78,13 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
       size.height - padding.bottom,
     );
 
-    //convertlogic:in (clampedX - padding.left) rangeis 0 to clickableWidth
+    // Map X: (clampedX - padding.left) runs from 0 to clickableWidth
     double normalizedX =
         ((clampedX - padding.left) / clickableWidth) *
             (widget.maxX - widget.minX) +
         widget.minX;
 
-    //Y axis
+    // Same mapping for the Y axis, inverted so up is positive
     double normalizedY =
         widget.maxY -
         ((clampedY - padding.top) / clickableHeight) *
@@ -108,7 +108,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
             widget.padding?.resolve(Directionality.of(context)) ??
             EdgeInsets.zero;
 
-        //corecalculatelogic:willcurrentmapBackscreenposition
+        // Map the current value back to a screen position
         double clickableWidth = size.width - padding.left - padding.right;
         double clickableHeight = size.height - padding.top - padding.bottom;
 
@@ -117,7 +117,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
         double yPercent =
             (_currentPoint.dy - widget.minY) / (widget.maxY - widget.minY);
 
-        //Up padding.left/top asoffset
+        // Add padding.left/top as the starting offset
         double xPos = padding.left + (xPercent * clickableWidth);
         double yPos =
             padding.top + (clickableHeight - (yPercent * clickableHeight));
@@ -140,7 +140,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
             onPointerCancel: (_) => setState(() => _isDragging = false),
             behavior: HitTestBehavior.opaque,
             child: Stack(
-              clipBehavior: Clip.none, //buttonor
+              clipBehavior: Clip.none, // Let the button shadow extend past the parent bounds
               children: [
                 if (widget.showMarking)
                   Positioned.fill(
@@ -151,7 +151,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
                         maxX: widget.maxX,
                         minY: widget.minY,
                         maxY: widget.maxY,
-                        //canaccording toNeedPassed padding For / To Painter draw
+                        // Pass padding so the painter can align its grid lines
                         padding: padding,
                         gridCountX: (clickableWidth / widget.targetGridSize)
                             .floor(),
@@ -162,7 +162,7 @@ class _GridCoordinateJoystickState extends State<GridCoordinateJoystick> {
                     ),
                   ),
                 Positioned(
-                  //buttoncanin padding Outsideshow,depends on xPos/yPos
+                  // The button may sit inside the padding area or partly outside, depending on xPos/yPos
                   left: xPos - widget.buttonSize / 2,
                   top: yPos - widget.buttonSize / 2,
                   child: _buildJoystickButton(context),
@@ -241,7 +241,7 @@ class JoystickPainter extends CustomPainter {
       ..color = CupertinoColors.systemGrey
       ..style = PaintingStyle.stroke;
 
-    //1. drawbackgroundand
+    // 1. Draw the background grid and tick labels
     for (int i = 0; i <= gridCountX; i++) {
       double x = i * gridSpacingX;
       double opacity = (i == 0 || i == gridCountX)
@@ -252,7 +252,7 @@ class JoystickPainter extends CustomPainter {
 
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
 
-      //draw X axis
+      // X axis labels
       double xValue = i * (maxX - minX) / gridCountX + minX;
       _drawText(
         canvas,
@@ -272,12 +272,12 @@ class JoystickPainter extends CustomPainter {
 
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
 
-      //draw Y axis
+      // Y axis labels
       double yValue = maxY - i * (maxY - minY) / gridCountY;
       _drawText(canvas, yValue.toInt().toString(), Offset(10, y - 5), size);
     }
 
-    //2. drawactivateMainaxis
+    // 2. Draw the active axis lines
     final activePaint = Paint()
       ..color = accentColor.withValues(alpha: 0.8)
       ..strokeWidth = 2

@@ -4,8 +4,10 @@ SPDX-License-Identifier: MIT
 */
 
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:get/get.dart';
 import 'package:opencv_dart/opencv.dart' as cv;
 import 'package:stack_chan/app_state.dart';
@@ -32,144 +34,145 @@ class _PanoPageState extends State<PanoPage> {
 
   RxBool isTakingPhotos = false.obs;
   RxBool isLoading = false.obs;
-  final Duration motionDelay = Duration(milliseconds: 500);
-  final Duration captureDelay = Duration(milliseconds: 500);
+  bool _shouldAutoAssemble = false;
+  final Duration motionDelay = const Duration(milliseconds: 500);
+  final Duration captureDelay = const Duration(milliseconds: 500);
 
   final SliverGridDelegateWithFixedCrossAxisCount gridDelegate =
-      SliverGridDelegateWithFixedCrossAxisCount(
+      const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 1,
       );
 
-  //data
+  // Servo poses visited during the panorama sweep.
   List<MotionData> motionList = [
     //1
     MotionData(
-      pitchServo: MotionDataItem(angle: 0, speed: 0),
-      yawServo: MotionDataItem(angle: 900, speed: 0),
+      yawServo: MotionDataItem(angle: 0, speed: 0),
+      pitchServo: MotionDataItem(angle: 900, speed: 0),
     ),
 
     //2 * 7
     MotionData(
-      pitchServo: MotionDataItem(angle: 1280, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: 1280, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 853, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: 853, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 426, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: 426, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 0, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: 0, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: -426, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: -426, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: -853, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: -853, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: -1280, speed: 0),
-      yawServo: MotionDataItem(angle: 675, speed: 0),
+      yawServo: MotionDataItem(angle: -1280, speed: 0),
+      pitchServo: MotionDataItem(angle: 675, speed: 0),
     ),
 
-    //3 * 7
+    // 3 * 7
     MotionData(
-      pitchServo: MotionDataItem(angle: -1280, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: -1280, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: -853, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: -853, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: -426, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: -426, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 0, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: 0, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 426, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: 426, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 853, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: 853, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
     MotionData(
-      pitchServo: MotionDataItem(angle: 1280, speed: 0),
-      yawServo: MotionDataItem(angle: 450, speed: 0),
+      yawServo: MotionDataItem(angle: 1280, speed: 0),
+      pitchServo: MotionDataItem(angle: 450, speed: 0),
     ),
 
-    //4 * 7
-    MotionData(
-      pitchServo: MotionDataItem(angle: 1280, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 853, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 426, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 0, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: -426, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: -853, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: -1280, speed: 0),
-      yawServo: MotionDataItem(angle: 225, speed: 0),
-    ),
-
-    //5 * 7
-    MotionData(
-      pitchServo: MotionDataItem(angle: -1280, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: -853, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: -426, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 0, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 426, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 853, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
-    MotionData(
-      pitchServo: MotionDataItem(angle: 1280, speed: 0),
-      yawServo: MotionDataItem(angle: 0, speed: 0),
-    ),
+    // //4 * 7
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 1280, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 853, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 426, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 0, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -426, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -853, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -1280, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 225, speed: 0),
+    // ),
+    //
+    // //5 * 7
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -1280, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -853, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: -426, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 0, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 426, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 853, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
+    // MotionData(
+    //   yawServo: MotionDataItem(angle: 1280, speed: 0),
+    //   pitchServo: MotionDataItem(angle: 0, speed: 0),
+    // ),
   ];
 
   @override
@@ -187,6 +190,12 @@ class _PanoPageState extends State<PanoPage> {
                 if (recordSwitch) {
                   imageDataList.add(parsedData);
                   recordSwitch = false;
+                  if (_shouldAutoAssemble &&
+                      imageDataList.length >= motionList.length &&
+                      !isLoading.value) {
+                    _shouldAutoAssemble = false;
+                    startAssemble();
+                  }
                 }
               }
               break;
@@ -214,6 +223,7 @@ class _PanoPageState extends State<PanoPage> {
 
     try {
       isTakingPhotos.value = true;
+      _shouldAutoAssemble = false;
       imageDataList.clear();
       panoImage.value = null;
       AppState.shared.showToast("Start panoramic shooting...");
@@ -222,7 +232,7 @@ class _PanoPageState extends State<PanoPage> {
         .onCamera,
         data: AppState.shared.deviceMac.toUint8List(),
       );
-      await Future.delayed(Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       for (final motion in motionList) {
         final jsonString = AppState.shared.deviceMac + motion.toString();
@@ -245,44 +255,32 @@ class _PanoPageState extends State<PanoPage> {
 
       AppState.shared.showToast("The shooting is complete.");
 
-      startAssemble();
+      _shouldAutoAssemble = true;
+      if (imageDataList.length >= motionList.length && !isLoading.value) {
+        _shouldAutoAssemble = false;
+        startAssemble();
+      }
     } catch (e) {
       AppState.shared.sendWebSocketMessage(
         .offCamera,
         data: AppState.shared.deviceMac.toUint8List(),
       );
-      AppState.shared.showToast("The shooting was unsuccessful.：${e.toString()}");
-          } finally {
+      _shouldAutoAssemble = false;
+      AppState.shared.showToast(
+        "The shooting was unsuccessful.：${e.toString()}",
+      );
+      debugPrint("拍照Exception:$e");
+    } finally {
       isTakingPhotos.value = false;
       recordSwitch = false;
     }
-
-    ///deviceSide / EndCamera
-    AppState.shared.sendWebSocketMessage(
-      .onCamera,
-      data: AppState.shared.deviceMac.toUint8List(),
-    );
-
-    for (final motion in motionList) {
-      String jsonString = AppState.shared.deviceMac + motion.toString();
-      AppState.shared.sendWebSocketMessage(
-        .controlMotion,
-        data: jsonString.toUint8List(),
-      );
-
-      ///Wait500ms,after recordSwitch = true, Again 500ms, executeNext
-    }
-
-    ///closedeviceSide / EndCamera
-    AppState.shared.sendWebSocketMessage(
-      .offCamera,
-      data: AppState.shared.deviceMac.toUint8List(),
-    );
   }
 
   Future<void> startAssemble() async {
     if (imageDataList.length < 5) {
-      AppState.shared.showToast("At least 5 photos are needed to stitch together a panoramic image!");
+      AppState.shared.showToast(
+        "At least 5 photos are needed to stitch together a panoramic image!",
+      );
       return;
     }
     if (isLoading.value) return;
@@ -315,14 +313,72 @@ class _PanoPageState extends State<PanoPage> {
       AppState.shared.showToast("Stitch success!");
       result.dispose();
     } catch (e) {
-      AppState.shared.showToast("Error: ${e.toString()}");
-          } finally {
+      debugPrint("Stitch error: $e");
+      try {
+        final fallbackImage = await _mergeImagesHorizontally(imageDataList);
+        panoImage.value = fallbackImage;
+        AppState.shared.showToast(
+          "Native Stitcher unavailable, used simple merge result.",
+        );
+      } catch (fallbackError) {
+        AppState.shared.showToast("Error: ${fallbackError.toString()}");
+        debugPrint("Fallback stitch error: $fallbackError");
+      }
+    } finally {
       for (var mat in mats) {
         mat.dispose();
       }
       vecMat?.dispose();
       stitcher?.dispose();
       isLoading.value = false;
+    }
+  }
+
+  Future<Uint8List> _mergeImagesHorizontally(List<Uint8List> images) async {
+    if (images.isEmpty) {
+      throw Exception("No images to merge");
+    }
+
+    final decodedImages = <ui.Image>[];
+    try {
+      for (final bytes in images) {
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        decodedImages.add(frame.image);
+      }
+
+      final totalWidth = decodedImages.fold<int>(
+        0,
+        (sum, image) => sum + image.width,
+      );
+      final maxHeight = decodedImages.fold<int>(
+        0,
+        (max, image) => image.height > max ? image.height : max,
+      );
+
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      final paint = Paint();
+
+      double dx = 0;
+      for (final image in decodedImages) {
+        final dy = (maxHeight - image.height) / 2;
+        canvas.drawImage(image, Offset(dx, dy), paint);
+        dx += image.width;
+      }
+
+      final picture = recorder.endRecording();
+      final merged = await picture.toImage(totalWidth, maxHeight);
+      final byteData = await merged.toByteData(format: ui.ImageByteFormat.png);
+      merged.dispose();
+      if (byteData == null) {
+        throw Exception("Encode merged image failed");
+      }
+      return byteData.buffer.asUint8List();
+    } finally {
+      for (final image in decodedImages) {
+        image.dispose();
+      }
     }
   }
 
@@ -340,8 +396,7 @@ class _PanoPageState extends State<PanoPage> {
           right: 4,
           child: CupertinoButton(
             padding: .zero,
-            minimumSize: Size(26, 26),
-            child: Icon(
+            child: const Icon(
               CupertinoIcons.clear_circled_solid,
               color: CupertinoColors.systemRed,
               size: 26,
@@ -357,18 +412,26 @@ class _PanoPageState extends State<PanoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
       navigationBar: CupertinoNavigationBar.large(
-        largeTitle: Text("Panorama"),
-        backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
+        backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+          context,
+        ),
+        border: ThemeSetting.cupertinoNavigationBarBorder(context),
+        padding: ThemeSetting.navigationBarPadding,
+        largeTitle: const Text("Panorama"),
       ),
       child: Padding(
         padding: .only(
-          top: 15,
-          bottom: 15 + MediaQuery.paddingOf(context).bottom,
-          left: 15,
-          right: 15,
+          top: 20,
+          bottom: 20 + padding.bottom,
+          left: 20 + padding.left,
+          right: 20 + padding.right,
         ),
         child: Column(
           children: [
@@ -378,7 +441,7 @@ class _PanoPageState extends State<PanoPage> {
                   mainAxisSize: .min,
                   spacing: 8,
                   children: [
-                    Text("Panorama Result"),
+                    const Text("Panorama Result"),
                     Container(
                       height: 220,
                       decoration: BoxDecoration(
@@ -392,7 +455,7 @@ class _PanoPageState extends State<PanoPage> {
                   ],
                 );
               }
-              return SizedBox.shrink();
+              return const SizedBox.shrink();
             }),
             Expanded(
               child: Obx(() {
@@ -407,9 +470,11 @@ class _PanoPageState extends State<PanoPage> {
               }),
             ),
             CupertinoButton.filled(
-              child: const SizedBox(
-                width: double.infinity,
-                child: Center(child: Text("Generate")),
+              child: const Center(
+                child: Text(
+                  "Generate",
+                  style: TextStyle(color: CupertinoColors.white),
+                ),
               ),
               onPressed: () {
                 startTakingPhotos();

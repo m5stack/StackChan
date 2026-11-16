@@ -3,7 +3,6 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-
 import 'agent.dart';
 import 'agents_device.dart';
 
@@ -14,7 +13,7 @@ class AgentsDevicesActivate {
   Agent? agent;
   AgentsDevice? device;
 
-  //Constructorfunction
+  // Creates an activation result.
   AgentsDevicesActivate({
     this.macAddress,
     this.serialNumber,
@@ -23,7 +22,7 @@ class AgentsDevicesActivate {
     this.device,
   });
 
-  //from JSON convert
+  // Creates an activation result from a JSON map.
   factory AgentsDevicesActivate.fromJson(Map<String, dynamic> json) {
     return AgentsDevicesActivate(
       macAddress: json['macAddress'],
@@ -36,7 +35,7 @@ class AgentsDevicesActivate {
     );
   }
 
-  //convertas JSON
+  // Converts this activation result to a JSON map.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['macAddress'] = macAddress;

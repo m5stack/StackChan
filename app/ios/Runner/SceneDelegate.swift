@@ -15,6 +15,7 @@ class SceneDelegate: FlutterSceneDelegate,CLLocationManagerDelegate {
     override func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         if let controller = window?.rootViewController as? FlutterViewController {
             NativeBridge.shared.setup(with: controller)
+            NativeBluetoothBridge.shared.setup(with: controller.binaryMessenger)
             NativeBridge.shared.setMethodCallHandler { [weak self] call, result in
                 self?.handleMethodCall(call: call, result: result)
             }
@@ -46,8 +47,16 @@ class SceneDelegate: FlutterSceneDelegate,CLLocationManagerDelegate {
             getWifiName()
         case .stopPlayPCM:
             NativeBridge.shared.stopPlayPCM()
+            result(nil)
+        case .startRecording:
+            NativeBridge.shared.startRecording { started in
+                result(started)
+            }
+        case .stopRecording:
+            NativeBridge.shared.stopRecording()
+            result(nil)
         default:
-            break
+            result(FlutterMethodNotImplemented)
         }
     }
     
@@ -75,7 +84,8 @@ class SceneDelegate: FlutterSceneDelegate,CLLocationManagerDelegate {
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-                if manager.authorizationStatus == .authorizedWhenInUse ||
+        print(manager.authorizationStatus)
+        if manager.authorizationStatus == .authorizedWhenInUse ||
             manager.authorizationStatus == .authorizedAlways {
             fetchWifiInfo()
         }

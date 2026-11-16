@@ -4,34 +4,46 @@ SPDX-License-Identifier: MIT
 */
 
 class CommonMcpTool {
-  String? endpoint_id;
+  String? endpointId;
   String? name;
   String? language;
+  List<String> languages;
 
-  //Constructorfunction
-  CommonMcpTool({this.endpoint_id, this.name, this.language});
+  // Creates a tool, deriving the language list from language if needed.
+  CommonMcpTool({
+    this.endpointId,
+    this.name,
+    this.language,
+    List<String>? languages,
+  }) : languages = languages ?? (language == null ? [] : [language]);
 
-  //1. singleobjectfrom JSON Deserialize
+  // Creates a tool from a JSON map; language may be a string or a list.
   factory CommonMcpTool.fromJson(Map<String, dynamic> json) {
+    final languages = _parseLanguages(json['language']);
     return CommonMcpTool(
-      endpoint_id: json['endpoint_id'] as String?,
+      endpointId: json['endpoint_id'] as String?,
       name: json['name'] as String?,
-      language: json['language'] as String?,
+      language: languages.isEmpty ? null : languages.first,
+      languages: languages,
     );
   }
 
-  //2. singleobjectSerializeas JSON
+  // Converts this tool to a JSON map; a single language stays a string.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    data['endpoint_id'] = endpoint_id;
+    data['endpoint_id'] = endpointId;
     data['name'] = name;
-    data['language'] = language;
+    if (languages.length > 1) {
+      data['language'] = languages;
+    } else {
+      data['language'] = language;
+    }
     return data;
   }
 
-  //3. JSON arrayconvertas CommonMcpTool list(core FromListJson Implement)
+  // Converts a JSON array to a list of tools.
   static List<CommonMcpTool> fromListJson(List<dynamic> jsonList) {
-    //iterate JSON array，one by oneconvertas CommonMcpTool object
+    // Every array entry must be a JSON object.
     return jsonList
         .map(
           (jsonItem) =>
@@ -40,9 +52,17 @@ class CommonMcpTool {
         .toList();
   }
 
-  //optionalExtension:CommonMcpTool listconvertas JSON array
+  // Converts a list of tools to a JSON array.
   static List<Map<String, dynamic>> toListJson(List<CommonMcpTool>? toolList) {
     if (toolList == null) return [];
     return toolList.map((tool) => tool.toJson()).toList();
+  }
+
+  static List<String> _parseLanguages(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((item) => item.toString()).toList();
+    }
+    return [value.toString()];
   }
 }

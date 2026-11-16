@@ -47,3 +47,10 @@ type AgentRestoreDefaultReq struct {
 }
 
 type AgentRestoreDefaultRes bool
+
+type ActivateAndBindDeviceReq struct {
+	g.Meta `path:"/device/activate_bind" method:"post" tags:"Device" summary:"Activate And Bind device to current user"`
+	Mac    string `json:"mac" v:"required" dc:"Device MAC address"`
+}
+
+type ActivateAndBindDeviceRes bool
