@@ -1,8 +1,3 @@
-/*
-SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-SPDX-License-Identifier: MIT
-*/
-
 //
 //  Generated file. Do not edit.
 //
@@ -10,6 +5,12 @@ SPDX-License-Identifier: MIT
 // clang-format off
 
 #import "GeneratedPluginRegistrant.h"
+
+#if __has_include(<adaptive_platform_ui/AdaptivePlatformUiPlugin.h>)
+#import <adaptive_platform_ui/AdaptivePlatformUiPlugin.h>
+#else
+@import adaptive_platform_ui;
+#endif
 
 #if __has_include(<audio_session/AudioSessionPlugin.h>)
 #import <audio_session/AudioSessionPlugin.h>
@@ -29,10 +30,10 @@ SPDX-License-Identifier: MIT
 @import ffmpeg_kit_flutter_new;
 #endif
 
-#if __has_include(<file_picker/FilePickerPlugin.h>)
-#import <file_picker/FilePickerPlugin.h>
+#if __has_include(<file_picker_darwin/FilePickerPlugin.h>)
+#import <file_picker_darwin/FilePickerPlugin.h>
 #else
-@import file_picker;
+@import file_picker_darwin;
 #endif
 
 #if __has_include(<flutter_angle/FlutterAnglePlugin.h>)
@@ -41,10 +42,10 @@ SPDX-License-Identifier: MIT
 @import flutter_angle;
 #endif
 
-#if __has_include(<flutter_blue_plus_darwin/FlutterBluePlusPlugin.h>)
-#import <flutter_blue_plus_darwin/FlutterBluePlusPlugin.h>
+#if __has_include(<foldable/FoldablePlugin.h>)
+#import <foldable/FoldablePlugin.h>
 #else
-@import flutter_blue_plus_darwin;
+@import foldable;
 #endif
 
 #if __has_include(<geolocator_apple/GeolocatorPlugin.h>)
@@ -69,6 +70,12 @@ SPDX-License-Identifier: MIT
 #import <just_audio/JustAudioPlugin.h>
 #else
 @import just_audio;
+#endif
+
+#if __has_include(<liquid_glass_widgets/LiquidGlassWidgetsPlugin.h>)
+#import <liquid_glass_widgets/LiquidGlassWidgetsPlugin.h>
+#else
+@import liquid_glass_widgets;
 #endif
 
 #if __has_include(<mobile_scanner/MobileScannerPlugin.h>)
@@ -119,8 +126,14 @@ SPDX-License-Identifier: MIT
 @import three_js_sensors;
 #endif
 
-#if __has_include(<video_player_avfoundation/FVPVideoPlayerPlugin.h>)
-#import <video_player_avfoundation/FVPVideoPlayerPlugin.h>
+#if __has_include(<url_launcher_ios/URLLauncherPlugin.h>)
+#import <url_launcher_ios/URLLauncherPlugin.h>
+#else
+@import url_launcher_ios;
+#endif
+
+#if __has_include(<video_player_avfoundation/VideoPlayerPlugin.h>)
+#import <video_player_avfoundation/VideoPlayerPlugin.h>
 #else
 @import video_player_avfoundation;
 #endif
@@ -134,16 +147,18 @@ SPDX-License-Identifier: MIT
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
+  [AdaptivePlatformUiPlugin registerWithRegistrar:[registry registrarForPlugin:@"AdaptivePlatformUiPlugin"]];
   [AudioSessionPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioSessionPlugin"]];
   [CameraPlugin registerWithRegistrar:[registry registrarForPlugin:@"CameraPlugin"]];
   [FFmpegKitFlutterPlugin registerWithRegistrar:[registry registrarForPlugin:@"FFmpegKitFlutterPlugin"]];
   [FilePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FilePickerPlugin"]];
   [FlutterAnglePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterAnglePlugin"]];
-  [FlutterBluePlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterBluePlusPlugin"]];
+  [FoldablePlugin registerWithRegistrar:[registry registrarForPlugin:@"FoldablePlugin"]];
   [GeolocatorPlugin registerWithRegistrar:[registry registrarForPlugin:@"GeolocatorPlugin"]];
   [GoogleMlKitCommonsPlugin registerWithRegistrar:[registry registrarForPlugin:@"GoogleMlKitCommonsPlugin"]];
   [GoogleMlKitFaceDetectionPlugin registerWithRegistrar:[registry registrarForPlugin:@"GoogleMlKitFaceDetectionPlugin"]];
   [JustAudioPlugin registerWithRegistrar:[registry registrarForPlugin:@"JustAudioPlugin"]];
+  [LiquidGlassWidgetsPlugin registerWithRegistrar:[registry registrarForPlugin:@"LiquidGlassWidgetsPlugin"]];
   [MobileScannerPlugin registerWithRegistrar:[registry registrarForPlugin:@"MobileScannerPlugin"]];
   [MusicFeatureAnalyzerPlugin registerWithRegistrar:[registry registrarForPlugin:@"MusicFeatureAnalyzerPlugin"]];
   [FPPNetworkInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPNetworkInfoPlusPlugin"]];
@@ -152,7 +167,8 @@ SPDX-License-Identifier: MIT
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [TJSSensorsPlugin registerWithRegistrar:[registry registrarForPlugin:@"TJSSensorsPlugin"]];
-  [FVPVideoPlayerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FVPVideoPlayerPlugin"]];
+  [URLLauncherPlugin registerWithRegistrar:[registry registrarForPlugin:@"URLLauncherPlugin"]];
+  [VideoPlayerPlugin registerWithRegistrar:[registry registrarForPlugin:@"VideoPlayerPlugin"]];
   [WebViewFlutterPlugin registerWithRegistrar:[registry registrarForPlugin:@"WebViewFlutterPlugin"]];
 }
 

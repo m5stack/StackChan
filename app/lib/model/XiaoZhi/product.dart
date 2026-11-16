@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-///deviceinfoentityClass
+/// Product and device configuration returned by the backend.
 class Product {
   int? id;
   int? developerId;
@@ -53,7 +53,7 @@ class Product {
     this.toolConciseMode,
   });
 
-  ///JSON toobject
+  /// Creates a product from a JSON map.
   factory Product.fromJson(Map<String, dynamic> json) => Product(
     id: json['id'] as int?,
     developerId: json['developer_id'] as int?,
@@ -81,7 +81,7 @@ class Product {
     toolConciseMode: json['tool_concise_mode'] as int?,
   );
 
-  ///objectto JSON
+  /// Converts this product to a JSON map.
   Map<String, dynamic> toJson() => {
     'id': id,
     'developer_id': developerId,
@@ -108,7 +108,7 @@ class Product {
   };
 }
 
-///MCP configentityClass
+/// MCP endpoints assigned to a product.
 class McpConfig {
   List<dynamic>? endpointIds;
 

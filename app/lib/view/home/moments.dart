@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
 import '../util/gradation_page_background.dart';
 
@@ -18,7 +18,10 @@ class _MomentsState extends State<Moments> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      child: GradationPageBackground(child: SizedBox.expand()),
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
+      child: const GradationPageBackground(child: SizedBox.expand()),
     );
   }
 }

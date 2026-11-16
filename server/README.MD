@@ -174,11 +174,14 @@ admin:
       password: "<admin-password>"
 
 m5stack:
-  loginUrl: ""
-  registrationUrl: ""
+  loginUrl: "https://<m5stack-login-endpoint>"
+  registrationUrl: "https://<m5stack-registration-endpoint>"
+  queryUsernameUrl: "https://<m5stack-username-query-endpoint>"
+  queryMacAddressUrl: "https://<m5stack-device-query-endpoint>"
   registrationToken: "Bearer <registration-token>"
-  issuer: ""
-  audience: ""
+  queryMacAddressToken: "Bearer <device-query-token>"
+  issuer: "stackChan"
+  audience: "stackChan_user"
 
 xiaozhi:
   secret_key: "<xiaozhi-secret-key>"
@@ -229,7 +232,7 @@ Recommended checks after startup:
 - `openapiPath`: OpenAPI JSON output path, currently `/api.json`
 - `swaggerPath`: commented out by default; enable only if you intend to expose Swagger UI
 
-Note: the service also calls `s.SetPort(12800)` inside `internal/cmd/cmd.go`. If you change the port strategy, check both the config and the code path.
+Note: the listen address is controlled by `server.address`. `internal/cmd/cmd.go` calls `s.Run()` without overriding the port.
 
 ### 5.2 `logger`
 
@@ -282,15 +285,23 @@ This section is used by app-side registration and login.
 
 - `loginUrl`: remote login endpoint
 - `registrationUrl`: remote registration endpoint
+- `queryUsernameUrl`: base URL for the username availability check; the username is appended to it
+- `queryMacAddressUrl`: base URL for the factory-device check; the MAC address is appended to it
 - `registrationToken`: remote registration Authorization value
+- `queryMacAddressToken`: Authorization value used for the factory-device check
 - `issuer` / `audience`: JWT claim values written into locally issued tokens
 
 ### 5.7 `rsa`
 
-The device API group and WebSocket entry both rely on an RSA-encrypted MAC token.
+The device API group and WebSocket entry both rely on an RSA-encrypted MAC token:
 
-- The server decrypts the incoming header with `rsa.server.private`
-- The app/device side must encrypt with `rsa.server.public`
+- App/device versions encrypt requests with `rsa.server.public`; the server decrypts with `rsa.server.private`
+- RSA-encrypted responses use `rsa.client.public`; clients decrypt with `rsa.client.private`
+
+```go
+plainText, err := utility.RSADecrypt(cipherText)
+encryptedResponse, err := utility.RSAEncrypt(response)
+```
 
 Recommended key-generation commands:
 

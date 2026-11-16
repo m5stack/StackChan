@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 //  StackChanRobot.swift
 //  Runner
 //
-// Created by on 2026/1/30.
+//  Created on 2026/1/30.
 //
 import SceneKit
 
@@ -109,7 +109,8 @@ class StackChanRobot: NSObject, FlutterPlatformView, FlutterStreamHandler {
     
     private func setupInitialScene() {
         guard let scene = SCNScene(named: "StackChanModel.scn") else {
-                        return
+            print("Failed to load StackChanModel.scn")
+            return
         }
         scene.rootNode.eulerAngles = SCNVector3Zero
         scene.rootNode.eulerAngles.x = -Float.pi / 2

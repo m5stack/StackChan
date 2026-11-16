@@ -4,7 +4,7 @@ SPDX-License-Identifier: MIT
 */
 
 import 'package:dio/dio.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:stack_chan/app_state.dart';
 import 'package:stack_chan/network/urls.dart';
 import 'package:stack_chan/network/web_socket_util.dart';
@@ -15,18 +15,20 @@ import '../util/value_constant.dart';
 void logPrint(Object? object) {
   if (object == null) return;
   String log = object.toString();
-  const int chunkSize = 800; //800（limit）
-  //ifcontent,directPrint
+  const int chunkSize = 800; // Print at most 800 characters at a time to stay under the system log limit.
+  // Print short logs directly.
   if (log.length <= chunkSize) {
-        return;
+    debugPrint(log);
+    return;
   }
 
-  //contentPrint
+  // Print long logs in chunks.
   for (int i = 0; i < log.length; i += chunkSize) {
     int end = i + chunkSize;
     if (end > log.length) end = log.length;
-    //usedebugPrint(print,supportcontent)
-      }
+    // Prefer debugPrint: it is more reliable than print and supports longer output.
+    debugPrint(log.substring(i, end));
+  }
 }
 
 class Http {
@@ -41,13 +43,13 @@ class Http {
     InterceptorsWrapper(
       onRequest:
           (RequestOptions options, RequestInterceptorHandler handler) async {
-            /// v1 mac
+            /// Legacy v1 MAC-based authorization token.
             final encryptedToken = RsaUtil.encrypt(
               WebSocketUtil.shared.getAuthorization(AppState.shared.deviceMac),
             );
             options.headers[ValueConstant.authorization] = encryptedToken;
 
-            /// v2 token
+            /// v2 token, present after login.
             final token = await AppState.asyncPrefs.getString(
               ValueConstant.token,
             );
@@ -55,21 +57,20 @@ class Http {
               options.headers[ValueConstant.token] = token;
             }
 
-            /// App Version
+            /// App version header.
             String? version = AppState.shared.packageInfo?.version;
             if (version != null) {
               options.headers[ValueConstant.appVersion] = version;
             }
-
             return handler.next(options);
           },
       onResponse:
           (Response response, ResponseInterceptorHandler handler) async {
-        if (response.statusCode == 401) {
-          await AppState.shared.logout();
-        }
-        return handler.next(response);
-      },
+            if (response.statusCode == 401) {
+              await AppState.shared.logout();
+            }
+            return handler.next(response);
+          },
       onError: (DioException error, ErrorInterceptorHandler handler) async {
         if (error.response?.statusCode == 401) {
           await AppState.shared.logout();
@@ -82,8 +83,9 @@ class Http {
   Http._init() {
     _baseOptions = BaseOptions(
       baseUrl: Urls.getBaseUrl(),
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
     );
     _dio = Dio(_baseOptions);
     _dio.interceptors.addAll(_interceptors);

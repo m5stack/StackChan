@@ -1,11 +1,12 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/cjson: ^1.7.19
   waveshare/esp_lcd_sh8601: 1.0.2
   espressif/esp_lcd_co5300: ^2.0.3
-  espressif/esp_lcd_ili9341: ==1.2.0
-  espressif/esp_lcd_gc9a01: ==2.0.1
+  espressif/esp_lcd_ili9341: ^2.1.0
+  espressif/esp_lcd_gc9a01: ~2.0.4
   espressif/esp_lcd_st77916: ^1.0.1
-  espressif/esp_lcd_axs15231b: ^1.0.0
+  espressif/esp_lcd_axs15231b: ^2.1.0
 
   espressif/esp_lcd_st7701:
     version: ^1.1.4
@@ -16,35 +17,37 @@ dependencies:
     rules:
     - if: target in [esp32, esp32s2, esp32s3, esp32p4]
   espressif/esp_lcd_spd2010: ==1.0.2
-  espressif/esp_io_expander_tca9554: ==2.0.0
-  waveshare/custom_io_expander_ch32v003: ^1.0.0
+  espressif/esp_io_expander_tca9554: ~2.0.3
+  waveshare/custom_io_expander_ch32v003: ^2.0.0
   espressif/esp_lcd_panel_io_additions: ^1.0.1
-  78/esp_lcd_nv3023: ~1.0.0
-  78/esp-wifi-connect: ~3.1.1
-  espressif/esp_audio_effects: ~1.2.1
-  espressif/esp_audio_codec: ~2.4.1
-  78/esp-ml307: ~3.6.4
+  78/esp_lcd_nv3023: ~1.0.1
+  78/esp-wifi-connect: ~3.3.1
+  espressif/esp_audio_effects: ~1.3.0
+  espressif/esp_audio_codec: ~2.5.0
+  78/esp-ml307:
+    git: https://github.com/78/esp-ml307.git
+    version: 39638f2a4e514e12ef5d8afc7241db5b9b394086
   78/uart-eth-modem:
-    version: ~0.3.3
+    version: ~0.7.0
     rules:
     - if: target not in [esp32]
-  78/xiaozhi-fonts: ~1.6.0
+  78/xiaozhi-fonts: ~2.0.0
   espressif/led_strip: ~3.0.2
-  espressif/esp_codec_dev: ~1.5.4
-  espressif/esp-sr: ~2.3.0
+  espressif/esp_codec_dev: ~1.6.2
+  espressif/esp-sr: ==2.4.7
   espressif/button: ~4.1.5
   espressif/knob: ^1.0.0
   espressif/esp32-camera:
-    version: ^2.1.4
+    version: ^2.1.7
     rules:
     - if: target in [esp32s3]
   espressif/esp_video:
-    version: ==1.3.1   # for compatibility. update version may need to modify this project code.
+    version: ^2.4.1
     rules:
     - if: target in [esp32p4, esp32s3]
   
   espressif/esp_image_effects:
-    version: ^1.0.1
+    version: ^1.1.0
     rules:
     - if: target not in [esp32]
   espressif/esp_lcd_touch_ft5x06: ~1.0.7
@@ -52,8 +55,8 @@ dependencies:
   espressif/esp_lcd_touch_gt1151: ^1
   waveshare/esp_lcd_touch_cst9217: ^1.0.3
   espressif/esp_lcd_touch_cst816s: ^1.0.6
-  lvgl/lvgl: ~9.4.0
-  esp_lvgl_port: ~2.7.0
+  lvgl/lvgl: ~9.5.0
+  esp_lvgl_port: ~2.9.0
   espressif/esp_io_expander_tca95xx_16bit: ^2.0.0
   espressif2022/image_player: ^1.1.1
   # espressif2022/esp_emote_expression: ^0.1.0
@@ -68,7 +71,7 @@ dependencies:
 
   # SenseCAP Watcher Board
   wvirgil123/sscma_client:
-    version: 1.0.2
+    version: ~1.0.4
     rules:
     - if: target in [esp32s3]
 
@@ -112,7 +115,7 @@ dependencies:
     - if: target in [esp32p4]
 
   espressif/bmi270_sensor:
-    version: ^0.1.0
+    version: ^0.1.2
     rules:
     - if: target in [esp32s3, esp32c5]
 
@@ -124,4 +127,4 @@ dependencies:
 
   ## Required IDF version
   idf:
-    version: '>=5.5.2'
+    version: '>=6.1.0,<6.2.0'

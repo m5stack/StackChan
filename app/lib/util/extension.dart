@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flex_color_picker/flex_color_picker.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
@@ -19,7 +19,7 @@ extension HexExtension on Uint8List {
   }
 }
 
-// NeedReplaceKeyValueFor
+// English display names for known model names.
 final projectStringReplacement = {
   "小智": "Xiaozhi",
   "Qwen3 实时": "Qwen3 235B (Fast)",
@@ -29,25 +29,26 @@ final projectStringReplacement = {
   "Kimi-K2（内测）": "Kimi-K2（Internal Test）",
   "Doubao 2.0（内测）": "Doubao 2.0（Internal Test）",
   "Qwen3.5 397B（内测）": "Qwen3.5 397B（Internal Test）",
+  "DeepSeek V4": "DeepSeek V4 (Fast)",
+  "DouBao Seed 2.0": "DouBao Seed 2.0 (Delayed)",
 };
 
 extension StringTool on String? {
-  /// RegexReplaceString
-  /// projectStringReplacement ThenReplaceAllMatchContent
+  /// Replaces each known model name with its English display name.
   String? regularExpressionSubstitution() {
-    // 1. NullValueDirectlyReturns null
+    // Return null unchanged.
     if (this == null) {
       return null;
     }
 
-    // 2. Non-NullString
+    // Work with a non-null copy.
     String result = this!;
 
-    // 3. IterateReplaceDictionary,ReplaceAllMatchItem
+    // Replace each mapped term.
     for (final entry in projectStringReplacement.entries) {
-      // Escape,AvoidRegex(,)
+      // Escape regex metacharacters such as parentheses and dots.
       final pattern = RegExp.escape(entry.key);
-      // GlobalReplaceAllMatchContent
+      // Replace every occurrence of the key.
       result = result.replaceAll(RegExp(pattern), entry.value);
     }
 
@@ -56,7 +57,7 @@ extension StringTool on String? {
 }
 
 extension StringToUint8List on String? {
-  ///Convert String? to Uint8List
+  /// Encode this string as UTF-8 bytes.
   Uint8List toUint8List() {
     if (this == null || this!.isEmpty) {
       return Uint8List(0);
@@ -64,8 +65,8 @@ extension StringToUint8List on String? {
     return Uint8List.fromList(utf8.encode(this!));
   }
 
-  ///Convert Hex string to Color object
-  ///Supported formats: "0xFFFFFFFF", "#FFFFFF", "FFFFFF"
+  /// Parse a hex color string.
+  /// Accepts "0xFFFFFFFF", "#FFFFFF", and "FFFFFF".
   Color hex() {
     if (this == null || this!.isEmpty) return CupertinoColors.transparent;
 
@@ -84,16 +85,41 @@ extension StringToUint8List on String? {
 }
 
 extension ColorExtension on Color? {
-  ///Convert Color to hex string (e.g., #RRGGBB)
+  /// Format the color as #RRGGBB.
   String hexString() {
     if (this == null) return "#000000";
 
-    //Extract RGB channels and convert to hex, ignore Alpha to match standard color codes
+    // Convert RGB channels to hex and omit alpha.
     String r = this!.red8bit.toRadixString(16).padLeft(2, '0');
     String g = this!.green8bit.toRadixString(16).padLeft(2, '0');
     String b = this!.blue8bit.toRadixString(16).padLeft(2, '0');
 
     return "#$r$g$b".toUpperCase();
+  }
+
+  Color desaturateColor(double saturation) {
+    if (this == null) {
+      return CupertinoColors.transparent;
+    }
+    HSVColor hsv = HSVColor.fromColor(this!);
+    return hsv.withSaturation(saturation).toColor();
+  }
+
+  Color brightenColor(double brightness) {
+    if (this == null) {
+      return CupertinoColors.transparent;
+    }
+
+    // Blend toward white: 0.0 leaves the color unchanged and 1.0 makes it
+    // pure white while preserving alpha.
+    final factor = brightness.clamp(0.0, 1.0);
+    final color = this!;
+
+    final r = (color.red8bit + (255 - color.red8bit) * factor).round();
+    final g = (color.green8bit + (255 - color.green8bit) * factor).round();
+    final b = (color.blue8bit + (255 - color.blue8bit) * factor).round();
+
+    return Color.fromARGB(color.alpha8bit, r, g, b);
   }
 }
 
@@ -103,7 +129,7 @@ extension ImageExtension on Uint8List {
     double? memorySize,
     bool cropCenter = false,
   }) async {
-    //Use compute isolation to avoid blocking UI thread when processing large images
+    // Compress on a background isolate to keep the UI responsive.
     return compute(
       _compressImage,
       _CompressParams(
@@ -124,7 +150,7 @@ extension ImageExtension on Uint8List {
   }
 }
 
-//Compression parameter wrapper (for compute isolation)
+// Parameters passed to the image compression isolate.
 class _CompressParams {
   final Uint8List bytes;
   final ui.Size? resolutionSize;
@@ -139,29 +165,29 @@ class _CompressParams {
   });
 }
 
-//Core compression logic (top-level function for compute isolation)
+// Compress image bytes on a background isolate.
 Future<Uint8List?> _compressImage(_CompressParams params) async {
   try {
-    //1. Decode original image
+    // Decode the source image.
     img.Image? originalImage = img.decodeImage(params.bytes);
-    if (originalImage == null) return null; //Return null on decode failure
+    if (originalImage == null) return null; // Return null if decoding fails.
 
     img.Image processedImage = originalImage;
 
-    //2. Handle resolution scaling/cropping (align with iOS logic)
+    // Scale and crop to match the iOS implementation.
     if (params.resolutionSize != null) {
       final targetWidth = params.resolutionSize!.width.toInt();
       final targetHeight = params.resolutionSize!.height.toInt();
 
       if (params.cropCenter) {
-        //CropCenter=true: Scale to cover target size then center crop (Aspect-Fill)
+        // Center-crop after scaling to cover the target size.
         final scaleX = targetWidth / originalImage.width;
         final scaleY = targetHeight / originalImage.height;
         final scale = scaleX > scaleY
             ? scaleX
-            : scaleY; //Take larger scale ratio
+            : scaleY; // Use the larger scale factor.
 
-        //Scale image to cover target size
+        // Scale the image to cover the target size.
         final scaledWidth = (originalImage.width * scale).toInt();
         final scaledHeight = (originalImage.height * scale).toInt();
         final scaledImage = img.copyResize(
@@ -170,11 +196,11 @@ Future<Uint8List?> _compressImage(_CompressParams params) async {
           height: scaledHeight,
         );
 
-        //Calculate center crop offset
+        // Calculate the top-left crop offset.
         final cropX = (scaledWidth - targetWidth) ~/ 2;
         final cropY = (scaledHeight - targetHeight) ~/ 2;
 
-        //Execute center crop
+        // Crop the center region.
         processedImage = img.copyCrop(
           scaledImage,
           x: cropX,
@@ -183,14 +209,14 @@ Future<Uint8List?> _compressImage(_CompressParams params) async {
           height: targetHeight,
         );
       } else {
-        //CropCenter=false: Aspect-Fit scaling, draw to target size canvas
+        // Aspect-fit scaling onto a target-size canvas.
         final scaleX = targetWidth / originalImage.width;
         final scaleY = targetHeight / originalImage.height;
         final scale = scaleX < scaleY
             ? scaleX
-            : scaleY; //Take smaller scale ratio
+            : scaleY; // Use the smaller scale factor.
 
-        //Scale image to fit target size
+        // Scale the image to fit the target size.
         final newWidth = (originalImage.width * scale).toInt();
         final newHeight = (originalImage.height * scale).toInt();
         final scaledImage = img.copyResize(
@@ -199,9 +225,9 @@ Future<Uint8List?> _compressImage(_CompressParams params) async {
           height: newHeight,
         );
 
-        //Create target size canvas, draw scaled image at top-left (align with iOS draw logic)
+        // Draw the scaled image at the top-left of a target-size canvas.
         final canvas = img.Image(width: targetWidth, height: targetHeight);
-        //Critical fix: Use direct blend mode (normal overlay, no color blending)
+        // Composite without color blending.
         img.compositeImage(
           canvas,
           scaledImage,
@@ -213,26 +239,27 @@ Future<Uint8List?> _compressImage(_CompressParams params) async {
       }
     }
 
-    //3. Handle memory size compression (JPEG quality adjustment)
+    // Compress to the requested memory budget by adjusting JPEG quality.
     if (params.memorySize == null) {
-      //No memory limit, return 100% quality JPEG
+      // No size limit: encode at full quality.
       return img.encodeJpg(processedImage, quality: 100);
     }
 
-    //Calculate max bytes (MB → Bytes)
+    // Convert the limit from MB to bytes.
     final maxBytes = (params.memorySize! * 1024 * 1024).toInt();
-    int quality = 100; //Corresponds to iOS compressionQuality=1.0
-    //Null safety fix: encodeJpg may return null, need ? and handling
+    int quality = 100; // Matches iOS compressionQuality = 1.0.
+    // Encode the initial JPEG.
     Uint8List compressedData = img.encodeJpg(processedImage, quality: quality);
-    //Gradually reduce quality (×0.7 each time) until size limit met or quality below 1%
+    // Reduce quality by 30% per pass until the size limit is met or quality reaches 1%.
     while (compressedData.length > maxBytes && quality > 1) {
       quality = (quality * 0.7).round();
-      if (quality < 1) quality = 1; //Minimum quality limit is 1%
+      if (quality < 1) quality = 1; // Never drop below 1% quality.
       compressedData = img.encodeJpg(processedImage, quality: quality);
     }
 
     return compressedData;
   } catch (e) {
-        return null;
+    debugPrint('图片压缩Failed:$e');
+    return null;
   }
 }

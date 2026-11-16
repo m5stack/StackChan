@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:video_player/video_player.dart';
 
 class LoopPlaybackVideo extends StatefulWidget {

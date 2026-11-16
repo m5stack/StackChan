@@ -30,4 +30,5 @@ type IDeviceV2 interface {
 	UnbindDevice(ctx context.Context, req *v2.UnbindDeviceReq) (res *v2.UnbindDeviceRes, err error)
 	UpdateDevice(ctx context.Context, req *v2.UpdateDeviceReq) (res *v2.UpdateDeviceRes, err error)
 	AgentRestoreDefault(ctx context.Context, req *v2.AgentRestoreDefaultReq) (res *v2.AgentRestoreDefaultRes, err error)
+	ActivateAndBindDevice(ctx context.Context, req *v2.ActivateAndBindDeviceReq) (res *v2.ActivateAndBindDeviceRes, err error)
 }

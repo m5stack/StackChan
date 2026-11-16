@@ -5,17 +5,20 @@ SPDX-License-Identifier: MIT
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/popup.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:get/get.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:stack_chan/app_state.dart';
 import 'package:stack_chan/view/popup/edit_agent.dart';
 
 import '../../model/XiaoZhi/agent.dart';
 import '../../model/XiaoZhi/agent_template.dart';
 import '../../model/XiaoZhi/device.dart';
-import '../../util/XiaoZhi_util.dart';
+import '../../util/xiao_zhi_util.dart';
 
-//System1UIConstant - Can
+// Shared UI constants - keeps layout tweaks in one place.
 const double kCardRadius = 16.0;
 const double kDefaultPadding = 16.0;
 const double kDefaultSpacing = 16.0;
@@ -34,7 +37,7 @@ class AgentConfigurationModel extends GetxController {
   RxList<AgentTemplate> agentTemplatesList = RxList([]);
   Rxn<Agent> currentBindAgent = Rxn(null);
 
-  //search
+  // Pagination and list-loading state.
   int agentListPage = 1;
   RxBool isLoading = false.obs;
   RxBool isDialogLoading = false.obs;
@@ -46,20 +49,21 @@ class AgentConfigurationModel extends GetxController {
     try {
       await Future.wait([loadDevice(), loadAgentTemplates()]);
     } catch (e) {
-          } finally {
+      debugPrint("Failed to initialize data: $e");
+    } finally {
       isLoading.value = false;
     }
   }
 
-  //loaddeviceinfo
+  // Load device info.
   Future<void> loadDevice() async {
     final devices = await XiaoZhiUtil.shared.getDevice(
       AppState.shared.deviceMac,
     );
     if (devices.isNotEmpty) {
       device.value = devices.first;
-      if (device.value?.agent_id != null) {
-        await getBindAgent(device.value!.agent_id!);
+      if (device.value?.agentId != null) {
+        await getBindAgent(device.value!.agentId!);
       } else {
         currentBindAgent.value = null;
       }
@@ -69,13 +73,13 @@ class AgentConfigurationModel extends GetxController {
     }
   }
 
-  //Getdeviceboundagentdetails
+  // Fetch the agent currently bound to the device.
   Future<void> getBindAgent(int agentId) async {
     final agent = await XiaoZhiUtil.shared.getAgentDetail(agentId);
     currentBindAgent.value = agent;
   }
 
-  //switchbindagent
+  // Switch the agent bound to the device.
   Future<bool> switchBindAgent(
     Agent targetAgent,
     String verificationCode,
@@ -99,11 +103,11 @@ class AgentConfigurationModel extends GetxController {
 
     isLoading.value = true;
     try {
-      //First / Previouslyunbindcurrentdevice
-      if (device.value?.device_id != null) {
-        await XiaoZhiUtil.shared.unbindDevice(device.value!.device_id!);
+      // Unbind the current device first.
+      if (device.value?.deviceId != null) {
+        await XiaoZhiUtil.shared.unbindDevice(device.value!.deviceId!);
       }
-      //bindtonewagent
+      // Bind to the new agent.
       final bindSuccess = await XiaoZhiUtil.shared.bindDeviceToAgent(
         targetAgent.id!,
         verificationCode,
@@ -111,19 +115,20 @@ class AgentConfigurationModel extends GetxController {
       if (!bindSuccess) {
         throw Exception("Failed to bind device to AI Agent");
       }
-      //refreshdata
+      // Refresh local data.
       await loadDevice();
       AppState.shared.showToast("Successfully switched AI Agent");
       return true;
     } catch (e) {
-            AppState.shared.showToast(e.toString().replaceAll("Exception: ", ""));
+      debugPrint("Failed to switch bound AI Agent: $e");
+      AppState.shared.showToast(e.toString().replaceAll("Exception: ", ""));
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  //loadagent
+  // Load agent templates.
   Future<void> loadAgentTemplates() async {
     final templates = await XiaoZhiUtil.shared.agentTemplatesList(
       agentListPage,
@@ -132,23 +137,17 @@ class AgentConfigurationModel extends GetxController {
     agentTemplatesList.assignAll(templates);
   }
 
-  //ReplaceDescriptionin
+  // Strip assistant-name placeholders and fill in the user's name.
   String replacePlaceholdersInCharacter(Agent agent) {
     if (agent.character == null || agent.character!.isEmpty) {
       return "";
     }
     String characterText = agent.character!;
-    if (agent.assistant_name != null && agent.assistant_name!.isNotEmpty) {
-      characterText = characterText.replaceAll(
-        "{{assistant_name}}",
-        agent.assistant_name!,
-      );
-    }
-    if (agent.user_name != null && agent.user_name!.isNotEmpty) {
-      characterText = characterText.replaceAll(
-        "{{user_name}}",
-        agent.user_name!,
-      );
+    characterText = characterText
+        .replaceAll("{{assistantName}}", "")
+        .replaceAll("{{assistant_name}}", "");
+    if (agent.userName != null && agent.userName!.isNotEmpty) {
+      characterText = characterText.replaceAll("{{userName}}", agent.userName!);
     }
     return characterText;
   }
@@ -180,7 +179,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     });
   }
 
-  ///showCreate agentpopup
+  /// Opens the agent editor for [editAgent], or for a new agent when it is null.
   void goToEditAgentPage({bool isCreate = false, Agent? editAgent}) {
     Navigator.of(context)
         .push(
@@ -197,32 +196,37 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
 
   @override
   Widget build(BuildContext context) {
-    //GetCupertinodynamicTheme
+    // Resolve theme colors once for this build.
     final CupertinoThemeData cupertinoTheme = CupertinoTheme.of(context);
-    final Color surfaceColor = CupertinoColors.systemGroupedBackground
-        .resolveFrom(context);
     final Color secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
       context,
     );
     final Color primaryColor = cupertinoTheme.primaryColor;
+    final padding = MediaQuery.paddingOf(context);
 
     return CupertinoPageScaffold(
-      backgroundColor: surfaceColor,
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
+      ),
       navigationBar: CupertinoNavigationBar.large(
+        backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+          context,
+        ),
+        border: ThemeSetting.cupertinoNavigationBarBorder(context),
+        padding: ThemeSetting.navigationBarPadding,
         largeTitle: Obx(
           () => Text(
-            model.currentBindAgent.value?.agent_name ?? "AI Agent",
+            model.currentBindAgent.value?.agentName ?? "AI Agent",
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
         leading: CupertinoButton(
-          padding: EdgeInsets.zero,
+          sizeStyle: .medium,
           child: const Icon(CupertinoIcons.xmark, size: 24),
-          onPressed: () => CupertinoSheetRoute.popSheet(context),
+          onPressed: () => closeCustomCupertinoSheet(context),
         ),
-        backgroundColor: surfaceColor,
         trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
+          sizeStyle: .medium,
           onPressed: () => goToEditAgentPage(
             isCreate: false,
             editAgent: model.currentBindAgent.value,
@@ -233,48 +237,51 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
             color: primaryColor,
           ),
         ),
-        border: const Border(bottom: BorderSide.none), //remove
       ),
       child: Obx(() {
-        //Initialloadstate
+        // Global loading state.
         if (model.isLoading.value) {
           return const Center(
-            child: CupertinoActivityIndicator(radius: 16), //increaseloadindicator
+            child: CupertinoActivityIndicator(
+              radius: 16,
+            ), // Larger loading indicator
           );
         }
-        //Nodevicestate
+        // No device available.
         if (model.device.value == null) {
           return _buildNoDeviceWidget(secondaryTextColor, primaryColor);
         }
-        //MainLayout
+        // Main layout.
         return ListView(
           controller: scrollController,
-          padding: const EdgeInsets.symmetric(
-            horizontal: kDefaultPadding,
-            vertical: 24,
+          padding: .only(
+            left: padding.left + kDefaultPadding,
+            right: padding.right + kDefaultPadding,
+            top: 24,
+            bottom: 24,
           ),
           children: [
-            //currentbindagent
+            // Card for the currently bound agent.
             _buildCurrentBindCard(
               cupertinoTheme,
               primaryColor,
               secondaryTextColor,
             ),
             const SizedBox(height: 32),
-            //increase
-            //listtitle
+            // Extra spacing for breathing room.
+            //listTitle
             // const Text(
             //   "AI Agent Templates",
             //   style: TextStyle(
             //     fontSize: 20,
             //     fontWeight: FontWeight.w600,
-            //letterSpacing: -0.5, // Zoom out
+            //letterSpacing: -0.5, // Slightly tighter spacing looks finer
             //   ),
             // ),
             // const SizedBox(height: 16),
-            //// Agent templatelist
+            //// Agent template list
             // _buildAgentTemplatesList(cupertinoTheme, primaryColor),
-            //// loadmoreindicator
+            //// Load-more indicator
             // if (model.isListLoading.value)
             //   const Padding(
             //     padding: EdgeInsets.symmetric(vertical: 24),
@@ -287,26 +294,26 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //currentbindagent - optimize
+  // Card showing the currently bound agent.
   Widget _buildCurrentBindCard(
     CupertinoThemeData theme,
     Color primaryColor,
     Color secondaryTextColor,
   ) {
-    final cardRadius = 40.0;
+    const cardRadius = 40.0;
 
     final currentAgent = model.currentBindAgent.value;
     if (currentAgent == null) {
       return ClipRSuperellipse(
         borderRadius: .circular(cardRadius),
         child: Container(
-          padding: .all(cardRadius / 2),
+          padding: const .all(cardRadius / 2),
           color: CupertinoColors.systemBackground.resolveFrom(context),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                CupertinoIcons.person_badge_plus, //useicon
+                CupertinoIcons.person_badge_plus, // Filled icon looks more modern
                 size: 56,
                 color: secondaryTextColor.withValues(alpha: 0.7),
               ),
@@ -324,7 +331,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
                 "Select an Agent template below to bind, or create a custom AI Agent by tapping the edit button in the upper right corner.",
                 style: TextStyle(
                   fontSize: 15,
-                  height: 1.5, //translated comment
+                  height: 1.5, // Taller line height improves readability
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -341,7 +348,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     return ClipRSuperellipse(
       borderRadius: .circular(cardRadius),
       child: Container(
-        padding: .all(cardRadius / 2),
+        padding: const .all(cardRadius / 2),
         color: CupertinoColors.systemBackground.resolveFrom(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,22 +377,22 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
             const SizedBox(height: 16),
             _buildInfoItem(
               "AI Model",
-              currentAgent.llm_model ?? "Not configured",
+              currentAgent.llmModel ?? "Not configured",
               secondaryTextColor,
             ),
             _buildInfoItem(
               "Voice Tone",
-              currentAgent.tts_voice ?? "Not configured",
+              currentAgent.ttsVoice ?? "Not configured",
               secondaryTextColor,
             ),
             _buildInfoItem(
               "Speech Speed",
-              currentAgent.tts_speech_speed ?? "Normal",
+              currentAgent.ttsSpeechSpeed ?? "Normal",
               secondaryTextColor,
             ),
             _buildInfoItem(
               "Pitch",
-              currentAgent.tts_pitch?.toString() ?? "0",
+              currentAgent.ttsPitch?.toString() ?? "0",
               secondaryTextColor,
             ),
             if (processedCharacter.isNotEmpty)
@@ -406,7 +413,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
                     ClipRSuperellipse(
                       borderRadius: .circular(cardRadius / 2),
                       child: Container(
-                        padding: .all(cardRadius / 4),
+                        padding: const .all(cardRadius / 4),
                         color: CupertinoColors.systemGroupedBackground
                             .resolveFrom(context),
                         child: Text(
@@ -428,7 +435,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //Nodevicehintcomponent - optimize
+  // Empty state shown when no device is available.
   Widget _buildNoDeviceWidget(Color secondaryTextColor, Color primaryColor) {
     return Center(
       child: Padding(
@@ -462,13 +469,25 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            CupertinoButton.filled(
-              borderRadius: BorderRadius.circular(12),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              onPressed: model.loadDevice,
-              child: const Text(
-                "Retry Detection",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            SizedBox(
+              width: 220,
+              child: GlassButton.custom(
+                height: 50,
+                settings: LiquidGlassSettings(
+                  glassColor: CupertinoTheme.of(context).primaryColor,
+                ),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 23),
+                onTap: model.loadDevice,
+                child: const Center(
+                  child: Text(
+                    "Retry Detection",
+                    style: TextStyle(
+                      color: CupertinoColors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -477,7 +496,7 @@ class _AgentConfigurationState extends State<AgentConfiguration> {
     );
   }
 
-  //infoItemcomponent - optimize
+  // Label/value row used for the agent details.
   Widget _buildInfoItem(String title, String value, Color secondaryTextColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),

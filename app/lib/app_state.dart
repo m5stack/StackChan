@@ -4,9 +4,10 @@ SPDX-License-Identifier: MIT
 */
 
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:dio/dio.dart' show Response;
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart' hide Response;
@@ -17,18 +18,23 @@ import 'package:stack_chan/model/device.dart';
 import 'package:stack_chan/model/model.dart';
 import 'package:stack_chan/network/http.dart';
 import 'package:stack_chan/util/blue_util.dart';
+import 'package:stack_chan/util/mac_address_validator.dart';
 import 'package:stack_chan/util/value_constant.dart';
 import 'package:stack_chan/view/popup/binding_device.dart';
 import 'package:stack_chan/view/popup/login_page.dart';
+import 'package:stack_chan/view/util/popup.dart';
 import 'package:uuid/uuid.dart';
 
 import 'model/blue_device_info.dart';
 import 'model/msg_type.dart';
 import 'model/user_info.dart';
 import 'network/urls.dart';
+import 'network/lan_endpoint_announcer.dart';
+import 'network/local_area_network_service.dart';
+import 'network/device_message_transport.dart';
 import 'network/web_socket_util.dart';
 
-class AppState extends GetxController {
+class AppState extends GetxController with WidgetsBindingObserver {
   static final AppState shared = Get.find<AppState>();
 
   static final asyncPrefs = SharedPreferencesAsync();
@@ -37,9 +43,57 @@ class AppState extends GetxController {
 
   PackageInfo? packageInfo;
 
-  AppState();
+  AppState() {
+    _localConnectionSubscription = LocalAreaNetworkService
+        .instance
+        .connectionStates
+        .listen((_) {
+          _updateConnectionMode();
+          _endpointAnnouncer.setLanConnected(_isLocalTargetConnected);
+        });
+    _localEndpointSubscription = LocalAreaNetworkService
+        .instance
+        .serverEndpoints
+        .listen(_endpointAnnouncer.updateEndpoint);
+    // Re-announce the endpoint on remote reconnect instead of waiting for the next cycle.
+    WebSocketUtil.shared.addConnectionObserver(
+      this,
+      _endpointAnnouncer.announce,
+    );
+  }
+
+  StreamSubscription<bool>? _localConnectionSubscription;
+  StreamSubscription<LanServerEndpoint?>? _localEndpointSubscription;
+
+  late final LanEndpointAnnouncer _endpointAnnouncer = LanEndpointAnnouncer(
+    send: _sendLanEndpoint,
+  );
+
+  bool get _isLocalTargetConnected =>
+      LocalAreaNetworkService.instance.canSendTo(deviceMac);
+
+  /// Sends the endpoint over the remote channel; the announcer repeats until the firmware connects directly.
+  void _sendLanEndpoint(LanServerEndpoint endpoint) {
+    if (deviceMac.isEmpty || !WebSocketUtil.shared.isConnected) return;
+    sendWebSocketMessage(MsgType.appLanAddress, data: endpoint.encode());
+  }
+
+  /// Whether commands for the currently selected device are using LAN.
+  final RxBool isLocalConnection = false.obs;
+
+  void _updateConnectionMode() {
+    isLocalConnection.value = LocalAreaNetworkService.instance.canSendTo(
+      deviceMac,
+    );
+  }
+
+  late final _deviceMessages = DeviceMessageTransport(
+    local: LocalAreaNetworkService.instance,
+    remote: sendWebSocketMessage,
+  );
 
   Future<void> initData() async {
+    WidgetsBinding.instance.addObserver(this);
     deviceMac = await asyncPrefs.getString(ValueConstant.deviceMac) ?? "";
     _deviceId.value =
         await asyncPrefs.getString(ValueConstant.deviceId) ?? uuid.v4();
@@ -48,21 +102,31 @@ class AppState extends GetxController {
     isInitialization = true;
     isLogin.value = await asyncPrefs.getBool(ValueConstant.isLogin) ?? false;
 
-    ///Set status bar and navigation bar to transparent
-    SystemUiOverlayStyle style = SystemUiOverlayStyle(
+    /// Make the status bar and navigation bar transparent.
+    const style = SystemUiOverlayStyle(
       statusBarColor: CupertinoColors.transparent,
+      systemNavigationBarColor: CupertinoColors.transparent,
+      systemNavigationBarDividerColor: CupertinoColors.transparent,
+      systemStatusBarContrastEnforced: false,
+      systemNavigationBarContrastEnforced: false,
+    );
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.edgeToEdge,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
     );
     SystemChrome.setSystemUIOverlayStyle(style);
-    SystemChrome.setEnabledSystemUIMode(.manual, overlays: [.top, .bottom]);
+    await SystemChrome.setPreferredOrientations([
+      .portraitUp,
+      .portraitDown,
+      .landscapeLeft,
+      .landscapeRight,
+    ]);
 
-    ///Lock screen orientation
-    SystemChrome.setPreferredOrientations([.portraitDown, .portraitUp]);
-
-    ///Initialize package manager
+    /// Initialize package metadata.
     packageInfo = await PackageInfo.fromPlatform();
   }
 
-  final uuid = Uuid();
+  final uuid = const Uuid();
 
   final RxString _deviceId = "".obs;
 
@@ -83,6 +147,30 @@ class AppState extends GetxController {
     _deviceMac.value = mac;
     asyncPrefs.setString(ValueConstant.deviceMac, _deviceMac.value);
     startSearchXiaoZhiConfig(mac);
+    unawaited(LocalAreaNetworkService.instance.setTargetDevice(mac));
+    _updateConnectionMode();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The inactive state covers permission prompts, so keep the service; paused/detached releases it, and resume restores it.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(LocalAreaNetworkService.instance.setForeground(true));
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(LocalAreaNetworkService.instance.setForeground(false));
+    }
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(LocalAreaNetworkService.instance.dispose());
+    unawaited(_localConnectionSubscription?.cancel());
+    unawaited(_localEndpointSubscription?.cancel());
+    _endpointAnnouncer.dispose();
+    WebSocketUtil.shared.removeConnectionObserver(this);
+    super.onClose();
   }
 
   bool get hasValidDeviceMac => _deviceMac.isNotEmpty;
@@ -99,7 +187,7 @@ class AppState extends GetxController {
 
   DateTime? manualShutdownTime;
 
-  bool popupState = false; //Popup state
+  bool popupState = false; // Whether a popup is currently shown.
 
   Rxn<Device> deviceInfo = Rxn();
 
@@ -122,7 +210,7 @@ class AppState extends GetxController {
 
   Rxn<UserInfo> userInfo = Rxn();
 
-  ///Location info
+  /// The phone's current location.
   final Rxn<Position> currentLocation = Rxn<Position>();
   final RxBool isLocationAvailable = false.obs;
 
@@ -204,6 +292,16 @@ class AppState extends GetxController {
     WebSocketUtil.shared.send(buffer.toBytes());
   }
 
+  /// Routes Avatar/Camera messages over LAN or remote, falling back to the cloud when the LAN is
+  /// unavailable, the target differs, or sending fails. Both channels keep the target MAC prefix.
+  void sendDeviceMessage(
+    MsgType type, {
+    required String deviceMac,
+    Uint8List? data,
+  }) {
+    _deviceMessages.send(type, deviceMac: deviceMac, data: data);
+  }
+
   void webSocketMessageMonitoring() {
     WebSocketUtil.shared.addObserver("App", (message) {
       if (message is Uint8List) {
@@ -213,6 +311,8 @@ class AppState extends GetxController {
           switch (msgType) {
             case .deviceOnline:
               deviceIsOnline = true;
+              // The firmware just entered AVATAR remotely; send it the endpoint immediately.
+              _endpointAnnouncer.announce();
               break;
             case .deviceOffline:
               deviceIsOnline = false;
@@ -222,7 +322,8 @@ class AppState extends GetxController {
           }
         }
       } else if (message is String) {
-              }
+        debugPrint("Received a regular message: $message");
+      }
     });
   }
 
@@ -232,9 +333,14 @@ class AppState extends GetxController {
     WebSocketUtil.shared.connect(webSocketUrl);
   }
 
-  ///Filter devices for pairing only
+  /// Filters scan results down to devices that support pairing.
   List<BlueDeviceInfo> screeningDevices(List<BlueDeviceInfo> devices) {
     List<BlueDeviceInfo> newDevices = [];
+    final allowedServiceUuids = {
+      BlueUtil.targetServiceUUID.toUpperCase(),
+      BlueUtil.danceTargetServiceUUID.toUpperCase(),
+    };
+
     for (final deviceInfo in devices) {
       final List<dynamic>? serviceUuids =
           deviceInfo.advertisementData[ValueConstant.serviceUuids];
@@ -243,7 +349,7 @@ class AppState extends GetxController {
       }
       final bool containsTargetUUID = serviceUuids
           .map((uuid) => uuid.toString().toUpperCase())
-          .contains(BlueUtil.targetServiceUUID.toUpperCase());
+          .any((uuid) => allowedServiceUuids.contains(uuid));
       if (containsTargetUUID) {
         newDevices.add(deviceInfo);
       }
@@ -251,7 +357,7 @@ class AppState extends GetxController {
     return newDevices;
   }
 
-  ///Upgrade device info
+  /// Updates the device information on the server.
   Future<void> updateDeviceInfo() async {
     final Map<String, dynamic> map = {
       ValueConstant.mac: deviceMac,
@@ -263,7 +369,7 @@ class AppState extends GetxController {
       if (data.isSuccess()) {
         showToast("Update successful");
         deviceInfo.refresh();
-        getDevices();
+        getDevices(force: true);
       } else {
         showToast("Failed to parse data");
       }
@@ -284,7 +390,7 @@ class AppState extends GetxController {
     }
   }
 
-  //Show bind window
+  // Show the binding sheet.
   void showBindingDevice(BuildContext context) async {
     if (AppState.shared.popupState) {
       return;
@@ -292,11 +398,12 @@ class AppState extends GetxController {
     if (AppState.shared.isLogin.value) {
       BlueUtil.shared.blueMode = 3;
       AppState.shared.popupState = true;
-      await showCupertinoSheet(
+      await showCustomCupertinoSheet(
         useNestedNavigation: true,
         context: context,
-        builder: (context) {
-          return BindingDevice();
+        enableDrag: false,
+        scrollableBuilder: (context, scrollController) {
+          return const BindingDevice();
         },
       );
       BlueUtil.shared.blueMode = 1;
@@ -309,24 +416,58 @@ class AppState extends GetxController {
 
   Future<void> showLoginPopup(BuildContext context) async {
     AppState.shared.popupState = true;
-    await showCupertinoSheet(
+    await showCustomCupertinoSheet(
       context: context,
       useNestedNavigation: true,
       enableDrag: false,
-      builder: (context) {
-        return LoginPage();
+      scrollableBuilder: (context, scrollController) {
+        return const LoginPage();
       },
     );
     AppState.shared.popupState = false;
   }
 
-  //Query XiaoZhi configuration status
+  // Query the XiaoZhi configuration status.
   Future<void> startSearchXiaoZhiConfig(String mac) async {}
 
   RxList<Device> devices = RxList([]);
 
-  //Get bound device list
-  Future<void> getDevices() async {
+  /// Limit StackChan device-list request frequency to avoid rapid polling while
+  /// BLE scanning is continuously updating and emitting frequent callbacks.
+  ///
+  /// `v2/devices` is usually only needed to track binding state changes, so
+  /// refreshing every 10 seconds is sufficient under normal usage.
+  static const Duration _devicesCacheDuration = Duration(seconds: 10);
+  Future<void>? _getDevicesFuture;
+  DateTime? _lastGetDevicesRequestAt;
+
+  // Get the list of bound devices.
+  Future<void> getDevices({bool force = false}) {
+    final runningRequest = _getDevicesFuture;
+    if (runningRequest != null) {
+      return runningRequest;
+    }
+
+    final now = DateTime.now();
+    final lastRequestAt = _lastGetDevicesRequestAt;
+    if (!force &&
+        lastRequestAt != null &&
+        now.difference(lastRequestAt) < _devicesCacheDuration) {
+      return Future.value();
+    }
+
+    _lastGetDevicesRequestAt = now;
+    late final Future<void> request;
+    request = _getDevicesInternal().whenComplete(() {
+      if (identical(_getDevicesFuture, request)) {
+        _getDevicesFuture = null;
+      }
+    });
+    _getDevicesFuture = request;
+    return request;
+  }
+
+  Future<void> _getDevicesInternal() async {
     final response = await Http.instance.get(Urls.devices);
     if (response.data != null) {
       Model<List<Device>> responseData = Model.fromJsonT(
@@ -361,18 +502,22 @@ class AppState extends GetxController {
   }
 
   Future<bool> bindDevice(String mac) async {
-    final map = {ValueConstant.mac: mac};
-    final response = await Http.instance.post(Urls.v2deviceBind, data: map);
+    final normalizedMac = MacAddressValidator.toPureMac(mac) ?? mac;
+    final map = {ValueConstant.mac: normalizedMac};
+    final response = await Http.instance.post(
+      Urls.v2deviceActivateBind,
+      data: map,
+    );
     if (response.data != null) {
       Model<bool> responseData = Model.fromJsonT(response.data);
       if (responseData.isSuccess()) {
-        showToast("Device binding successful");
-        getDevices();
-        getDeviceInfo();
-
-        ///Proactively reset device default configuration
-        Http.instance.post(Urls.deviceAgentRestore, data: map);
+        deviceMac = normalizedMac;
+        await getDevices(force: true);
+        await getDeviceInfo();
+        connectWebSocket();
         return true;
+      } else if (responseData.message != null) {
+        showToast(responseData.message);
       }
     }
     return false;
@@ -387,17 +532,17 @@ class AppState extends GetxController {
         AppState.shared.showToast("Device unbinding successful");
         AppState.shared.deviceMac = "";
         AppState.shared.deviceInfo.value = null;
-        getDevices();
+        getDevices(force: true);
       } else {
         AppState.shared.showToast(responseData.message);
       }
     }
   }
 
-  ///Get current phone location
+  /// Gets the phone's current location.
   Future<void> obtainLocation() async {
     try {
-      //Check if location service is enabled
+      // Check whether location services are enabled.
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         showToast(
@@ -407,7 +552,7 @@ class AppState extends GetxController {
         return;
       }
 
-      //Check location permission
+      // Check the location permission.
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -416,7 +561,7 @@ class AppState extends GetxController {
             "The location permission was denied, and thus the location information could not be obtained",
           );
           isLocationAvailable.value = false;
-          //Guide user to settings page to enable permission
+          // Send the user to settings to grant the permission.
           await openAppSettings();
           return;
         }
@@ -431,7 +576,7 @@ class AppState extends GetxController {
         return;
       }
 
-      //Get current location
+      // Get the current position.
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -441,13 +586,17 @@ class AppState extends GetxController {
 
       currentLocation.value = position;
       isLocationAvailable.value = true;
-          } catch (e) {
+      debugPrint(
+        "GetPositionSuccess: 纬度${position.latitude}, 经度${position.longitude}",
+      );
+    } catch (e) {
       showToast("Failed to obtain location: ${e.toString()}");
       isLocationAvailable.value = false;
-          }
+      debugPrint("GetPositionError: $e");
+    }
   }
 
-  ///Continuously listen for location changes
+  /// Continuously listens for location changes.
   void startLocationUpdates() {
     Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
@@ -460,8 +609,59 @@ class AppState extends GetxController {
         isLocationAvailable.value = true;
       },
       onError: (e) {
-                isLocationAvailable.value = false;
+        debugPrint("PositionUpdateError: $e");
+        isLocationAvailable.value = false;
       },
+    );
+  }
+
+  /// Prompts the user to open the Avatar page on StackChan.
+  void showSwitchDeviceAvatar(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text(
+          "Please switch to StackChan and enter Avatar to use this function.",
+        ),
+        content: Padding(
+          padding: const .only(top: 10),
+          child: SizedBox(
+            height: 180,
+            child: Image.asset("assets/stackchan_avatar_page.png"),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text("I have understood."),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Prompts the user to open the Dance page on StackChan.
+  void showSwitchDeviceDance(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text(
+          "Please switch to StackChan and enter Dance to use this function.",
+        ),
+        content: Padding(
+          padding: const .only(top: 10),
+          child: SizedBox(
+            height: 180,
+            child: Image.asset("assets/stackchan_dance_page.png"),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text("I have understood."),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ],
+      ),
     );
   }
 }

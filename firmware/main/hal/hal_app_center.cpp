@@ -42,8 +42,9 @@ app_center::AppInfoList_t Hal::fetchAppList()
         return app_list;
     }
 
-    if (http->GetStatusCode() != 200) {
-        mclog::tagError(_tag, "failed to fetch app list, status code: {}", http->GetStatusCode());
+    const auto status = http->GetStatusCode();
+    if (!status || *status != 200) {
+        mclog::tagError(_tag, "failed to fetch app list, status code: {}", status.value_or(-1));
         http->Close();
         return app_list;
     }

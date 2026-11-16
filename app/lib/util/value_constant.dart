@@ -1,8 +1,7 @@
 /*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 /// Application-wide constant values and configuration
 ///
@@ -14,9 +13,9 @@
 /// - Bluetooth encryption keys
 ///
 /// Backend Configuration Notes:
-/// - Update serverPublicKey and clientPrivateKey for your backend server
-/// - These keys are used for RSA-OAEP encryption with SHA-256
-/// - For production, use environment variables instead of hardcoding
+/// - No key material is stored in this file; keys are injected at build time
+/// - The keys are used for RSA-OAEP encryption with SHA-256
+/// - Pass them with --dart-define (see the key declarations below)
 class ValueConstant {
   // ===========================================================================
   // API Response Keys - Used for JSON parsing from backend responses
@@ -143,6 +142,17 @@ class ValueConstant {
   /// Device unique identifier key
   static const String deviceId = "deviceId";
 
+  static const String motionPromptWindow = "motionPromptWindow";
+
+  static const String avatarPromptWindow = "avatarPromptWindow";
+
+  static const String monitoringCameraPromptWindow =
+      "monitoringCameraPromptWindow";
+
+  static const String dancePromptWindow = "dancePromptWindow";
+
+  static const String agreeUserAgreement = "agreeUserAgreement";
+
   // ===========================================================================
   // Language Support Configuration
   // ===========================================================================
@@ -198,32 +208,19 @@ class ValueConstant {
   // RSA Encryption Keys - Backend Configuration
   // ===========================================================================
 
-  /// Server RSA Public Key for encrypting outgoing requests
+  /// Server RSA public key used to encrypt outgoing requests.
   ///
-  /// IMPORTANT BACKEND CONFIGURATION:
-  /// - This key must match the public key from your backend server
-  /// - Used for RSA-OAEP encryption with SHA-256 padding
-  /// - Encrypt sensitive data before sending to server
-  ///
-  /// To replace with your backend key:
-  /// 1. Generate RSA key pair on your server (2048-bit recommended)
-  /// 2. Extract the public key in PEM format
-  /// 3. Replace the content below with your server's public key
-  static const String serverPublicKey = '''
-''';
+  /// The key is never committed. Supply it at build time, for example:
+  ///   flutter run --dart-define=SERVER_PUBLIC_KEY="$(cat server_public.pem)"
+  static const String serverPublicKey =
+      String.fromEnvironment('SERVER_PUBLIC_KEY');
 
-  /// Client RSA Private Key for decrypting incoming responses
+  /// Client RSA private key used to decrypt incoming responses.
   ///
-  /// IMPORTANT SECURITY NOTE:
-  /// - In production, DO NOT hardcode this key!
-  /// - Use secure storage, environment variables, or key management service
-  /// - This private key should ONLY be used for development/testing
-  ///
-  /// Key Usage:
-  /// - Decrypt data encrypted with the corresponding public key
-  /// - Used for secure server-to-client communication
-  static const String clientPrivateKey = '''
-''';
+  /// Never commit a real private key. Supply it at build time, for example:
+  ///   flutter run --dart-define=CLIENT_PRIVATE_KEY="$(cat client_private.pem)"
+  static const String clientPrivateKey =
+      String.fromEnvironment('CLIENT_PRIVATE_KEY');
 
   // ===========================================================================
   // Character Sets
@@ -300,14 +297,11 @@ class ValueConstant {
   // Bluetooth Encryption Key
   // ===========================================================================
 
-  /// StackChan Bluetooth RSA Private Key
+  /// RSA private key for the encrypted BLE link with StackChan devices.
   ///
-  /// This key is used for secure communication with StackChan hardware devices
-  /// over Bluetooth Low Energy (BLE). It enables encrypted communication
-  /// between the mobile app and the StackChan robot.
-  ///
-  /// Note: Each StackChan device should have a unique key pair in production.
-  /// This is a default development key for testing purposes.
-  static const stackChanBluePrivateKey = '''
-''';
+  /// Production devices should use a per-device key. Supply the default
+  /// development key at build time, for example:
+  ///   --dart-define=STACKCHAN_BLE_PRIVATE_KEY="$(cat ble_private.pem)"
+  static const String stackChanBluePrivateKey =
+      String.fromEnvironment('STACKCHAN_BLE_PRIVATE_KEY');
 }

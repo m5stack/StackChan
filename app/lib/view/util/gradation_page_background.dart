@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
 class GradationPageBackground extends StatelessWidget {
   final Widget? child;
