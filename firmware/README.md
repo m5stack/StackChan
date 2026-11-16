@@ -73,3 +73,17 @@ curl -s http://stackchan.local/mcp_server -d '{"jsonrpc":"2.0","id":2,"method":"
 There is no authentication: anything on the LAN can move the head. Turn it off with
 `CONFIG_STACKCHAN_LAN_MCP_ENABLE=n`; port, hostname and endpoint are in the "LAN Services" Kconfig menu.
 Code: `main/hal/hal_lan_server.cpp`, `main/hal/hal_lan_mcp.cpp`.
+
+## Voice gestures and LED moods (adampog fork)
+
+Extra MCP tools in `main/hal/hal_mcp.cpp`, available to the voice agent and to LAN agents:
+
+- `self.robot.nod` / `self.robot.shake_head` (`times` 1-5): yes/no gestures around the current head pose.
+- `self.robot.dance` (`style`: `happy`, `robot`, `panic`, `look_around`): the built-in dance sequences.
+- `self.robot.set_led_color` now holds its color until `self.robot.reset_led_color` returns to moods.
+
+LED moods (`main/stackchan/addons/led_mood/led_mood.h`) drive all 12 LEDs from the agent's state:
+amber pulse while connecting, soft green while listening, a pulse tinted by the face's emotion while
+speaking (neutral blue, happy gold, angry red, sad deep blue, doubt purple), off when idle or asleep.
+Priority is alert (reefwatch detection amber) > manual color > mood. Colors and pulse speeds are
+constants at the top of that file.

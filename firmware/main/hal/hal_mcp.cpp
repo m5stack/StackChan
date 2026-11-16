@@ -84,7 +84,8 @@ void Hal::xiaozhi_mcp_init()
     mclog::tagInfo(_tag, "add robot.set_led_color tool");
     add_tool(
         "self.robot.set_led_color",
-        "Set the color of the robot's INTERNAL onboard LED. This is NOT for room lights. "
+        "Set the color of the robot's INTERNAL onboard LEDs. This is NOT for room lights. "
+        "The color stays until self.robot.reset_led_color is called; until then the LEDs stop showing your mood. "
         "Values: 0-168 (safe range). Red=168,0,0; Green=0,168,0; Blue=0,0,168; White=100,100,100; Off=0,0,0.",
         PropertyList({Property("red", kPropertyTypeInteger, 0, 0, 168),
                       Property("green", kPropertyTypeInteger, 0, 0, 168),
@@ -98,11 +99,79 @@ void Hal::xiaozhi_mcp_init()
 
             LvglLockGuard lock;
 
-            GetStackChan().leftNeonLight().setColor(r, g, b);
-            GetStackChan().rightNeonLight().setColor(r, g, b);
+            GetStackChan().ledMood().setOverride(r, g, b);
 
             return true;
         });
+
+    mclog::tagInfo(_tag, "add robot.reset_led_color tool");
+    add_tool("self.robot.reset_led_color",
+             "Go back to automatic LED moods (green while listening, a pulse matching your mood while speaking, off "
+             "when idle). Use when the user asks to reset the lights or set them back to normal/automatic.",
+             std::vector<Property>{}, [this](const PropertyList& properties) -> ReturnValue {
+                 mclog::tagInfo(_tag, "reset_led_color");
+                 LvglLockGuard lock;
+                 GetStackChan().ledMood().clearOverride();
+                 return true;
+             });
+
+    // Only one gesture or dance at a time, so a new one replaces the last
+    // (modifier ids are reused once a modifier finishes, so check the slot still holds our gesture before removing)
+    static int gesture_modifier_id       = -1;
+    static Modifier* gesture_modifier    = nullptr;
+    auto start_gesture                   = [](std::unique_ptr<Modifier> modifier) {
+        auto& stackchan = GetStackChan();
+        if (gesture_modifier_id >= 0 && stackchan.getModifier(gesture_modifier_id) == gesture_modifier) {
+            stackchan.removeModifier(gesture_modifier_id);
+        }
+        gesture_modifier    = modifier.get();
+        gesture_modifier_id = stackchan.addModifier(std::move(modifier));
+    };
+
+    mclog::tagInfo(_tag, "add robot.nod tool");
+    add_tool("self.robot.nod", "Nod your head, e.g. to say yes or agree.",
+             PropertyList({Property("times", kPropertyTypeInteger, 2, 1, 5)}),
+             [this, start_gesture](const PropertyList& properties) -> ReturnValue {
+                 int times = properties["times"].value<int>();
+                 mclog::tagInfo(_tag, "nod: {}", times);
+                 LvglLockGuard lock;
+                 start_gesture(std::make_unique<HeadGestureModifier>(HeadGestureModifier::Nod(times)));
+                 return true;
+             });
+
+    mclog::tagInfo(_tag, "add robot.shake_head tool");
+    add_tool("self.robot.shake_head", "Shake your head, e.g. to say no or disagree.",
+             PropertyList({Property("times", kPropertyTypeInteger, 2, 1, 5)}),
+             [this, start_gesture](const PropertyList& properties) -> ReturnValue {
+                 int times = properties["times"].value<int>();
+                 mclog::tagInfo(_tag, "shake_head: {}", times);
+                 LvglLockGuard lock;
+                 start_gesture(std::make_unique<HeadGestureModifier>(HeadGestureModifier::Shake(times)));
+                 return true;
+             });
+
+    mclog::tagInfo(_tag, "add robot.dance tool");
+    add_tool("self.robot.dance",
+             "Do a short dance (a few seconds). Styles: happy (sway side to side), robot (stiff sharp moves), "
+             "panic (fast shaking), look_around (slowly scan the room).",
+             PropertyList({Property("style", kPropertyTypeString, std::string("happy"))}),
+             [this, start_gesture](const PropertyList& properties) -> ReturnValue {
+                 static const std::map<std::string, const animation::KeyframeSequence*> styles = {
+                     {"happy", &DanceModifier::Happy},
+                     {"robot", &DanceModifier::Robot},
+                     {"panic", &DanceModifier::Panic},
+                     {"look_around", &DanceModifier::LookAround}};
+
+                 auto style = properties["style"].value<std::string>();
+                 auto it    = styles.find(style);
+                 if (it == styles.end()) {
+                     throw std::invalid_argument("Unknown dance style: " + style);
+                 }
+                 mclog::tagInfo(_tag, "dance: {}", style);
+                 LvglLockGuard lock;
+                 start_gesture(std::make_unique<DanceModifier>(*it->second));
+                 return true;
+             });
 
     mclog::tagInfo(_tag, "add robot.create_reminder tool");
     add_tool("self.robot.create_reminder",

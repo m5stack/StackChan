@@ -12,4 +12,5 @@
 #include "idle_motion.h"
 #include "idle_expression.h"
 #include "dance.h"
+#include "head_gesture.h"
 #include "imu.h"

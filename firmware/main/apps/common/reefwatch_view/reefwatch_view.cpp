@@ -54,8 +54,7 @@ static void hide()
     _detection_on_screen = false;
     if (_reacted) {
         _reacted = false;
-        GetStackChan().leftNeonLight().setColor(0, 0, 0);
-        GetStackChan().rightNeonLight().setColor(0, 0, 0);
+        GetStackChan().ledMood().clearAlert();  // back to the mood or manual color
     }
     if (_head_turned) {
         _head_turned = false;
@@ -86,8 +85,7 @@ static void on_click(lv_event_t* e)
 static void react_to_detection(const std::string& camera)
 {
     // Amber LEDs, within the 0-168 range hal_mcp treats as safe
-    GetStackChan().leftNeonLight().setColor(168, 90, 0);
-    GetStackChan().rightNeonLight().setColor(168, 90, 0);
+    GetStackChan().ledMood().setAlert(168, 90, 0);
 
     auto yaw = _camera_yaw.find(camera);
     if (yaw != _camera_yaw.end()) {
