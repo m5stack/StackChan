@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/linearLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#00fdff"
     android:orientation="vertical">
-
-    <io.github.sceneview.SceneView
-        android:id="@+id/sceneView"
-        android:layout_width="300dp"
-        android:layout_height="300dp" />
 
 
 </LinearLayout>

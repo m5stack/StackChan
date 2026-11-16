@@ -1,5 +1,6 @@
-#SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-#SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+# SPDX-License-Identifier: MIT
+
 # Install/Update to the latest CLI tool.
 .PHONY: cli
 cli:

@@ -60,7 +60,7 @@ class XiaoZhiUtil {
             await _asyncPrefs.remove(_tokenKay);
             final newToken = await getTokenFromServer();
             if (newToken != null) {
-              //Resend request
+              // Retry the request
               final Options newOptions = Options(
                 method: response.requestOptions.method,
                 headers: {
@@ -85,7 +85,7 @@ class XiaoZhiUtil {
             }
           }
 
-          //Handle session expiration response
+          // Handle session expiry responses
           if (response.data != null) {
             try {
               XiaozhiResponse xiaozhiResponse = XiaozhiResponse.fromJsonT(
@@ -93,10 +93,10 @@ class XiaoZhiUtil {
               );
               if (!xiaozhiResponse.success &&
                   xiaozhiResponse.message == "Session expired or logged out") {
-                //Refresh token
+                // Refresh the token
                 final newToken = await refreshXiaoZhiToken();
                 if (newToken != null) {
-                  //Resend request
+                  // Retry the request
                   final Options newOptions = Options(
                     method: response.requestOptions.method,
                     headers: {
@@ -153,7 +153,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Refresh XiaoZhi token
+  /// Refresh the XiaoZhi access token
   Future<String?> refreshXiaoZhiToken() async {
     final response = await Http.instance.get(Urls.xiaozhiTokenRefresh);
     Model<String> responseData = Model.fromJsonT(response.data);
@@ -167,7 +167,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Agent template
+  /// Get the agent template list
   Future<List<AgentTemplate>> agentTemplatesList(int page, int pageSize) async {
     Map<String, dynamic> map = {"page": page, "pageSize": pageSize};
     final response = await _dio.get(
@@ -190,7 +190,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Query device by serial number
+  /// Query device by serial number
   Future<Device?> serialNumberGetDevice(String serialNumber) async {
     final map = {'serial_number': serialNumber};
     final response = await _dio.get(
@@ -207,14 +207,14 @@ class XiaoZhiUtil {
           );
       if (xiaozhiResponse.success) {
         final list = xiaozhiResponse.data?.list ?? [];
-        //Safe access: check if list is empty first
+        // Safe access: check if list is empty first
         return list.isNotEmpty ? list.first : null;
       }
     }
     return null;
   }
 
-  //Get device list
+  // Get device list
   Future<List<Device>> getDevice(String macAddress) async {
     final map = {'mac_address': MacAddressValidator.formatMac(macAddress)};
     try {
@@ -246,7 +246,7 @@ class XiaoZhiUtil {
     }
   }
 
-  ///Get authorization list
+  /// Get authorization list
   Future<License?> getLicenses(String serialNumber, String productId) async {
     final map = {"query": serialNumber};
     final response = await _dio.get(
@@ -307,7 +307,7 @@ class XiaoZhiUtil {
     }
   }
 
-  ///Get voice list
+  /// Get voice list
   Future<TTsList?> getTtsList() async {
     final response = await _dio.get("api/user/tts-list");
     if (response.data != null) {
@@ -322,7 +322,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Get model list
+  /// Get model list
   Future<List<ModelData>> getModelList() async {
     final response = await _dio.get("api/roles/model-list");
     if (response.data != null) {
@@ -337,7 +337,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Get official MCP tools
+  /// Get official MCP tools
   Future<List<CommonMcpTool>> getCommonMcpTool() async {
     final response = await _dio.get("api/agents/common-mcp-tool/list");
     if (response.data != null) {
@@ -353,7 +353,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Create agent
+  /// Create agent
   Future<int?> createAgent(AgentCreate agentParams) async {
     final response = await _dio.post("api/agents", data: agentParams.toJson());
     if (response.data != null) {
@@ -368,7 +368,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Get agent list
+  /// Get agent list
   Future<List<Agent>> getAgents({
     int page = 1,
     int pageSize = 24,
@@ -392,7 +392,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Get agent details
+  /// Get agent details
   Future<Agent?> getAgentDetail(int agentId) async {
     final response = await _dio.get("api/agents/$agentId");
     if (response.data != null) {
@@ -408,7 +408,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Update agent
+  /// Update agent
   Future<bool> updateAgent(int agentId, AgentCreate agentParams) async {
     final response = await _dio.post(
       "api/agents/$agentId/config",
@@ -425,7 +425,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Bind device to agent (core: add device to specified agent
+  /// Bind a device to an agent (adds the device to that agent)
   Future<bool> bindDeviceToAgent(int agentId, String verificationCode) async {
     final response = await _dio.post(
       "api/agents/$agentId/devices",
@@ -442,7 +442,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Unbind device
+  /// Unbind device
   Future<bool> unbindDevice(int deviceId) async {
     final response = await _dio.post(
       "api/developers/unbind-device",
@@ -459,12 +459,12 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Generate device authorization license
-  ///[macAddress]: Device MAC address (replaces seed parameter)
-  ///Returns: Authorization info (includes serial number), null on failure
+  /// Generate a device authorization license
+  ///[macAddress]: device MAC address, sent as the seed parameter
+  /// Returns the license (including the serial number), or null on failure
   Future<GenerateLicense?> generateLicense(String macAddress) async {
     try {
-      // Get generateLicenseToken License
+      // Fetch the token used to generate the license
       final generateResponse = await Http.instance.get(
         Urls.xiaozhiGenerateLicenseToken,
       );
@@ -502,7 +502,7 @@ class XiaoZhiUtil {
     }
   }
 
-  ///Enterprise device activation API
+  /// Activate a device through the enterprise API
   Future<bool> agentsDevicesActivate(
     String serialNumber,
     String macAddress,
@@ -521,12 +521,12 @@ class XiaoZhiUtil {
             );
 
         if (xiaozhiResponse.success) {
-          //Activation successful
+          // Activation successful
           return true;
         }
       }
     } else if (response.statusCode == 400) {
-      ///Already added
+      /// The device was already added; treat it as success
       XiaozhiResponse xiaozhiResponse = XiaozhiResponse.fromJsonT(
         response.data,
       );
@@ -537,7 +537,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Get MCP endpoint list
+  /// Get MCP endpoint list
   Future<List<McpEndpoints>> mcpEndpoints() async {
     final response = await _dio.get("api/developers/mcp-endpoints");
     if (response.data != null) {
@@ -553,7 +553,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Create mcp endpoint
+  /// Create an MCP endpoint
   Future<bool> createMcpEndpoints(
     String name,
     String description,
@@ -572,7 +572,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Get agent MCP endpoint
+  /// Generate an MCP endpoint token for an agent
   Future<String?> generateMcpEndpointToken(int id) async {
     String url = "api/agents/$id/generate-mcp-endpoint-token";
     final response = await _dio.post(url);
@@ -587,7 +587,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Get endpoint token
+  /// Generate a token for an MCP endpoint
   Future<String?> getEndpointToken(int id) async {
     String url = "api/developers/mcp-endpoints/$id/generate-endpoint-token";
     final response = await _dio.post(url);
@@ -613,7 +613,7 @@ class XiaoZhiUtil {
     return null;
   }
 
-  ///Edit MCP endpoint information
+  /// Edit MCP endpoint information
   Future<bool> editEndpoints(
     int id, {
     String? name,
@@ -639,7 +639,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Delete MCP endpoint
+  /// Delete MCP endpoint
   Future<bool> deleteEndpoints(int id) async {
     String url = "api/developers/mcp-endpoints/$id";
     final response = await _dio.delete(url);
@@ -690,7 +690,7 @@ class XiaoZhiUtil {
     return [];
   }
 
-  ///Delete conversation
+  /// Delete conversation
   Future<bool> deleteConversation(int agentId, int id) async {
     String url = "api/agents/$agentId/chats/$id";
     final response = await _dio.delete(url);
@@ -705,7 +705,7 @@ class XiaoZhiUtil {
     return false;
   }
 
-  ///Get message list
+  /// Get message list
   Future<List<ConversationMessageData>> getChatsMessages(
     Map<String, dynamic> data,
   ) async {
@@ -781,13 +781,13 @@ class ListData<T> {
   List<T> list;
   Pagination? pagination;
 
-  //Fix constructor: Use generic list instead of fixed Device type
+  // Use a generic list instead of a fixed Device type
   ListData({required this.list, this.pagination});
 
-  //Generic factory method: support parsing any type list
+  // Generic factory: parses a list of any type
   factory ListData.fromJson(
     Map<String, dynamic> json,
-    T Function(Map<String, dynamic>) fromJsonT, //Type conversion function
+    T Function(Map<String, dynamic>) fromJsonT, // Item converter
   ) {
     return ListData<T>(
       list: json['list'] != null
@@ -803,7 +803,7 @@ class ListData<T> {
     );
   }
 
-  //Convert to JSON: Support any generic type serialization
+  // Serialize to JSON for any generic type
   Map<String, dynamic> toJson(dynamic Function(T) toJsonT) {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['list'] = list.map((v) => toJsonT(v)).toList();
@@ -821,7 +821,7 @@ class Licenses {
   Licenses({required this.licenses, this.pagination});
 
   factory Licenses.fromJson(Map<String, dynamic> json) {
-    //Core fix: Correctly call License.fromJson(x)
+    // Parse each license entry with License.fromJson
     final licenseList = json['licenses'] as List<dynamic>? ?? [];
     final licenses = licenseList
         .map((x) => License.fromJson(x as Map<String, dynamic>))

@@ -1,8 +1,7 @@
 /*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 /// API endpoint configuration for the StackChan backend server
 ///
@@ -11,8 +10,8 @@
 ///
 /// Backend Configuration:
 /// - Update the [url] constant to point to your backend server address
-/// - The base URL is constructed as: http://<server-ip>:<port>/stackChan/
-/// - WebSocket endpoint uses: ws://<server-ip>:<port>/stackChan/ws
+/// - The base URL is constructed as: `http://<server-ip>:<port>/stackChan/`
+/// - WebSocket endpoint uses: `ws://<server-ip>:<port>/stackChan/ws`
 class Urls {
   /// Backend server base address configuration
   ///
@@ -20,13 +19,15 @@ class Urls {
   /// Format: "server-ip:port/"
   /// Example: "192.168.1.100:8080/" or "api.example.com/"
   ///
-  /// For development, you can use the commented local IP below
-  static const String url = "00.000.000.000:0000/";
+  /// For development, use the commented-out local IP below
+  static const String url = "api.example.com:8080/";
 
+  // Alternative development server
+  // static const String url = "192.168.1.100:8080/";
 
   /// Get the HTTP base URL for API requests
   ///
-  /// Returns: "http://<server-address>/stackChan/"
+  /// Returns: `http://<server-address>/stackChan/`
   static String getBaseUrl() {
     return "http://$url"
         "stackChan/";
@@ -34,14 +35,14 @@ class Urls {
 
   /// Get the HTTP base URL for file operations (uploads and downloads)
   ///
-  /// Returns: "http://<server-address>/"
+  /// Returns: `http://<server-address>/`
   static String getFileUrl() {
     return "http://$url";
   }
 
   /// Get the WebSocket URL for real-time communication
   ///
-  /// Returns: "ws://<server-address>/stackChan/ws"
+  /// Returns: `ws://<server-address>/stackChan/ws`
   static String getWebSocketUrl() {
     return "ws://$url"
         "stackChan/ws";
@@ -74,7 +75,7 @@ class Urls {
   // Social & Content Endpoints
   // ===========================================================================
 
-  /// Get random list of devices for discovery
+  /// Get a random list of devices for discovery
   static const String deviceRandomList = "device/randomList";
 
   /// File upload endpoint for media (images, videos, dance files)
@@ -121,28 +122,24 @@ class Urls {
   // Device-User Binding Endpoints
   // ===========================================================================
 
-  /// Bind a device to a user account
-  static const String v2deviceBind = "v2/device/bind";
+  /// Activate and bind a device to a user account
+  static const String v2deviceActivateBind = "v2/device/activate_bind";
 
   /// Unbind a device from a user account
   static const String v2deviceUnbind = "v2/device/unbind";
-
-  /// Restore device agent configuration
-  static const String deviceAgentRestore = "v2/device/agent/restore";
 
   // ===========================================================================
   // XiaoZhi AI Service Endpoints
   // ===========================================================================
 
   /// XiaoZhi AI authentication token endpoint
-  /// Retrieve token for AI service access
+  /// Retrieve a token for AI service access
   static const String xiaozhiToken = "xiaozhi/token";
 
   /// XiaoZhi AI token refresh endpoint
   /// Refresh expired authentication tokens
   static const String xiaozhiTokenRefresh = "xiaozhi/token/refresh";
 
-  /// Generate license token for device activation
-  /// Used for StackChan device licensing and activation
-  static const String xiaozhiGenerateLicenseToken = "xiaozhi/generateLicenseToken";
+  static const String privacyPolicyUrl =
+      "https://policies.m5stack.com/stack-chan-privacy-policy";
 }

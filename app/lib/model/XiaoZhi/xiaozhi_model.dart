@@ -6,12 +6,12 @@ SPDX-License-Identifier: MIT
 class XiaoZhiModel {
   List<ModelData>? modelList;
 
-  //Constructorfunction
+  // Creates a model catalog; the list is optional.
   XiaoZhiModel({this.modelList});
 
-  //from JSON Deserialize
+  // Creates a model catalog from a JSON map.
   factory XiaoZhiModel.fromJson(Map<String, dynamic> json) {
-    //handlearraytype modelList
+    // Parse the modelList array.
     var modelListJson = json['modelList'] as List?;
     List<ModelData>? modelList;
     if (modelListJson != null) {
@@ -23,10 +23,10 @@ class XiaoZhiModel {
     return XiaoZhiModel(modelList: modelList);
   }
 
-  //Serializeas JSON
+  // Converts this catalog to a JSON map.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    //handlearraytype modelList
+    // Only include the list when it is set.
     if (modelList != null) {
       data['modelList'] = modelList!.map((v) => v.toJson()).toList();
     }
@@ -37,19 +37,19 @@ class XiaoZhiModel {
 class ModelData {
   String? name;
   String? description;
-  List<String>? xiaozhi_version;
+  List<String>? xiaozhiVersion;
   List<String>? role;
 
-  //Constructorfunction
-  ModelData({this.name, this.description, this.xiaozhi_version, this.role});
+  // Creates a model entry; every field is optional.
+  ModelData({this.name, this.description, this.xiaozhiVersion, this.role});
 
-  //from JSON Deserialize
+  // Creates a model entry from a JSON map.
   factory ModelData.fromJson(Map<String, dynamic> json) {
     return ModelData(
       name: json['name'] as String?,
       description: json['description'] as String?,
-      //handleStringarray
-      xiaozhi_version: json['xiaozhi_version'] != null
+      // Parse the version string array.
+      xiaozhiVersion: json['xiaozhi_version'] != null
           ? List<String>.from(json['xiaozhi_version'] as List)
           : null,
       role: json['role'] != null
@@ -58,12 +58,12 @@ class ModelData {
     );
   }
 
-  //Serializeas JSON
+  // Converts this model entry to a JSON map.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['name'] = name;
     data['description'] = description;
-    data['xiaozhi_version'] = xiaozhi_version;
+    data['xiaozhi_version'] = xiaozhiVersion;
     data['role'] = role;
     return data;
   }

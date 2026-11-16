@@ -5,9 +5,9 @@ SPDX-License-Identifier: MIT
 
 import 'package:flutter/services.dart';
 
-///createtime：2024/1/8
-///Author:
-///Description:status barManagertoolClass
+/// Created 2024-01-08.
+/// Status bar styling helpers.
+/// Utilities for configuring the status bar and navigation bar.
 
 class StatusBarManagement {
   static StatusBarManagement? _statusBarManagement;
@@ -16,7 +16,7 @@ class StatusBarManagement {
     return _statusBarManagement ?? StatusBarManagement();
   }
 
-  ///setstatus barfontandicon
+  /// Configure an immersive status bar and its icon brightness.
   void setStatusBarImmerse(Brightness statusBarBrightness) {
     SystemUiOverlayStyle style = SystemUiOverlayStyle(
       statusBarColor: const Color(0x00000000),
@@ -29,7 +29,7 @@ class StatusBarManagement {
     );
   }
 
-  ///setstatus barcolorfontandicon
+  /// Set the status bar color and icon appearance.
   void setStatusColor(
     Color color,
     Brightness statusBarBrightness, {
@@ -86,7 +86,7 @@ class StatusBarManagement {
     SystemChrome.setSystemUIOverlayStyle(style);
   }
 
-  ///setstatus barandnavigation barfontandicon
+  /// Set the status bar and navigation bar colors and icon brightness.
   void setStatusBarAndNavigationBarDark(
     Color statusBarColor,
     Color navigationColor,
@@ -121,7 +121,7 @@ class StatusBarManagement {
     );
   }
 
-  ///setstatus barandnavigation barfontandicon
+  /// Configure immersive status bar and navigation bar icon brightness.
   void setStatusBarAndNavigationBarImmerseDark(
     Brightness statusBarBrightness,
     Brightness navigationBrightness,
@@ -155,7 +155,7 @@ class StatusBarManagement {
     );
   }
 
-  ///setstatus barandnavigation barcustom
+  /// Set status bar and navigation bar colors, with optional immersive mode.
   void setStatusBarAndNavigationBarCustom({
     bool isImmerse = false,
     Color? statusBackColor,

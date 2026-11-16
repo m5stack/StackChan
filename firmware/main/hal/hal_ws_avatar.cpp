@@ -9,11 +9,9 @@
 #include <mooncake.h>
 #include <mooncake_log.h>
 #include <board.h>
-#include <web_socket.h>
+#include "utils/local_network/avatar_socket.h"
 #include <esp_log.h>
-#include <arpa/inet.h>
 #include <jpg/image_to_jpeg.h>
-#include <wifi_station.h>
 #include <ArduinoJson.hpp>
 #include <settings.h>
 #include <mutex>
@@ -22,9 +20,14 @@
 #include <esp_heap_caps.h>
 #include <display.h>
 #include <lvgl_image.h>
-#include <wifi_manager.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
+#include <atomic>
 #include "utils/jpeg_to_image/jpeg_decoder.h"
 #include "utils/secret_logic/secret_logic.h"
+#include "utils/local_network/local_avatar_client.h"
+#include "utils/local_network/local_network_protocol.h"
 
 static std::string _tag = "WS-Avatar";
 
@@ -33,6 +36,16 @@ static const std::string _setting_device_name_key = "device_name";
 
 class WebSocketAvatar {
 public:
+    ~WebSocketAvatar()
+    {
+        _stopping = true;
+        if (_call_response_connection >= 0) GetHAL().onWsCallResponse.disconnect(_call_response_connection);
+        if (_call_end_connection >= 0) GetHAL().onWsCallEnd.disconnect(_call_end_connection);
+        _local_client.reset();
+        stopRemoteTask();
+        _websocket.reset();
+    }
+
     enum class DataType : uint8_t {
         Opus              = 0x01,
         Jpeg              = 0x02,
@@ -54,9 +67,18 @@ public:
         DanceSequence     = 0x14,
         StartAudioStream  = 0x18,
         StopAudioStream   = 0x19,
+        AimedTakePhoto    = 0x1A,
+        AppLanAddress     = 0x1B,
+    };
+
+    enum class Channel : uint8_t {
+        Remote,
+        Local,
     };
 
     struct ReceivedMessage {
+        Channel channel;
+        uint32_t generation;
         bool binary;
         std::vector<uint8_t> data;
     };
@@ -65,23 +87,28 @@ public:
     {
         _url = fmt::format("{}/stackChan/ws?deviceType=StackChan", secret_logic::get_server_url());
 
-        connect();
+        _local_client = std::make_unique<local_network::AvatarClient>(
+            GetHAL().getFactoryMacString(), []() { return secret_logic::generate_handshake_token("stackchan-lan-v1"); },
+            [this](uint32_t generation, std::vector<uint8_t> frame) {
+                enqueueMessage({Channel::Local, generation, true, std::move(frame)});
+            });
+        _local_client->start();
 
-        GetHAL().onWsCallResponse.connect([this](bool accepted) {
+        _call_response_connection = GetHAL().onWsCallResponse.connect([this](bool accepted) {
             if (!isConnected()) {
                 return;
             }
 
             if (accepted) {
                 ESP_LOGI(_tag.c_str(), "Sending AcceptCall");
-                sendPacket(DataType::AcceptCall, nullptr, 0);
+                sendPacket(_call_channel, DataType::AcceptCall, nullptr, 0);
             } else {
                 ESP_LOGI(_tag.c_str(), "Sending DeclineCall");
-                sendPacket(DataType::DeclineCall, nullptr, 0);
+                sendPacket(_call_channel, DataType::DeclineCall, nullptr, 0);
             }
         });
 
-        GetHAL().onWsCallEnd.connect([this](WsSignalSource source) {
+        _call_end_connection = GetHAL().onWsCallEnd.connect([this](WsSignalSource source) {
             if (!isConnected()) {
                 return;
             }
@@ -91,85 +118,64 @@ public:
             }
 
             ESP_LOGI(_tag.c_str(), "Sending EndCall");
-            sendPacket(DataType::EndCall, nullptr, 0);
+            sendPacket(_call_channel, DataType::EndCall, nullptr, 0);
         });
+
+        startRemoteTask();
     }
 
     void connect()
     {
-        auto token = secret_logic::generate_auth_token();
-
-        // 销毁旧实例，确保状态复位
-        _websocket.reset();
-
-        auto& board  = Board::GetInstance();
-        auto network = board.GetNetwork();
-
-        // 创建 WebSocket 实例
-        _websocket = network->CreateWebSocket(1);
-
-        if (!_websocket) {
-            ESP_LOGE(_tag.c_str(), "Failed to create websocket");
-            return;
-        }
-
-        // 设置认证头
-        _websocket->SetHeader("Authorization", token.c_str());
-
-        // 设置回调
-        _websocket->OnConnected([this]() {
-            ESP_LOGI(_tag.c_str(), "Connected to server!");
-            // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Server connected");
+        const auto token = secret_logic::generate_auth_token();
+        if (_stopping) return;
+        auto socket           = std::make_shared<local_network::AvatarSocket>(*Board::GetInstance().GetNetwork(), 1,
+                                                                              local_network::AvatarSocket::RemoteSendTimeoutMs);
+        const auto generation = ++_remote_generation;
+        _remote_connected     = false;
+        socket->SetHeader("Authorization", token.c_str());
+        socket->OnConnected([this, generation]() {
+            if (_stopping || generation != _remote_generation) return;
             _last_heartbeat_time = GetHAL().millis();
-            _websocket->Send("{\"type\":\"hello\", \"msg\":\"Hello from StackChan!\"}");
+            _remote_connected    = true;
+            ESP_LOGI(_tag.c_str(), "Connected to server");
         });
-
-        _websocket->OnDisconnected([this]() {
-            ESP_LOGI(_tag.c_str(), "Disconnected!");
-            // GetHAL().onWsLog.emit(CommonLogLevel::Error, "Server disconnected");
+        socket->OnDisconnected([this, generation]() {
+            if (generation == _remote_generation) _remote_connected = false;
+            ESP_LOGI(_tag.c_str(), "Server disconnected");
         });
-
-        _websocket->OnData([this](const char* data, size_t len, bool binary) {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _msg_queue.push({binary, std::vector<uint8_t>(data, data + len)});
+        socket->OnData([this, generation](const char* data, size_t len, bool binary) {
+            if (_stopping || generation != _remote_generation || len == 0 || len > 256 * 1024) return;
+            enqueueMessage({Channel::Remote, generation, binary, std::vector<uint8_t>(data, data + len)});
         });
-
-        // ESP_LOGI(_tag.c_str(), "Connecting to %s...", _url.c_str());
-        // GetHAL().onWsLog.emit(CommonLogLevel::Info, "Connecting to server...");
-        if (!_websocket->Connect(_url.c_str())) {
-            ESP_LOGE(_tag.c_str(), "Failed to connect");
-            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Connect to server Failed");
+        std::shared_ptr<local_network::AvatarSocket> old;
+        {
+            std::lock_guard<std::mutex> lock(_remote_mutex);
+            old        = std::move(_websocket);
+            _websocket = socket;
         }
-        _last_reconnect_attempt = GetHAL().millis();
+        old.reset();
+        if (!socket->Connect(_url.c_str())) {
+            _remote_connected = false;
+            ESP_LOGW(_tag.c_str(), "Connect to server failed; the LAN connection task continues");
+        } else {
+            std::lock_guard<std::mutex> lock(_send_mutex);
+            socket->Send("{\"type\":\"hello\", \"msg\":\"Hello from StackChan!\"}");
+        }
     }
 
     void update()
     {
-        if (!_websocket) {
-            return;
+        // The endpoint announcement and both connection attempts run outside
+        // this worker, so an unavailable server never blocks LAN controls or
+        // camera capture.
+        processMessages();
+        if (_remote_connected && GetHAL().millis() - _last_heartbeat_time > 10000) {
+            GetHAL().onWsLog.emit(CommonLogLevel::Error, "Heartbeat Timeout");
+            _last_heartbeat_time = GetHAL().millis();
         }
-
-        if (!_websocket->IsConnected()) {
-            if (GetHAL().millis() - _last_reconnect_attempt > 5000) {
-                connect();
-            }
-        } else {
-            processMessages();
-
-            // Check heartbeat timeout
-            if (GetHAL().millis() - _last_heartbeat_time > 10000) {
-                ESP_LOGE(_tag.c_str(), "Heartbeat timeout!");
-                GetHAL().onWsLog.emit(CommonLogLevel::Error, "Heartbeat Timeout");
-                _last_heartbeat_time = GetHAL().millis();
-                return;
-            }
-        }
-
-        if (_is_streaming) {
-            if (GetHAL().millis() - _last_capture_time >= (_is_video_mode ? 700 : 350)) {
-                captureAndSendFrame();
-                _last_capture_time = GetHAL().millis();
-            }
+        if (_is_streaming && GetHAL().millis() - _last_capture_time >= (_is_video_mode ? 700 : 350)) {
+            captureAndSendFrame();
+            _last_capture_time = GetHAL().millis();
         }
     }
 
@@ -182,15 +188,22 @@ public:
                 messages.push_back(std::move(_msg_queue.front()));
                 _msg_queue.pop();
             }
+            _queued_bytes = 0;
         }
 
         for (const auto& msg : messages) {
+            const auto generation =
+                msg.channel == Channel::Local ? _local_client->generation() : _remote_generation.load();
+            if (msg.generation != generation) continue;
             handleMessage(msg);
         }
     }
 
     void handleMessage(const ReceivedMessage& msg)
     {
+        // Media and controls over the LAN prove the session is alive, so a busy
+        // LAN link must not be reported as a remote heartbeat timeout.
+        _last_heartbeat_time = GetHAL().millis();
         if (msg.binary) {
             if (msg.data.size() < 1) return;
             DataType type = static_cast<DataType>(msg.data[0]);
@@ -209,13 +222,13 @@ public:
                 case DataType::StartCameraStream: {
                     ESP_LOGI(_tag.c_str(), "Start Camera Stream");
                     setStreamingEnabled(true);
-                    _websocket->Send("camera stream started");
+                    sendText(msg.channel, "camera stream started");
                     break;
                 }
                 case DataType::StopCameraStream: {
                     ESP_LOGI(_tag.c_str(), "Stop Camera Stream");
                     setStreamingEnabled(false);
-                    _websocket->Send("camera stream stopped");
+                    sendText(msg.channel, "camera stream stopped");
                     break;
                 }
                 case DataType::ControlAvatar: {
@@ -239,8 +252,9 @@ public:
                 case DataType::RequestCall: {
                     // Protocol: [Type(1)] [Length(4)] [Payload]
                     if (msg.data.size() >= 5) {
+                        _call_channel = msg.channel;
                         std::string payload(msg.data.begin() + 5, msg.data.end());
-                        ESP_LOGI(_tag.c_str(), "RequestCall Payload: %s", payload.c_str());
+                        ESP_LOGI(_tag.c_str(), "RequestCall received, payload size: %u", (unsigned)payload.size());
                         GetHAL().onWsCallRequest.emit(payload);
                     }
                     break;
@@ -254,7 +268,7 @@ public:
                     // Protocol: [Type(1)] [Length(4)] [Payload]
                     if (msg.data.size() >= 5) {
                         std::string payload(msg.data.begin() + 5, msg.data.end());
-                        ESP_LOGI(_tag.c_str(), "SetDeviceName Payload: %s", payload.c_str());
+                        ESP_LOGI(_tag.c_str(), "SetDeviceName received, payload size: %u", (unsigned)payload.size());
 
                         Settings settings(_setting_ns, true);
                         settings.SetString(_setting_device_name_key, payload);
@@ -267,20 +281,23 @@ public:
                     Settings settings(_setting_ns, false);
                     auto device_name = settings.GetString(_setting_device_name_key, "StackChan");
 
-                    sendPacket(DataType::GetDeviceName, (const uint8_t*)device_name.c_str(), device_name.size());
+                    sendPacket(msg.channel, DataType::GetDeviceName, (const uint8_t*)device_name.c_str(),
+                               device_name.size());
                     break;
                 }
                 case DataType::HeartbeatPing: {
                     ESP_LOGI(_tag.c_str(), "HeartbeatPing");
-                    _last_heartbeat_time = GetHAL().millis();
-                    sendPacket(DataType::HeartbeatPong, nullptr, 0);
+                    if (msg.channel == Channel::Remote) {
+                        _last_heartbeat_time = GetHAL().millis();
+                    }
+                    sendPacket(msg.channel, DataType::HeartbeatPong, nullptr, 0);
                     break;
                 }
                 case DataType::TextMessage: {
                     // Protocol: [Type(1)] [Length(4)] [Payload]
                     if (msg.data.size() >= 5) {
                         std::string payload(msg.data.begin() + 5, msg.data.end());
-                        ESP_LOGI(_tag.c_str(), "TextMessage Payload: %s", payload.c_str());
+                        ESP_LOGI(_tag.c_str(), "TextMessage received, payload size: %u", (unsigned)payload.size());
 
                         ArduinoJson::JsonDocument doc;
                         auto error = ArduinoJson::deserializeJson(doc, payload);
@@ -356,6 +373,14 @@ public:
                     }
                     break;
                 }
+                case DataType::AppLanAddress: {
+                    // Protocol: [Type(1)] [Length(4)] [JSON]
+                    if (msg.data.size() >= 5) {
+                        const std::string payload(msg.data.begin() + 5, msg.data.end());
+                        applyAnnouncedEndpoint(payload);
+                    }
+                    break;
+                }
                 case DataType::StartAudioStream: {
                     break;
                 }
@@ -366,13 +391,28 @@ public:
                     break;
             }
         } else {
-            ESP_LOGI(_tag.c_str(), "Received text: %.*s", (int)msg.data.size(), (char*)msg.data.data());
+            ESP_LOGI(_tag.c_str(), "Received text, size: %u", (unsigned)msg.data.size());
         }
+    }
+
+    /// The App announces its LAN endpoint over the remote channel; connect on
+    /// receipt instead of waiting for the next retry round.
+    void applyAnnouncedEndpoint(const std::string& payload)
+    {
+        std::vector<std::string> hosts;
+        uint16_t port = 0;
+        if (!local_network::parseEndpointAnnouncement(payload, hosts, port)) {
+            ESP_LOGW(_tag.c_str(), "Ignoring AppLanAddress without a usable IPv4 endpoint");
+            return;
+        }
+        ESP_LOGI(_tag.c_str(), "App announced LAN endpoint: %u address(es), port %u", (unsigned)hosts.size(),
+                 (unsigned)port);
+        _local_client->setEndpoint(std::move(hosts), port);
     }
 
     bool isConnected()
     {
-        return _websocket && _websocket->IsConnected();
+        return (_local_client && _local_client->isConnected()) || _remote_connected;
     }
 
     void captureAndSendFrame()
@@ -389,6 +429,10 @@ public:
             return;
         }
 
+        // AI capture/upload owns the same frame. Skip video instead of blocking
+        // the HAL loop or encoding a frame that another task is replacing.
+        auto frame_lock = camera->TryLockFrame();
+        if (!frame_lock.owns_lock()) return;
         _time_count = esp_timer_get_time();
         if (camera->StreamCaptures()) {
             _interval = esp_timer_get_time() - _time_count;
@@ -400,21 +444,19 @@ public:
             int height               = camera->GetFrameHeight();
             int format               = camera->GetFrameFormat();
 
-            uint8_t* jpeg_data = nullptr;
-            size_t jpeg_len    = 0;
-
-            // 压缩为 JPEG
-            _time_count = esp_timer_get_time();
-            if (image_to_jpeg((uint8_t*)frameData, frameSize, width, height, (v4l2_pix_fmt_t)format, 20, &jpeg_data,
-                              &jpeg_len)) {
-                _interval = esp_timer_get_time() - _time_count;
-                // mclog::info("jpeg encode time: {} ms, size: {}", _interval / 1000, jpeg_len);
-                mclog::info("jpeg encode time: {} ms", _interval / 1000);
-
-                if (jpeg_data) {
-                    sendPacket(DataType::Jpeg, jpeg_data, jpeg_len);  // Type 2 for JPEG
-                    free(jpeg_data);
-                }
+            // Keep LAN JPEG inside the uint16 payload limit. Sending an
+            // oversized frame to remote while LAN is active would be ignored
+            // by the App's LAN-priority media listener.
+            for (const int quality : {20, 10, 5}) {
+                uint8_t* jpeg_data   = nullptr;
+                size_t jpeg_len      = 0;
+                const bool encoded   = image_to_jpeg((uint8_t*)frameData, frameSize, width, height,
+                                                     (v4l2_pix_fmt_t)format, quality, &jpeg_data, &jpeg_len);
+                const bool too_large = _local_client->isConnected() && jpeg_len > local_network::MaxPayloadSize;
+                if (encoded && jpeg_data && !too_large) sendPacket(DataType::Jpeg, jpeg_data, jpeg_len);
+                free(jpeg_data);
+                if (!encoded || !too_large) break;
+                if (quality == 5) ESP_LOGW(_tag.c_str(), "Skipping oversized LAN JPEG");
             }
         }
     }
@@ -425,57 +467,119 @@ public:
     }
 
 private:
-    std::unique_ptr<WebSocket> _websocket;
+    std::shared_ptr<local_network::AvatarSocket> _websocket;
+    std::unique_ptr<local_network::AvatarClient> _local_client;
+    std::mutex _remote_mutex;
+    TaskHandle_t _remote_task         = nullptr;
+    SemaphoreHandle_t _remote_stopped = nullptr;
+    std::atomic_bool _stopping{false};
+    std::atomic_bool _remote_connected{false};
+    std::atomic_uint32_t _remote_generation{0};
+    std::atomic_uint32_t _last_heartbeat_time{0};
     std::string _url;
-    uint32_t _last_reconnect_attempt = 0;
-    uint32_t _last_capture_time      = 0;
-    uint32_t _last_heartbeat_time    = 0;
-    bool _is_streaming               = false;
-    bool _is_video_mode              = false;
+    uint32_t _last_capture_time   = 0;
+    bool _is_streaming            = false;
+    bool _is_video_mode           = false;
+    Channel _call_channel         = Channel::Remote;
+    int _call_response_connection = -1;
+    int _call_end_connection      = -1;
     std::mutex _mutex;
     std::queue<ReceivedMessage> _msg_queue;
-
+    size_t _queued_bytes = 0;
     std::mutex _send_mutex;
+
+    void enqueueMessage(ReceivedMessage message)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        // A delayed UI/camera decoder must not allow media to exhaust the heap.
+        if (_msg_queue.size() >= 16 || _queued_bytes + message.data.size() > 256 * 1024) return;
+        _queued_bytes += message.data.size();
+        _msg_queue.push(std::move(message));
+    }
+
+    void startRemoteTask()
+    {
+        _remote_stopped = xSemaphoreCreateBinary();
+        if (_remote_stopped == nullptr) return;
+        if (xTaskCreate(
+                [](void* argument) {
+                    auto* service         = static_cast<WebSocketAvatar*>(argument);
+                    bool first_attempt    = true;
+                    uint32_t last_attempt = 0;
+                    while (!service->_stopping) {
+                        if (!service->_remote_connected &&
+                            (first_attempt || GetHAL().millis() - last_attempt >= 5000)) {
+                            first_attempt = false;
+                            service->connect();
+                            last_attempt = GetHAL().millis();
+                        }
+                        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(250));
+                    }
+                    xSemaphoreGive(service->_remote_stopped);
+                    vTaskDelete(nullptr);
+                },
+                "avatar_remote", 8192, this, 2, &_remote_task) != pdPASS) {
+            vSemaphoreDelete(_remote_stopped);
+            _remote_stopped = nullptr;
+            _remote_task    = nullptr;
+            ESP_LOGE(_tag.c_str(), "Failed to start remote connection task");
+        }
+    }
+
+    void stopRemoteTask()
+    {
+        _stopping = true;
+        if (_remote_task != nullptr) {
+            xTaskNotifyGive(_remote_task);
+            xSemaphoreTake(_remote_stopped, portMAX_DELAY);
+        }
+        if (_remote_stopped != nullptr) vSemaphoreDelete(_remote_stopped);
+    }
+
+    std::shared_ptr<local_network::AvatarSocket> remoteSocket()
+    {
+        std::lock_guard<std::mutex> lock(_remote_mutex);
+        return _websocket;
+    }
+
+    void sendText(Channel channel, const char* text)
+    {
+        // The App's LAN interface accepts binary messages only; the legacy
+        // text acknowledgements are retained for remote camera commands.
+        if (channel != Channel::Remote || !_remote_connected) return;
+        std::lock_guard<std::mutex> lock(_send_mutex);
+        if (auto socket = remoteSocket()) socket->Send(text);
+    }
+
+    bool sendRemotePacket(DataType type, const uint8_t* data, size_t len)
+    {
+        if (!_remote_connected) return false;
+        auto socket = remoteSocket();
+        if (!socket) return false;
+        std::vector<uint8_t> packet(5 + len);
+        packet[0] = static_cast<uint8_t>(type);
+        local_network::writeBigEndian(packet.data() + 1, len, 4);
+        if (len != 0) memcpy(packet.data() + 5, data, len);
+        if (socket->SendBinary(packet.data(), packet.size())) return true;
+        _remote_connected = false;
+        return false;
+    }
+
+    void sendPacket(Channel channel, DataType type, const uint8_t* data, size_t len)
+    {
+        std::lock_guard<std::mutex> lock(_send_mutex);
+        if (channel == Channel::Local) {
+            _local_client->send(static_cast<uint8_t>(type), data, len);
+        } else {
+            sendRemotePacket(type, data, len);
+        }
+    }
 
     void sendPacket(DataType type, const uint8_t* data, size_t len)
     {
         std::lock_guard<std::mutex> lock(_send_mutex);
-        if (!_websocket || !_websocket->IsConnected()) {
-            return;
-        }
-
-        // mclog::info("sending packet type: {}, len: {}", (int)type, (int)len);
-
-        // static int64_t _time_count = 0;
-        // static int64_t _interval   = 0;
-        // _time_count                = esp_timer_get_time();
-
-        std::vector<uint8_t> packet;
-        packet.reserve(1 + 4 + len);
-
-        // [1 byte type]
-        packet.push_back(static_cast<uint8_t>(type));
-
-        // [4 bytes length] (Big Endian)
-        uint32_t net_len       = htonl((uint32_t)len);
-        const uint8_t* len_ptr = (const uint8_t*)&net_len;
-        packet.push_back(len_ptr[0]);
-        packet.push_back(len_ptr[1]);
-        packet.push_back(len_ptr[2]);
-        packet.push_back(len_ptr[3]);
-
-        // [payload]
-        if (len > 0) {
-            packet.insert(packet.end(), data, data + len);
-        }
-
-        // _interval = esp_timer_get_time() - _time_count;
-        // mclog::info("pack time: {} ms, size: {}", _interval / 1000, packet.size());
-
-        // _time_count = esp_timer_get_time();
-        _websocket->Send(packet.data(), packet.size(), true);
-        // _interval = esp_timer_get_time() - _time_count;
-        // mclog::info("send time: {} ms, size: {}", _interval / 1000, packet.size());
+        if (_local_client->send(static_cast<uint8_t>(type), data, len)) return;
+        sendRemotePacket(type, data, len);
     }
 };
 

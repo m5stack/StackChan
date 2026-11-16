@@ -4,7 +4,7 @@ SPDX-License-Identifier: MIT
 */
 
 import 'package:camera/camera.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class MlKitUtil {
@@ -34,7 +34,8 @@ class MlKitUtil {
       final faces = await _faceDetector.processImage(inputImage);
       onFacesDetected(faces);
     } catch (e) {
-          } finally {
+      debugPrint("Face detection error: $e");
+    } finally {
       _isProcessing = false;
     }
   }

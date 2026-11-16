@@ -16,9 +16,9 @@ bool Hal::updateFirmware(std::function<void(std::string_view)> onLog)
     onLog("Checking firmware updates...");
 
     Ota ota;
-    esp_err_t err = ota.CheckVersion();
-    if (err != ESP_OK) {
-        mclog::tagError(_tag, "failed to check firmware version: {}", esp_err_to_name(err));
+    const auto check = ota.CheckVersion();
+    if (!check) {
+        mclog::tagError(_tag, "failed to check firmware version: {}", check.error().Name());
         onLog("Failed to check firmware updates");
         return false;
     }
@@ -58,7 +58,7 @@ bool Hal::updateFirmware(std::function<void(std::string_view)> onLog)
         std::snprintf(msg, sizeof(msg), "Upgrading firmware: %d%% at %uKB/s", progress,
                             static_cast<unsigned>(speed / 1024));
         onLog(msg);
-          });
+    });
 
     if (!upgrade_success) {
         mclog::tagError(_tag, "firmware upgrade failed: version={}, url={}", firmware_version, firmware_url);

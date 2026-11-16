@@ -1,3 +1,8 @@
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
+
 // =================================================================================
 // Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
 // =================================================================================

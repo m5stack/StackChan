@@ -7,16 +7,12 @@ package device
 
 import (
 	"context"
-	"stackChan/internal/dao"
 	"stackChan/internal/model"
-	"stackChan/internal/model/do"
 	"stackChan/internal/service"
 
-	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/os/gtime"
 
 	"stackChan/api/device/v2"
 )
@@ -31,21 +27,7 @@ func (c *ControllerV2) BindDevice(ctx context.Context, req *v2.BindDeviceReq) (r
 		return nil, gerror.NewCode(gcode.CodeMissingParameter, "Device MAC address cannot be empty")
 	}
 
-	err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		if err = service.CreateMacIfNotExistsWithTx(ctx, tx, req.Mac); err != nil {
-			return err
-		}
-
-		_, err = dao.Device.Ctx(ctx).TX(tx).
-			Where("mac = ?", req.Mac).
-			Data(do.Device{
-				Uid:      uid,
-				BindTime: gtime.Now().Format("Y-m-d H:i:s"),
-			}).
-			Update()
-		return err
-	})
-	if err != nil {
+	if err = service.BindDeviceToUser(ctx, uid, req.Mac); err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "Device binding failed")
 	}
 	return new(v2.BindDeviceRes(true)), nil

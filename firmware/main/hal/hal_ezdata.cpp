@@ -181,7 +181,8 @@ private:
             return "";
         }
 
-        int status_code = http->GetStatusCode();
+        const auto status     = http->GetStatusCode();
+        const int status_code = status.value_or(-1);
 
         if (status_code != 200) {
             ESP_LOGE(_tag.c_str(), "HTTP request failed, status code: %d", status_code);
@@ -219,7 +220,7 @@ private:
             _last_reconnect_attempt = GetHAL().millis();
             return;
         }
-        ESP_LOGI(_tag.c_str(), "get token %s", _token.c_str());
+        ESP_LOGI(_tag.c_str(), "Device authorization acquired");
 
         auto& board  = Board::GetInstance();
         auto network = board.GetNetwork();
@@ -326,7 +327,7 @@ private:
             case CmdType::DeviceGetMatchCode: {
                 if (doc["body"]["pairCode"].is<std::string>()) {
                     std::string pair_code = doc["body"]["pairCode"].as<std::string>();
-                    ESP_LOGI(_tag.c_str(), "Pair code: %s", pair_code.c_str());
+                    ESP_LOGI(_tag.c_str(), "Pair code received");
 
                     if (onPairCodeReceived) {
                         onPairCodeReceived(pair_code);

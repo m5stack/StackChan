@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 
 class NativeBridge {
@@ -15,16 +15,18 @@ class NativeBridge {
     _channel.setMethodCallHandler(_handleMethodCall);
   }
 
-  final MethodChannel _channel = MethodChannel("com.m5stack.stackchan/native");
+  final MethodChannel _channel = const MethodChannel(
+    "com.m5stack.stackchan/native",
+  );
 
   final BasicMessageChannel _audioPlayChannel = const BasicMessageChannel(
     "com.m5stack.stackchan/audio_play",
     BinaryCodec(),
   );
 
-  // final EventChannel recordChannel = const EventChannel(
-  //   "com.m5stack.stackchan/record",
-  // );
+  final EventChannel recordChannel = const EventChannel(
+    "com.m5stack.stackchan/record",
+  );
 
   final Map<Method, Future<dynamic> Function(MethodCall)> _handlers = {};
 
@@ -74,10 +76,12 @@ class NativeBridge {
       if (method != Method.unknown && _handlers.containsKey(method)) {
         return await _handlers[method]!(call);
       } else {
-                return null;
+        debugPrint('Unregistered method: ${call.method}');
+        return null;
       }
     } catch (e) {
-            return null;
+      debugPrint('Error handling method call: $e');
+      return null;
     }
   }
 
@@ -86,7 +90,8 @@ class NativeBridge {
     try {
       return await _channel.invokeMethod(method.name, arguments);
     } catch (e) {
-            return null;
+      debugPrint('Error sending message to native: $e');
+      return null;
     }
   }
 
@@ -95,7 +100,8 @@ class NativeBridge {
     try {
       await _audioPlayChannel.send(pcmData);
     } catch (e) {
-          }
+      debugPrint("Audio stream send failed: $e");
+    }
   }
 }
 

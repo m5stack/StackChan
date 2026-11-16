@@ -6,7 +6,8 @@ SPDX-License-Identifier: MIT
 import 'dart:async';
 
 import 'package:flex_color_picker/flex_color_picker.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:stack_chan/view/util/theme_setting.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart' hide FormData, MultipartFile;
@@ -20,6 +21,7 @@ import 'package:stack_chan/util/music_util.dart';
 import 'package:stack_chan/view/util/grid_coordinate_joystick.dart';
 import 'package:uuid/uuid.dart';
 
+import '../util/popup.dart';
 import '../util/stackchan_robot_box.dart';
 import 'add_music.dart';
 
@@ -86,9 +88,8 @@ class _RecordDanceState extends State<RecordDance> {
   String formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
-    return DateFormat(
-      'mm:ss',
-    ).format(DateTime(0, 0, 0, 0, minutes, remainingSeconds));
+    return DateFormat('mm:ss')
+        .format(DateTime(0, 0, 0, 0, minutes, remainingSeconds));
   }
 
   void recordDanceFrame() {
@@ -104,7 +105,11 @@ class _RecordDanceState extends State<RecordDance> {
       durationMs: 100,
     );
     recordedDanceFrames.add(danceFrame);
-      }
+    debugPrint(
+      "Recorded frame ${recordedDanceFrames.length}: "
+      "Yaw=${danceFrame.yawServo.angle}, Pitch=${danceFrame.pitchServo.angle}, Duration=100ms",
+    );
+  }
 
   Widget buildBandFrequencyChart(List<double> frequencies, double progress) {
     if (frequencies.isEmpty) {
@@ -129,7 +134,7 @@ class _RecordDanceState extends State<RecordDance> {
                     height: normalizedFreq * 250,
                     decoration: BoxDecoration(
                       color: CupertinoColors.systemBlue.withValues(alpha: 0.7),
-                      borderRadius: .vertical(top: .circular(2)),
+                      borderRadius: const .vertical(top: .circular(2)),
                     ),
                   ),
                 ),
@@ -170,10 +175,9 @@ class _RecordDanceState extends State<RecordDance> {
                     style: theme.textTheme.textStyle,
                   ),
                 ),
-                Spacer(),
+                const Spacer(),
                 CupertinoButton(
                   padding: .zero,
-                  minimumSize: .zero,
                   child: Row(
                     spacing: 4,
                     mainAxisSize: .min,
@@ -255,11 +259,9 @@ class _RecordDanceState extends State<RecordDance> {
     } else {
       listWidget.add(
         CupertinoButton(
-          color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-          borderRadius: .circular(12),
           padding: .zero,
-          minimumSize: .zero,
-          child: SizedBox(
+          color: CupertinoColors.tertiarySystemBackground.resolveFrom(context),
+          child: const SizedBox(
             height: 60,
             child: Row(
               crossAxisAlignment: .center,
@@ -271,9 +273,9 @@ class _RecordDanceState extends State<RecordDance> {
             ),
           ),
           onPressed: () {
-            showCupertinoSheet(
+            showCustomCupertinoSheet(
               context: context,
-              builder: (context) {
+              scrollableBuilder: (context, scrollController) {
                 return AddMusic(
                   onResult: (url) async {
                     final musicInfo = await MusicUtil.shared.getMusicInfoAsync(
@@ -321,7 +323,7 @@ class _RecordDanceState extends State<RecordDance> {
         height: 200,
         width: .infinity,
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
+          color: CupertinoColors.tertiarySystemBackground.resolveFrom(context),
           borderRadius: BorderRadius.circular(25),
         ),
         child: Obx(
@@ -350,21 +352,16 @@ class _RecordDanceState extends State<RecordDance> {
       ),
     );
 
-    listWidget.add(SizedBox(height: 15));
+    listWidget.add(const SizedBox(height: 15));
 
     listWidget.add(
       Row(
         children: [
           Text("Light strip left color", style: theme.textTheme.textStyle),
-          Spacer(),
+          const Spacer(),
           Obx(
             () => CupertinoButton(
-              borderRadius: .circular(50),
-              color: CupertinoColors.systemGroupedBackground.resolveFrom(
-                context,
-              ),
-              minimumSize: .zero,
-              padding: .all(5),
+              padding: const .all(5),
               child: Container(
                 width: 40,
                 height: 40,
@@ -382,21 +379,16 @@ class _RecordDanceState extends State<RecordDance> {
       ),
     );
 
-    listWidget.add(SizedBox(height: 15));
+    listWidget.add(const SizedBox(height: 15));
 
     listWidget.add(
       Row(
         children: [
           Text("Light strip right color", style: theme.textTheme.textStyle),
-          Spacer(),
+          const Spacer(),
           Obx(
             () => CupertinoButton(
-              borderRadius: .circular(50),
-              color: CupertinoColors.systemGroupedBackground.resolveFrom(
-                context,
-              ),
-              minimumSize: .zero,
-              padding: .all(5),
+              padding: const .all(5),
               child: Container(
                 width: 40,
                 height: 40,
@@ -413,35 +405,56 @@ class _RecordDanceState extends State<RecordDance> {
         ],
       ),
     );
-
+    final mediaQueryPadding = MediaQuery.paddingOf(context);
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
-      navigationBar: CupertinoNavigationBar.large(
-        backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
-        largeTitle: Text("Record Dance"),
-        trailing: CupertinoButton(
-          sizeStyle: .medium,
-          onPressed: () async {
-            if (model.isRecording.value) {
-              stopRecordingAndPlayback();
-            }
-            CupertinoSheetRoute.popSheet(context);
-            //directreturn
-            widget.onResult?.call(
-              recordedDanceFrames,
-              model.musicUrl.value ?? "",
-              model.danceName.value,
-            );
-          },
-          child: Icon(CupertinoIcons.check_mark),
-        ),
-        leading: CupertinoButton(
-          sizeStyle: .medium,
-          child: Icon(CupertinoIcons.xmark),
-          onPressed: () => CupertinoSheetRoute.popSheet(context),
-        ),
+      backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
+        context,
       ),
-      child: ListView(padding: .all(15), children: listWidget),
+      child: CustomScrollView(
+        slivers: [
+          CupertinoSliverNavigationBar(
+            backgroundColor: ThemeSetting.cupertinoNavigationBarBackgroundColor(
+              context,
+            ),
+            border: ThemeSetting.cupertinoNavigationBarBorder(context),
+            padding: ThemeSetting.navigationBarPadding,
+            largeTitle: const Text("Record Dance"),
+            trailing: CupertinoButton(
+              sizeStyle: .medium,
+              foregroundColor: CupertinoTheme.of(context).primaryColor,
+              onPressed: () async {
+                if (model.isRecording.value) {
+                  stopRecordingAndPlayback();
+                }
+                closeCustomCupertinoSheet(context);
+                // Return the recording to the caller.
+                widget.onResult?.call(
+                  recordedDanceFrames,
+                  model.musicUrl.value ?? "",
+                  model.danceName.value,
+                );
+              },
+              child: const Icon(CupertinoIcons.check_mark),
+            ),
+            leading: CupertinoButton(
+              sizeStyle: .medium,
+              onPressed: () {
+                closeCustomCupertinoSheet(context);
+              },
+              child: const Icon(CupertinoIcons.xmark),
+            ),
+          ),
+          SliverPadding(
+            padding: .only(
+              left: 20 + mediaQueryPadding.left,
+              right: 20 + mediaQueryPadding.right,
+              bottom: 20 + mediaQueryPadding.bottom,
+              top: 20,
+            ),
+            sliver: SliverList.list(children: listWidget),
+          ),
+        ],
+      ),
     );
   }
 
@@ -537,7 +550,7 @@ class _RecordDanceState extends State<RecordDance> {
       final currentPosition = MusicUtil.shared.getCurrentPosition();
 
       if (duration > 0 && currentPosition >= 0) {
-        //calculatenormalizeprogress (0.0 to 1.0)
+        // Normalized progress in the range 0.0 to 1.0.
         final progress = currentPosition / duration;
         model.playbackProgress.value = progress.clamp(0.0, 1.0);
       }

@@ -1,6 +1,7 @@
-// SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-//
-// SPDX-License-Identifier: MIT
+/*
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 enum MsgType {
   opus(0x01),
@@ -26,13 +27,14 @@ enum MsgType {
   deviceOnline(0x17),
   onAudio(0x18),
   offAudio(0x19),
-  aimedTakePhoto(0x1A);
+  aimedTakePhoto(0x1A),
+  appLanAddress(0x1B);
 
-  final int value; //custom，andiOSrawValuefullyfor
+  final int value; // Matches the raw values used on iOS.
 
   const MsgType(this.value);
 
-  //CurrentlySerializelogic:valueAnd / WhileNon-index
+  // Serialize by value rather than by enum index so the wire format stays stable.
   String toJson() => value.toString();
 
   static MsgType fromJson(String json) {

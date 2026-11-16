@@ -3,10 +3,10 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:stack_chan/native/native_bluetooth_bridge.dart';
 
 class BlueDeviceInfo {
-  final BluetoothDevice device;
+  final NativeBluetoothDevice device;
   final Map<String, dynamic> advertisementData;
   final int rssi;
   DateTime lastSeen;

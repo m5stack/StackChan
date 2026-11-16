@@ -9,7 +9,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"path/filepath"
 	v1 "stackChan/api/file/v1"
 
 	"github.com/gogf/gf/v2/errors/gcode"
@@ -17,51 +16,49 @@ import (
 )
 
 func AddFile(ctx context.Context, req *v1.FileReq) (res *v1.FileRes, err error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	baseDir := "file"
-	fileDir := filepath.Join(currentDir, baseDir)
-
-	if req.Directory != "" {
-		fileDir = filepath.Join(fileDir, req.Directory)
-	}
-
-	if _, err := os.Stat(fileDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(fileDir, os.ModePerm); err != nil {
-			return nil, err
-		}
-	}
-
-	if req.File.Size == 0 || req.Name == "" {
+	if req.File == nil || req.File.Size == 0 || req.Name == "" {
 		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "file or filename is empty")
 	}
 
-	filePath := filepath.Join(fileDir, req.Name)
-
-	file, err := req.File.Open()
+	fileDir, filePath, returnPath, err := buildUploadFilePath(req.Directory, req.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	fileBytes, err := io.ReadAll(file)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return nil, gerror.Wrap(err, "failed to determine upload root")
+	}
+	uploadRoot, err := openUploadRoot(currentDir)
 	if err != nil {
 		return nil, err
 	}
+	defer uploadRoot.Close()
 
-	if err := os.WriteFile(filePath, fileBytes, os.ModePerm); err != nil {
-		return nil, err
+	if fileDir != "." {
+		if err := uploadRoot.MkdirAll(fileDir, 0o755); err != nil {
+			return nil, gerror.Wrap(err, "failed to create upload directory")
+		}
 	}
 
-	_ = file.Close()
+	source, err := req.File.Open()
+	if err != nil {
+		return nil, gerror.Wrap(err, "failed to open uploaded file")
+	}
+	defer source.Close()
 
-	var returnPath string
-	if req.Directory != "" {
-		returnPath = filepath.Join(baseDir, req.Directory, req.Name)
-	} else {
-		returnPath = filepath.Join(baseDir, req.Name)
+	target, err := uploadRoot.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, gerror.Wrap(err, "failed to open upload destination")
+	}
+
+	_, copyErr := io.Copy(target, source)
+	closeErr := target.Close()
+	if copyErr != nil {
+		return nil, gerror.Wrap(copyErr, "failed to write uploaded file")
+	}
+	if closeErr != nil {
+		return nil, gerror.Wrap(closeErr, "failed to close uploaded file")
 	}
 
 	return &v1.FileRes{

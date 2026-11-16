@@ -19,13 +19,13 @@ class RsaUtil {
     ),
   );
 
-  ///RSA Encrypt（OAEP + SHA-256）
+  /// Encrypt [plainText] with RSA-OAEP and SHA-256.
   static String encrypt(String plainText) {
     final encrypted = _encrypter.encrypt(plainText);
     return encrypted.base64;
   }
 
-  ///RSA Decrypt（OAEP + SHA-256）
+  /// Decrypt a base64 [cipherText] with RSA-OAEP and SHA-256.
   static String decrypt(String cipherText) {
     final encrypted = Encrypted.fromBase64(cipherText);
     return _encrypter.decrypt(encrypted);

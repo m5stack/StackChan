@@ -1,12 +1,11 @@
 /*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
+SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+SPDX-License-Identifier: MIT
+*/
 
 /// Utility class for MAC address validation and formatting
 ///
-/// Supports two common MAC address formats:
+/// Supports three common MAC address formats:
 /// 1. Standard colon-separated format: 00:11:22:33:44:55
 /// 2. Hyphen-separated format: 00-11-22-33-44-55
 /// 3. Pure 12-character format: 001122334455

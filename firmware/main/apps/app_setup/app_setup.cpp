@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "app_setup.h"
+#include "workers/feature_toggle.h"
 #include <hal/hal.h>
 #include <mooncake.h>
 #include <mooncake_log.h>
@@ -50,6 +51,11 @@ void AppSetup::onOpen()
                   _destroy_menu    = true;
                   _need_warm_reset = true;
                   _worker          = std::make_unique<WifiSetupWorker>();
+              }},
+             {"Testing service",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<NetworkTestWorker>();
               }}},
         },
         {
@@ -136,6 +142,14 @@ void AppSetup::onOpen()
                 //       _worker       = std::make_unique<FactoryResetWorker>();
                 //   }}
             },
+        },
+        {
+            "Apps",
+            {{"App visibility",
+              [&]() {
+                  _destroy_menu = true;
+                  _worker       = std::make_unique<FeatureToggleWorker>();
+              }}},
         },
     };
 

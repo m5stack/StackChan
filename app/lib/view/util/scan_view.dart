@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 SPDX-License-Identifier: MIT
 */
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -64,7 +64,7 @@ class _ScanViewState extends State<ScanView>
                 "assets/viewfinder.svg",
                 width: viewfinderSize,
                 height: viewfinderSize,
-                colorFilter: .mode(CupertinoColors.white, .srcIn),
+                colorFilter: const .mode(CupertinoColors.white, .srcIn),
               ),
             ),
             buildFlashlightButton(width, height, viewfinderSize),
@@ -100,11 +100,12 @@ class _ScanViewState extends State<ScanView>
       left: left,
       child: CupertinoButton(
         padding: .zero,
+        sizeStyle: .medium,
         child: SvgPicture.asset(
           "assets/flashlight.off.fill.svg",
           width: buttonSize,
           height: buttonSize,
-          colorFilter: .mode(CupertinoColors.white, .srcIn),
+          colorFilter: const .mode(CupertinoColors.white, .srcIn),
         ),
         onPressed: () async {
           await controller.toggleTorch();
