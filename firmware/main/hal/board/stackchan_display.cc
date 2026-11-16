@@ -349,6 +349,7 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
         avatar.setEmotion(Emotion::Sleepy);
         avatar.setSpeech("Zzz…");
         is_sleeping_ = true;
+        stackchan.ledMood().setState(addon::LedMood::State::Sleeping);
         // avatar.mouth().setWeight(10);
 
         // Stop idle motion
@@ -503,8 +504,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
             speaking_modifier_id_ = -1;
         }
 
-        GetHAL().setRgbColor(0, 0, 50, 0);
-        GetHAL().refreshRgb();
+        stackchan.ledMood().setState(addon::LedMood::State::Listening);
 
     } else if (strcmp(status, Lang::Strings::STANDBY) == 0) {
         _is_xiaozhi_ready = true;
@@ -518,16 +518,17 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
         is_idle = true;
 
-        GetHAL().setRgbColor(0, 0, 0, 0);
-        GetHAL().refreshRgb();
+        stackchan.ledMood().setState(addon::LedMood::State::Idle);
 
     } else if (strcmp(status, Lang::Strings::SPEAKING) == 0) {
         if (speaking_modifier_id_ < 0) {
             speaking_modifier_id_ = stackchan.addModifier(std::make_unique<SpeakingModifier>(0, 180, false));
         }
 
-        GetHAL().setRgbColor(0, 0, 0, 50);
-        GetHAL().refreshRgb();
+        stackchan.ledMood().setState(addon::LedMood::State::Speaking);
+    } else if (strcmp(status, Lang::Strings::CONNECTING) == 0) {
+        stackchan.ledMood().setState(addon::LedMood::State::Connecting);
+        avatar.setSpeech(status);
     } else {
         avatar.setSpeech(status);
     }

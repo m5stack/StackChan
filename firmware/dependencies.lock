@@ -781,6 +781,16 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 3.0.3
+  espressif/mdns:
+    component_hash: b679eafd0acae2066e2645bd91d073e33ca5be515e2545cd3c4e55a3e3bce3cb
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.13.1
   espressif/mqtt:
     component_hash: fb18bc3b65aa8c94693a9811ffc322cca8a65d92d5ec84983d3e385080e3969c
     dependencies:
@@ -978,6 +988,7 @@ direct_dependencies:
 - espressif/iot_usbh_rndis
 - espressif/knob
 - espressif/led_strip
+- espressif/mdns
 - espressif2022/image_player
 - idf
 - lvgl/lvgl

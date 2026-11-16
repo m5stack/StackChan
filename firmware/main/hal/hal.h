@@ -40,6 +40,13 @@ struct WsTextMessage_t {
     std::string content;
 };
 
+struct ReefwatchFrame_t {
+    std::shared_ptr<LvglImage> image;
+    std::string camera;
+    std::string labels;
+    bool isLive = false;
+};
+
 /**
  * @brief
  *
@@ -252,6 +259,15 @@ public:
     uitk::Signal<CommonLogLevel, std::string_view> onWsLog;
 
     void startWebSocketAvatarService(std::function<void(std::string_view)> onStartLog);
+
+    /* ------------------------------- LAN server ------------------------------- */
+    void startLanServer();  // reefwatch frames + MCP for LAN agents, once Wi-Fi is up
+
+    /* -------------------------------- Reefwatch ------------------------------- */
+    uitk::Signal<const ReefwatchFrame_t&> onReefwatchFrame;
+
+    void setReefwatchLiveCamera(std::string_view camera);  // empty to stop the live view
+    std::string getReefwatchLiveCamera();
 
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;

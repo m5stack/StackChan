@@ -7,6 +7,7 @@
 #include "modifiable.h"
 #include "modifiers/modifiers.h"
 #include "json/json_helper.h"
+#include "addons/led_mood/led_mood.h"
 #include <memory>
 
 namespace stackchan {
@@ -101,6 +102,16 @@ public:
     }
 
     /**
+     * @brief LED moods: neon light colors driven by conversation state and emotion
+     *
+     * @return addon::LedMood&
+     */
+    addon::LedMood& ledMood()
+    {
+        return _led_mood;
+    }
+
+    /**
      * @brief Add modifier
      *
      * @param modifier
@@ -140,6 +151,7 @@ public:
             _motion->update();
         }
 
+        _led_mood.update(*this);
         _left_neon_light.update();
         _right_neon_light.update();
     }
@@ -183,6 +195,7 @@ private:
     std::unique_ptr<motion::Motion> _motion;
     addon::LeftNeonLight _left_neon_light;
     addon::RightNeonLight _right_neon_light;
+    addon::LedMood _led_mood;
     ObjectPool<Modifier> _modifier_pool;
 };
 

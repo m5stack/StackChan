@@ -11,6 +11,79 @@ config STACKCHAN_SERVER_URL
 
 endmenu
 
+menu "LAN Services"
+
+config STACKCHAN_LAN_SERVER_PORT
+    int "HTTP port"
+    default 80
+    help
+        One small HTTP server on the local network hosts the services below.
+
+config STACKCHAN_LAN_HOSTNAME
+    string "mDNS hostname"
+    default "stackchan"
+    help
+        The robot answers as <hostname>.local on the LAN.
+
+config STACKCHAN_LAN_MCP_ENABLE
+    bool "MCP server for LAN agents (e.g. ESP-Claw)"
+    default y
+    help
+        Exposes the robot's own MCP tools (head, LEDs, reminders, camera view)
+        as JSON-RPC over HTTP POST, and advertises them via mDNS as _mcp._tcp
+        so ESP-Claw's mcp_client can discover them. There is no
+        authentication: anything on the LAN can move the head.
+
+config STACKCHAN_LAN_MCP_ENDPOINT
+    string "MCP endpoint path"
+    default "mcp_server"
+    depends on STACKCHAN_LAN_MCP_ENABLE
+    help
+        Served at http://<robot>/<endpoint>. "mcp_server" is ESP-Claw's default.
+
+endmenu
+
+menu "Reefwatch Camera View"
+
+config STACKCHAN_REEFWATCH_ENABLE
+    bool "Show reefwatch camera frames on screen"
+    default y
+    help
+        Accepts JPEG frames from the reefwatch detector
+        (github.com/adampog/reefwatch) on the LAN server and shows them
+        full screen. POST /frame takes the JPEG, GET /live tells reefwatch
+        which camera to stream live.
+
+config STACKCHAN_REEFWATCH_TOKEN
+    string "Shared token (X-Reefwatch-Token header)"
+    default ""
+    depends on STACKCHAN_REEFWATCH_ENABLE
+    help
+        Must match REEFWATCH_STACKCHAN_TOKEN on the reefwatch side. Empty
+        accepts any request on the LAN. Set it in sdkconfig.defaults.local.
+
+config STACKCHAN_REEFWATCH_SHOW_MS
+    int "How long a detection stays on screen (ms)"
+    default 8000
+    depends on STACKCHAN_REEFWATCH_ENABLE
+
+config STACKCHAN_REEFWATCH_LIVE_FPS
+    int "Live view frame rate requested from reefwatch"
+    default 5
+    range 1 15
+    depends on STACKCHAN_REEFWATCH_ENABLE
+
+config STACKCHAN_REEFWATCH_CAMERA_YAW
+    string "Head yaw per camera, in degrees"
+    default ""
+    depends on STACKCHAN_REEFWATCH_ENABLE
+    help
+        Turns the head toward a camera when it sees something, e.g.
+        "front=-45,garden=45" (negative is the robot's left). Empty
+        keeps the head still.
+
+endmenu
+
 menu "Xiaozhi Assistant"
 
 config OTA_URL
