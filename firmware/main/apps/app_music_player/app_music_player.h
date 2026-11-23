@@ -91,7 +91,7 @@ private:
         bool valid           = false;
     };
 
-    /* ---------------------------- SD & Escaneo ---------------------------- */
+    /* --------------------------- SD & Scanning ---------------------------- */
     bool mount_sd();
     void unmount_sd();
     void scan_tracks();
@@ -101,7 +101,7 @@ private:
     static std::string clip_text(const std::string& s, size_t max_chars);
     static std::string fmt_time(int32_t ms);
 
-    /* -------------------------- Sondeo y Audio ---------------------------- */
+    /* ------------------------- Probing & Audio ---------------------------- */
     static AudioProbeInfo probe_wav(const std::string& path);
     static AudioProbeInfo probe_mp3(const std::string& path);
     static AudioProbeInfo probe_audio(const std::string& path, bool is_mp3);
@@ -124,7 +124,7 @@ private:
     int random_index() const;
     void track_finished();
 
-    /* ------------------------ Robot & Persistencia NVS -------------------- */
+    /* ---------------------- Robot & NVS Persistence ----------------------- */
     void load_saved_prefs();
     void save_settings();
     void save_last_track();
@@ -134,7 +134,7 @@ private:
     void set_all_rgb(uint32_t hex_color);
     void beat_update(uint32_t now);
 
-    /* ------------------------------ Interfaz UI --------------------------- */
+    /* ------------------------------- UI ----------------------------------- */
     void set_status(const std::string& msg, uint32_t duration_ms = 2500);
     std::string audio_state_summary() const;
 
@@ -151,7 +151,7 @@ private:
     void refresh_list_ui();
     void refresh_head_ui();
 
-    /* ------------------------------ Estado -------------------------------- */
+    /* ------------------------------ State --------------------------------- */
     bool _sd_mounted          = false;
     void* _sd_card_handle     = nullptr;
     bool _scan_error          = false;
@@ -166,13 +166,13 @@ private:
     std::string _saved_track_path;
     int _saved_track_idx      = 0;
 
-    // Preferencias persistentes del reproductor
+    // Persistent player preferences
     int _volume               = 60;
     int _loop_mode            = 0;      // 0: OFF, 1: 1, 2: ALL
     bool _robot_move          = true;
     bool _lights_on           = true;
     bool _shuffle_on          = false;
-    int _y_home_deg           = 45;     // 0..90 grados (45 = frente)
+    int _y_home_deg           = 45;     // 0..90 degrees (45 = facing forward)
     int _sway_side            = 1;
 
     ScreenMode _mode          = ScreenMode::Main;
@@ -187,7 +187,7 @@ private:
     int _batt_pct             = -1;
     bool _batt_chg            = false;
 
-    // Sincronización con tarea de audio en segundo plano
+    // Background audio task synchronization
     mutable std::mutex _audio_mutex;
     std::atomic<bool> _task_running{false};
     std::atomic<bool> _task_exited{true};
@@ -205,10 +205,10 @@ private:
     int32_t _target_start_ms  = 0;
     AudioProbeInfo _active_probe;
 
-    /* --------------------------- Widgets LVGL ----------------------------- */
+    /* --------------------------- LVGL Widgets ----------------------------- */
     lv_obj_t* _root_screen    = nullptr;
 
-    // 1. Vista Principal (Main)
+    // 1. Main view
     lv_obj_t* _main_cont      = nullptr;
     lv_obj_t* _lbl_title      = nullptr;
     lv_obj_t* _batt_cont      = nullptr;
@@ -224,7 +224,7 @@ private:
     lv_obj_t* _lbl_vol_ver    = nullptr;
     lv_obj_t* _lbl_status     = nullptr;
 
-    // Zona central con carita clásica de StackChan animada y notas flotantes
+    // Center stage: animated classic StackChan face + floating musical notes
     lv_obj_t* _stage_cont     = nullptr;
     lv_obj_t* _face_card      = nullptr;
     lv_obj_t* _face_eye_l     = nullptr;
@@ -239,11 +239,11 @@ private:
     };
     BtnWidget _main_btns[6];
 
-    // 2. Vista Configuración (Settings)
+    // 2. Settings view
     lv_obj_t* _settings_cont  = nullptr;
     BtnWidget _cfg_btns[7];   // loop, shuf, lights, move, playlist, head, menu
 
-    // 3. Vista Lista (List)
+    // 3. Playlist view
     lv_obj_t* _list_cont        = nullptr;
     lv_obj_t* _lbl_list_hdr     = nullptr;
     lv_obj_t* _lbl_list_count   = nullptr;
@@ -257,7 +257,7 @@ private:
     lv_obj_t* _btn_open_head    = nullptr;
     lv_obj_t* _btn_exit_app     = nullptr;
 
-    // 4. Vista Ajuste de Cabeza (Head)
+    // 4. Head calibration view
     lv_obj_t* _head_cont        = nullptr;
     lv_obj_t* _lbl_head_hdr     = nullptr;
     lv_obj_t* _lbl_head_target  = nullptr;

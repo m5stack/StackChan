@@ -49,7 +49,7 @@ constexpr const char* TAG        = "MUSIC";
 constexpr const char* APP_VERSION = "v4.0";
 constexpr const char* TRACK_DIR  = "/sd";
 
-// Claves NVS (Keep it simple: un solo namespace para toda la app)
+// NVS keys (single namespace for all player preferences and last track)
 constexpr const char* NVS_NS         = "music_player";
 constexpr const char* KEY_Y_HOME     = "y_home";
 constexpr const char* KEY_VOLUME     = "volume";
@@ -75,7 +75,7 @@ constexpr int MAX_TRACKS         = 2000;
 constexpr int PAGE_ROWS          = 5;
 constexpr int MAX_SCAN_DEPTH     = 3;
 
-// Paleta coherente con el diseño oscuro
+// Dark UI color palette
 constexpr uint32_t COL_BG        = 0x0B0F1A;
 constexpr uint32_t COL_CARD      = 0x151B2E;
 constexpr uint32_t COL_CARD_HI   = 0x232C4A;
@@ -94,7 +94,7 @@ constexpr uint32_t PALETTE[8] = {
     0x00C7BE, 0x007AFF, 0x5856D6, 0xAF52DE,
 };
 
-// Geometría superior conservada
+// Top status/progress geometry
 constexpr int TITLE_Y  = 4;
 constexpr int BAR_X    = 8;
 constexpr int BAR_Y    = 26;
@@ -103,13 +103,13 @@ constexpr int BAR_H    = 6;
 constexpr int TIME_Y   = 35;
 constexpr int STATUS_Y = 49;
 
-// Área central del avatar de Naruto (y = 63 .. 184)
+// Center stage area (y = 64 .. 184)
 constexpr int STAGE_X  = 8;
 constexpr int STAGE_Y  = 64;
 constexpr int STAGE_W  = 304;
 constexpr int STAGE_H  = 120;
 
-// Barra inferior de 6 botones (y = 190 .. 232)
+// Bottom 6-button control bar (y = 190 .. 232)
 constexpr int BAR6_Y   = 190;
 constexpr int BAR6_H   = 42;
 constexpr int BAR6_W   = 48;
@@ -130,9 +130,9 @@ struct CfgBtnSpec {
     int h;
 };
 
-// Pantalla de configuración siguiendo Diapositiva 2:
-// Fila 1: LOOP | SHUFFLE | LIGHTS | MOVE
-// Fila 2: PLAYLIST | CABEZA | MENU
+// Settings screen layout:
+// Row 1: LOOP | SHUFFLE | LIGHTS | MOVE
+// Row 2: PLAYLIST | HEAD | EXIT
 constexpr CfgBtnSpec CFG_BTN_SPECS[7] = {
     {"loop",     8,   48,  73, 56},
     {"shuf",     85,  48,  73, 56},
@@ -183,7 +183,7 @@ void style_flat_box(lv_obj_t* obj, uint32_t bg_hex, int radius = 0)
 }  // namespace
 
 /* -------------------------------------------------------------------------- */
-/*                          Ciclo de vida Mooncake                            */
+/*                           Mooncake Lifecycle                               */
 /* -------------------------------------------------------------------------- */
 
 AppMusicPlayer::AppMusicPlayer()
@@ -228,11 +228,11 @@ void AppMusicPlayer::onOpen()
     _byte_rate            = 0;
     _decoded_bytes        = 0;
 
-    // 1. Cargar preferencias y última pista guardada desde NVS
+    // 1. Load saved preferences and last played track from NVS
     load_saved_prefs();
     GetHAL().setSpeakerVolume(static_cast<uint8_t>(_volume), false);
 
-    // 2. Preparar servos y LEDs
+    // 2. Initialize servos and LEDs
     GetHAL().setServoPowerEnabled(true);
     rgb_off();
     auto& stackchan = GetStackChan();
@@ -241,11 +241,11 @@ void AppMusicPlayer::onOpen()
     stackchan.motion().setAutoTorqueReleaseEnabled(false);
     move_home(600);
 
-    // 3. Montar microSD y escanear pistas (.wav y .mp3)
+    // 3. Mount microSD card and scan tracks (.wav and .mp3)
     _sd_mounted = mount_sd();
     scan_tracks();
 
-    // 5. Restaurar la última canción que sonó (por ruta exacta, con fallback al último índice)
+    // 4. Restore last played track (by exact path, falling back to last index)
     if (!_tracks.empty()) {
         int restored = -1;
         if (!_saved_track_path.empty()) {
@@ -268,10 +268,10 @@ void AppMusicPlayer::onOpen()
         _byte_rate   = info.byte_rate;
     }
 
-    // 6. Iniciar tarea de decodificación de audio (pila en PSRAM)
+    // 5. Start audio decoding task (stack in PSRAM)
     start_audio_task();
 
-    // 7. Construir UI LVGL
+    // 6. Build LVGL UI
     {
         LvglLockGuard lock;
         build_ui();
@@ -360,7 +360,7 @@ void AppMusicPlayer::onClose()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              Tarjeta microSD                               */
+/*                               microSD Card                                 */
 /* -------------------------------------------------------------------------- */
 
 bool AppMusicPlayer::mount_sd()
@@ -559,7 +559,7 @@ void AppMusicPlayer::scan_tracks()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                          Sondeo WAV / MP3 y Audio                          */
+/*                         WAV / MP3 Probing & Audio                          */
 /* -------------------------------------------------------------------------- */
 
 AppMusicPlayer::AudioProbeInfo AppMusicPlayer::probe_wav(const std::string& path)
@@ -966,7 +966,7 @@ void AppMusicPlayer::audio_task_loop()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         Controles de Reproducción                          */
+/*                            Playback Controls                               */
 /* -------------------------------------------------------------------------- */
 
 void AppMusicPlayer::play_track(int idx, int32_t start_ms)
@@ -982,7 +982,7 @@ void AppMusicPlayer::play_track(int idx, int32_t start_ms)
     std::string tr_path(tr.path.c_str(), tr.path.size());
     auto info = probe_audio(tr_path, tr.is_mp3);
     if (!info.valid) {
-        set_status(tr.is_mp3 ? "MP3 NO VALIDO" : "WAV NO VALIDO");
+        set_status(tr.is_mp3 ? "INVALID MP3" : "INVALID WAV");
         _playing = false;
         _started = false;
         return;
@@ -1015,7 +1015,7 @@ void AppMusicPlayer::play_track(int idx, int32_t start_ms)
     _audio_err.clear();
     _last_beat = 0xFFFFFFFF;
 
-    // Guardar última canción inmediatamente
+    // Persist last played track immediately
     save_last_track();
 }
 
@@ -1059,7 +1059,7 @@ void AppMusicPlayer::seek_to(int32_t ms)
         return;
     }
     if (_byte_rate.load() == 0) {
-        set_status("SALTO NO DISPONIBLE");
+        set_status("SEEK UNAVAILABLE");
         return;
     }
     if (ms < 0) {
@@ -1106,10 +1106,10 @@ void AppMusicPlayer::toggle_move()
     save_settings();
     if (_robot_move) {
         _last_beat = 0xFFFFFFFF;
-        set_status("MOVIMIENTO ON");
+        set_status("MOTION ON");
     } else {
         move_home(500);
-        set_status("MOVIMIENTO OFF");
+        set_status("MOTION OFF");
     }
 }
 
@@ -1119,10 +1119,10 @@ void AppMusicPlayer::toggle_lights()
     save_settings();
     _last_beat = 0xFFFFFFFF;
     if (_lights_on) {
-        set_status("LUCES ON");
+        set_status("LIGHTS ON");
     } else {
         rgb_off();
-        set_status("LUCES OFF");
+        set_status("LIGHTS OFF");
     }
 }
 
@@ -1172,7 +1172,7 @@ void AppMusicPlayer::track_finished()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                     Robot: Servos, LEDs y Persistencia                     */
+/*                     Robot: Servos, LEDs & Persistence                      */
 /* -------------------------------------------------------------------------- */
 
 void AppMusicPlayer::load_saved_prefs()
@@ -1297,7 +1297,7 @@ std::string AppMusicPlayer::audio_state_summary() const
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            Construcción UI LVGL                            */
+/*                             LVGL UI Builder                                */
 /* -------------------------------------------------------------------------- */
 
 void AppMusicPlayer::build_ui()
@@ -1306,13 +1306,13 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_style_bg_color(_root_screen, lv_color_hex(COL_BG), 0);
     lv_obj_remove_flag(_root_screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* ========================== 1. VISTA PRINCIPAL ========================= */
+    /* ============================ 1. MAIN VIEW ============================= */
     _main_cont = lv_obj_create(_root_screen);
     lv_obj_set_size(_main_cont, W, H);
     lv_obj_set_pos(_main_cont, 0, 0);
     style_flat_box(_main_cont, COL_BG, 0);
 
-    // Título arriba a la izquierda (tocar abre la lista)
+    // Track title top-left (tap to open playlist)
     _lbl_title = lv_label_create(_main_cont);
     lv_obj_set_pos(_lbl_title, 10, TITLE_Y);
     lv_obj_set_size(_lbl_title, 232, 20);
@@ -1328,7 +1328,7 @@ void AppMusicPlayer::build_ui()
         },
         LV_EVENT_CLICKED, this);
 
-    // Zona de batería arriba a la derecha
+    // Battery widget top-right (tap for audio/battery diagnostic)
     _batt_cont = lv_obj_create(_main_cont);
     lv_obj_set_pos(_batt_cont, 244, 2);
     lv_obj_set_size(_batt_cont, 72, 20);
@@ -1369,7 +1369,7 @@ void AppMusicPlayer::build_ui()
     style_flat_box(_batt_tip, COL_DIM, 1);
     lv_obj_remove_flag(_batt_tip, LV_OBJ_FLAG_CLICKABLE);
 
-    // Barra de progreso táctil
+    // Touch-seekable progress bar
     _bar_bg = lv_obj_create(_main_cont);
     lv_obj_set_pos(_bar_bg, BAR_X, BAR_Y);
     lv_obj_set_size(_bar_bg, BAR_W, BAR_H);
@@ -1398,7 +1398,7 @@ void AppMusicPlayer::build_ui()
     style_flat_box(_bar_fill, COL_ACCENT, 3);
     lv_obj_remove_flag(_bar_fill, LV_OBJ_FLAG_CLICKABLE);
 
-    // Tiempos y número de pista
+    // Elapsed time, track counter, and total duration
     _lbl_elapsed = lv_label_create(_main_cont);
     lv_obj_set_pos(_lbl_elapsed, 10, TIME_Y);
     lv_obj_set_style_text_font(_lbl_elapsed, &lv_font_montserrat_12, 0);
@@ -1418,7 +1418,7 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_style_text_font(_lbl_duration, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(_lbl_duration, lv_color_hex(COL_DIM), 0);
 
-    // Volumen / versión y estado
+    // Volume / version and playback status
     _lbl_vol_ver = lv_label_create(_main_cont);
     lv_obj_set_pos(_lbl_vol_ver, 10, STATUS_Y);
     lv_obj_set_style_text_font(_lbl_vol_ver, &lv_font_montserrat_12, 0);
@@ -1432,7 +1432,7 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_style_text_font(_lbl_status, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(_lbl_status, lv_color_hex(COL_DIM), 0);
 
-    // Escenario central: Carita clásica de StackChan animada + notas flotantes laterales
+    // Center stage: animated classic StackChan face + floating musical notes
     _stage_cont = lv_obj_create(_main_cont);
     lv_obj_set_pos(_stage_cont, STAGE_X, STAGE_Y);
     lv_obj_set_size(_stage_cont, STAGE_W, STAGE_H);
@@ -1476,7 +1476,7 @@ void AppMusicPlayer::build_ui()
     style_flat_box(_face_mouth, COL_WHITE, 4);
     lv_obj_remove_flag(_face_mouth, LV_OBJ_FLAG_CLICKABLE);
 
-    // 4 notas musicales flotantes a izquierda y derecha de la carita
+    // 4 floating musical notes flanking the face
     const int note_xs[4] = {20, 54, 232, 266};
     for (int i = 0; i < 4; ++i) {
         lv_obj_t* n   = lv_label_create(_stage_cont);
@@ -1487,7 +1487,7 @@ void AppMusicPlayer::build_ui()
         lv_obj_set_pos(n, note_xs[i], 52);
     }
 
-    // Fila inferior de 6 botones: VOL- | << | > | >> | VOL+ | ⚙
+    // Bottom 6-button bar: VOL- | << | > | >> | VOL+ | Settings
     for (int i = 0; i < 6; ++i) {
         const char* nm     = MAIN_BTN_NAMES[i];
         _main_btns[i].name = nm;
@@ -1546,7 +1546,7 @@ void AppMusicPlayer::build_ui()
             LV_EVENT_CLICKED, this);
     }
 
-    /* ====================== 2. VISTA CONFIGURACIÓN ========================= */
+    /* =========================== 2. SETTINGS VIEW ========================== */
     _settings_cont = lv_obj_create(_root_screen);
     lv_obj_set_size(_settings_cont, W, H);
     lv_obj_set_pos(_settings_cont, 0, 0);
@@ -1558,7 +1558,7 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_size(lbl_cfg_hdr, 220, 24);
     lv_obj_set_style_text_font(lbl_cfg_hdr, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(lbl_cfg_hdr, lv_color_hex(COL_TEXT), 0);
-    lv_label_set_text(lbl_cfg_hdr, "< CONFIGURACION");
+    lv_label_set_text(lbl_cfg_hdr, "< SETTINGS");
     lv_obj_add_flag(lbl_cfg_hdr, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(
         lbl_cfg_hdr,
@@ -1625,7 +1625,7 @@ void AppMusicPlayer::build_ui()
             LV_EVENT_CLICKED, this);
     }
 
-    // Botón grande "VOLVER AL REPRODUCTOR" en la parte inferior de Settings
+    // Back button at the bottom of Settings
     lv_obj_t* btn_cfg_back = lv_button_create(_settings_cont);
     lv_obj_set_pos(btn_cfg_back, 60, 186);
     lv_obj_set_size(btn_cfg_back, 200, 38);
@@ -1634,7 +1634,7 @@ void AppMusicPlayer::build_ui()
     lv_obj_center(lbl_back);
     lv_obj_set_style_text_font(lbl_back, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(lbl_back, lv_color_hex(COL_WHITE), 0);
-    lv_label_set_text(lbl_back, "VOLVER");
+    lv_label_set_text(lbl_back, "BACK");
     lv_obj_add_event_cb(
         btn_cfg_back,
         [](lv_event_t* e) {
@@ -1643,7 +1643,7 @@ void AppMusicPlayer::build_ui()
         },
         LV_EVENT_CLICKED, this);
 
-    /* ============================ 3. VISTA LISTA =========================== */
+    /* =========================== 3. PLAYLIST VIEW ========================== */
     _list_cont = lv_obj_create(_root_screen);
     lv_obj_set_size(_list_cont, W, H);
     lv_obj_set_pos(_list_cont, 0, 0);
@@ -1737,7 +1737,7 @@ void AppMusicPlayer::build_ui()
         return b;
     };
 
-    _btn_page_prev = make_list_footer_btn(8, 72, "PAG -");
+    _btn_page_prev = make_list_footer_btn(8, 72, "PREV");
     lv_obj_add_event_cb(
         _btn_page_prev,
         [](lv_event_t* e) {
@@ -1749,7 +1749,7 @@ void AppMusicPlayer::build_ui()
         },
         LV_EVENT_CLICKED, this);
 
-    _btn_page_next = make_list_footer_btn(85, 72, "PAG +");
+    _btn_page_next = make_list_footer_btn(85, 72, "NEXT");
     lv_obj_add_event_cb(
         _btn_page_next,
         [](lv_event_t* e) {
@@ -1762,7 +1762,7 @@ void AppMusicPlayer::build_ui()
         },
         LV_EVENT_CLICKED, this);
 
-    _btn_open_head = make_list_footer_btn(162, 76, "CONFIG");
+    _btn_open_head = make_list_footer_btn(162, 76, "SETUP");
     lv_obj_add_event_cb(
         _btn_open_head,
         [](lv_event_t* e) {
@@ -1780,7 +1780,7 @@ void AppMusicPlayer::build_ui()
         },
         LV_EVENT_CLICKED, this);
 
-    /* ====================== 4. VISTA AJUSTE DE CABEZA ====================== */
+    /* =========================== 4. HEAD VIEW ============================== */
     _head_cont = lv_obj_create(_root_screen);
     lv_obj_set_size(_head_cont, W, H);
     lv_obj_set_pos(_head_cont, 0, 0);
@@ -1792,7 +1792,7 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_size(_lbl_head_hdr, 240, 22);
     lv_obj_set_style_text_font(_lbl_head_hdr, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(_lbl_head_hdr, lv_color_hex(COL_TEXT), 0);
-    lv_label_set_text(_lbl_head_hdr, "< AJUSTE DE CABEZA");
+    lv_label_set_text(_lbl_head_hdr, "< HEAD CALIBRATION");
     lv_obj_add_flag(_lbl_head_hdr, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(
         _lbl_head_hdr,
@@ -1811,13 +1811,13 @@ void AppMusicPlayer::build_ui()
     lv_obj_set_pos(lbl_obj_cap, 56, 56);
     lv_obj_set_style_text_font(lbl_obj_cap, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(lbl_obj_cap, lv_color_hex(COL_DIM), 0);
-    lv_label_set_text(lbl_obj_cap, "OBJETIVO");
+    lv_label_set_text(lbl_obj_cap, "TARGET");
 
     lv_obj_t* lbl_real_cap = lv_label_create(_head_cont);
     lv_obj_set_pos(lbl_real_cap, 206, 56);
     lv_obj_set_style_text_font(lbl_real_cap, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(lbl_real_cap, lv_color_hex(COL_DIM), 0);
-    lv_label_set_text(lbl_real_cap, "REAL");
+    lv_label_set_text(lbl_real_cap, "ACTUAL");
 
     _lbl_head_target = lv_label_create(_head_cont);
     lv_obj_set_pos(_lbl_head_target, 64, 78);
@@ -1875,13 +1875,13 @@ void AppMusicPlayer::build_ui()
     lv_obj_center(lbl_save);
     lv_obj_set_style_text_font(lbl_save, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(lbl_save, lv_color_hex(COL_WHITE), 0);
-    lv_label_set_text(lbl_save, "GUARDAR");
+    lv_label_set_text(lbl_save, "SAVE");
     lv_obj_add_event_cb(
         _btn_head_save,
         [](lv_event_t* e) {
             auto* self = static_cast<AppMusicPlayer*>(lv_event_get_user_data(e));
             self->save_head_cfg();
-            self->set_status("CABEZA GUARDADA");
+            self->set_status("HEAD SAVED");
             self->switch_mode(ScreenMode::Main);
         },
         LV_EVENT_CLICKED, this);
@@ -1958,7 +1958,7 @@ void AppMusicPlayer::open_list()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         Actualización de Vistas UI                         */
+/*                             UI View Updates                                */
 /* -------------------------------------------------------------------------- */
 
 void AppMusicPlayer::refresh_battery_ui()
@@ -2064,11 +2064,11 @@ void AppMusicPlayer::refresh_settings_ui()
         } else if (std::strcmp(nm, "head") == 0) {
             bg_col  = COL_CARD_HI;
             txt_col = COL_TEXT;
-            text    = "CABEZA";
+            text    = "HEAD";
         } else if (std::strcmp(nm, "menu") == 0) {
             bg_col  = COL_CARD_HI;
             txt_col = COL_YELLOW;
-            text    = "SALIR";
+            text    = "EXIT";
         }
 
         lv_obj_set_style_bg_color(btn, lv_color_hex(bg_col), 0);
@@ -2094,7 +2094,7 @@ void AppMusicPlayer::refresh_main_ui(uint32_t now)
         lv_label_set_text(_lbl_track_num, tnum);
     } else {
         lv_obj_set_style_text_color(_lbl_title, lv_color_hex(COL_RED), 0);
-        lv_label_set_text(_lbl_title, "SIN MUSICA");
+        lv_label_set_text(_lbl_title, "NO MUSIC");
         lv_label_set_text(_lbl_track_num, "");
     }
 
@@ -2113,7 +2113,7 @@ void AppMusicPlayer::refresh_main_ui(uint32_t now)
     std::string vol_line = "VOL " + std::to_string(_volume) + " " + APP_VERSION;
     lv_label_set_text(_lbl_vol_ver, vol_line.c_str());
 
-    std::string status_line = std::string(_playing.load() ? "SONANDO" : "PAUSA") + "  LOOP " + LOOP_NAMES[_loop_mode];
+    std::string status_line = std::string(_playing.load() ? "PLAYING" : "PAUSED") + "  LOOP " + LOOP_NAMES[_loop_mode];
     uint32_t status_col     = COL_DIM;
     if (!_status_msg.empty()) {
         status_line = _status_msg;
@@ -2136,7 +2136,7 @@ void AppMusicPlayer::refresh_avatar_anim(uint32_t now)
 
     bool is_playing = _playing.load();
 
-    // Animar la carita clásica de StackChan al compás de la música
+    // Animate the classic StackChan face on the beat
     int offset_y = 0;
     int offset_x = 0;
     if (is_playing) {
@@ -2165,7 +2165,7 @@ void AppMusicPlayer::refresh_avatar_anim(uint32_t now)
     }
     lv_obj_align(_face_card, LV_ALIGN_CENTER, offset_x, offset_y);
 
-    // Notas musicales flotantes a los lados
+    // Floating musical notes on the sides
     const int base_xs[4] = {18, 54, 232, 268};
     for (int i = 0; i < 4; ++i) {
         if (!_note_lbls[i]) {
@@ -2195,7 +2195,7 @@ void AppMusicPlayer::refresh_list_ui()
     _list_page      = std::clamp(_list_page, 0, pages - 1);
 
     char cbuf[48];
-    std::snprintf(cbuf, sizeof(cbuf), "%d PISTAS  %d/%d", track_count, _list_page + 1, pages);
+    std::snprintf(cbuf, sizeof(cbuf), "%d TRACKS  %d/%d", track_count, _list_page + 1, pages);
     lv_label_set_text(_lbl_list_count, cbuf);
 
     for (int i = 0; i < PAGE_ROWS; ++i) {
@@ -2216,14 +2216,14 @@ void AppMusicPlayer::refresh_list_ui()
         lv_obj_remove_flag(_lbl_list_empty1, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(_lbl_list_empty2, LV_OBJ_FLAG_HIDDEN);
         if (!_sd_mounted) {
-            lv_label_set_text(_lbl_list_empty1, "SD NO MONTADA");
-            lv_label_set_text(_lbl_list_empty2, "FORMATEA EN FAT32");
+            lv_label_set_text(_lbl_list_empty1, "SD NOT MOUNTED");
+            lv_label_set_text(_lbl_list_empty2, "FORMAT AS FAT32");
         } else if (_scan_error) {
-            lv_label_set_text(_lbl_list_empty1, "ERROR AL LEER SD");
-            lv_label_set_text(_lbl_list_empty2, "DEMASIADOS ARCHIVOS?");
+            lv_label_set_text(_lbl_list_empty1, "SD READ ERROR");
+            lv_label_set_text(_lbl_list_empty2, "TOO MANY FILES?");
         } else {
-            lv_label_set_text(_lbl_list_empty1, "SIN WAV/MP3 EN /SD");
-            lv_label_set_text(_lbl_list_empty2, "REVISA LA CARPETA RAIZ");
+            lv_label_set_text(_lbl_list_empty1, "NO WAV/MP3 IN /SD");
+            lv_label_set_text(_lbl_list_empty2, "CHECK ROOT FOLDER");
         }
     } else {
         lv_obj_add_flag(_lbl_list_empty1, LV_OBJ_FLAG_HIDDEN);
@@ -2232,7 +2232,7 @@ void AppMusicPlayer::refresh_list_ui()
 
     uint32_t free_kb = static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) / 1024);
     char ibuf[96];
-    std::snprintf(ibuf, sizeof(ibuf), "%d ENT  %d AUDIO  M:%uK", _scan_entries, track_count,
+    std::snprintf(ibuf, sizeof(ibuf), "%d ITEMS  %d AUDIO  M:%uK", _scan_entries, track_count,
                   static_cast<unsigned>(free_kb));
     std::string info_str(ibuf);
     if (_scan_other_n > 0) {
