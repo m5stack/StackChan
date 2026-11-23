@@ -1,19 +1,3 @@
-## MicroSD Music Player (`MUSIC`) — Custom Firmware Feature
-
-This fork adds a native **MicroSD Music Player (`MUSIC`)** app integrated directly into the StackChan ESP-IDF v6.1 firmware launcher alongside `AI.AGENT`, `AVATAR`, `DANCE`, and `SETUP`:
-
-- **Offline audio playback**: Plays `.wav` (PCM 8/16-bit, mono/stereo) and `.mp3` files from a FAT32 microSD card mounted at `/sd` (recursive scan up to 3 levels deep, PSRAM-backed track index supporting 1,000+ songs).
-- **Minimalist touch UI**: Top status header (track title, battery indicator, touch-seekable progress bar, elapsed/total time, volume), animated StackChan face with floating musical notes, and a clean 6-button control bar (`VOL-`, `Prev`, `Play/Pause`, `Next`, `VOL+`, `Settings`).
-- **Dedicated Settings & Playlist views**: Configure `LOOP` (`OFF` / `1` / `ALL`), `SHUFFLE`, `LIGHTS` (12 RGB LEDs synced to the beat), `MOVE` (rhythm head sway), browse the paginated `PLAYLIST`, and calibrate the neutral `HEAD` angle.
-- **Persistent preferences**: Volume, playback toggles, head calibration, and the last played track are automatically saved to NVS and restored on next launch.
-- **Menu visibility toggle**: Can be shown or hidden from `SETUP -> Apps -> App visibility`.
-
-> **Quick start**: Format a microSD card as FAT32, copy your `.mp3` or `.wav` files to the card, insert it into CoreS3, build & flash `firmware/` with ESP-IDF v6.1 (see [firmware/README.md](firmware/README.md)), and open **MUSIC** from the launcher.
-
-> **Transparency note**: This feature was built through AI-assisted development (*vibe coding*) and iteratively tested on physical StackChan hardware (M5Stack CoreS3, ESP-IDF v6.1). Code reviews, suggestions, and improvements from the community are very welcome.
-
-----
-
 # StackChan Open-Source
 
 <img src="https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/K151_stack_chan_main_pictures_01.webp" width="60%">
@@ -31,6 +15,16 @@ Update of this repo could be a little late than the released firmware and mobile
 The **robot body**, connected to the main unit, includes a USB-C interface for power and data, a 550 mAh battery, two feedback servos (360-degree continuous rotation on the horizontal axis and 90-degree movement on the vertical axis), two rows totaling 12 RGB LEDs, infrared transmitter and receiver, a three-zone touch panel, and a full-featured NFC module. 
 
 The **factory firmware** is feature-rich, including an AI Agent, lively and expressive animations, ESP-NOW wireless remote control, and online app downloads. It can connect to a mobile app for video viewing, remote avatar control, and more, and also supports online updates (OTA). The product also supports programming via Arduino, UiFlow2, and other methods, and can connect to various expansion units in the M5Stack ecosystem, making it easy to implement a wide range of custom functions. 
+
+### MicroSD Music Player (`MUSIC`)
+
+The firmware also includes a built-in **MicroSD Music Player (`MUSIC`)** app integrated into the launcher menu alongside `AI.AGENT`, `AVATAR`, `DANCE`, and `SETUP`:
+
+- **Offline audio playback**: Plays `.wav` (PCM 8/16-bit, mono/stereo) and `.mp3` files from a FAT32 microSD card mounted at `/sd` (recursive scan up to 3 levels deep, PSRAM-backed track index supporting 1,000+ songs).
+- **Touch UI**: Top status header (track title, battery indicator, touch-seekable progress bar, elapsed/total time, volume), animated StackChan face with floating musical notes, and a 6-button control bar (`VOL-`, `Prev`, `Play/Pause`, `Next`, `VOL+`, `Settings`).
+- **Settings, Playlist & Head calibration**: Configure `LOOP` (`OFF` / `1` / `ALL`), `SHUFFLE`, `LIGHTS` (12 RGB LEDs synced to the beat), `MOVE` (rhythm head sway), browse the paginated `PLAYLIST`, and calibrate the neutral `HEAD` angle.
+- **Persistent preferences**: Volume, playback toggles, head calibration, and the last played track are automatically saved to NVS and restored on next launch.
+- **Menu visibility toggle**: Can be shown or hidden from `SETUP -> Apps -> App visibility`.
 
 > ⚠️ Do not forcibly rotate any movable parts connected to the motors by hand when you are unsure whether the motors are powered and under control, as this may cause hardware damage. 
 
