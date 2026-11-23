@@ -16,6 +16,16 @@ The **robot body**, connected to the main unit, includes a USB-C interface for p
 
 The **factory firmware** is feature-rich, including an AI Agent, lively and expressive animations, ESP-NOW wireless remote control, and online app downloads. It can connect to a mobile app for video viewing, remote avatar control, and more, and also supports online updates (OTA). The product also supports programming via Arduino, UiFlow2, and other methods, and can connect to various expansion units in the M5Stack ecosystem, making it easy to implement a wide range of custom functions. 
 
+### MicroSD Music Player (`MUSIC`)
+
+This repository includes a built-in **MicroSD Music Player** app integrated directly into the StackChan launcher menu alongside `AI.AGENT`, `AVATAR`, `DANCE`, and `SETUP`:
+
+- **Audio playback**: Plays `.wav` (PCM 8/16-bit, mono/stereo) and `.mp3` files from a FAT32 microSD card mounted at `/sd` (recursive scan up to 3 levels deep, PSRAM-backed track index supporting 1,000+ songs).
+- **Minimalist touch UI**: Top status header (track title, battery indicator, touch-seekable progress bar, elapsed/total time, volume), animated StackChan face with floating musical notes, and a clean 6-button control bar (`VOL-`, `Prev`, `Play/Pause`, `Next`, `VOL+`, `Settings`).
+- **Dedicated Settings & Playlist views**: Configure `LOOP` (`OFF` / `1` / `ALL`), `SHUFFLE`, `LIGHTS` (12 RGB LEDs synced to the beat), `MOVE` (rhythm head sway), browse the paginated `PLAYLIST`, and calibrate the neutral `HEAD` angle.
+- **Persistent preferences**: Volume, playback toggles, head calibration, and the last played track are automatically saved to NVS and restored on next launch.
+- **Menu visibility toggle**: Can be shown or hidden from `SETUP -> Apps -> App visibility`.
+
 > ⚠️ Do not forcibly rotate any movable parts connected to the motors by hand when you are unsure whether the motors are powered and under control, as this may cause hardware damage. 
 
 - Purchase link: [M5Stack Official Store](https://shop.m5stack.com/products/stackchan-kawaii-co-created-open-source-ai-desktop-robot) | [淘宝 Taobao](https://item.taobao.com/item.htm?id=1042238294510)

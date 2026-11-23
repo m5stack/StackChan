@@ -32,3 +32,14 @@ ctest --test-dir build-host-tests --output-on-failure
 ```bash
 idf.py flash
 ```
+
+## Built-in Apps
+
+- `AI.AGENT` – Xiaozhi voice AI assistant
+- `AVATAR` – Remote avatar / WebSocket / video call mode
+- `ESPNOW.REMOTE` – ESP-NOW wireless controller
+- `APP.CENTER` – Online firmware/app launcher
+- `EZDATA` – EzData cloud integration
+- `DANCE` – BLE dance controller
+- `MUSIC` – Offline microSD Music Player (`.wav` & `.mp3` from `/sd`, rhythm RGB LEDs & servo sway, NVS-persisted settings and last track)
+- `SETUP` – Device settings, hardware tests, and app visibility toggles
