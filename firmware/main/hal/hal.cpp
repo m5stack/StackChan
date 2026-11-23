@@ -151,11 +151,11 @@ static void _stackchan_update_task(void* param)
 
         tools::update_reminders();
 
-        LvglLockGuard lock;
-
         if (!hal_bridge::is_xiaozhi_idle()) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(80));
         }
+
+        LvglLockGuard lock;
 
         GetStackChan().update();
 
