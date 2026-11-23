@@ -10,6 +10,8 @@ This fork adds a native **MicroSD Music Player (`MUSIC`)** app integrated direct
 
 > **Quick start**: Format a microSD card as FAT32, copy your `.mp3` or `.wav` files to the card, insert it into CoreS3, build & flash `firmware/` with ESP-IDF v6.1 (see [firmware/README.md](firmware/README.md)), and open **MUSIC** from the launcher.
 
+> **Transparency note**: This feature was built through AI-assisted development (*vibe coding*) and iteratively tested on physical StackChan hardware (M5Stack CoreS3, ESP-IDF v6.1). Code reviews, suggestions, and improvements from the community are very welcome.
+
 ----
 
 # StackChan Open-Source
