@@ -1,5 +1,5 @@
 diff --git a/main/application.cc b/main/application.cc
-index 31de205..50096d8 100644
+index 31de205..93f6279 100644
 --- a/main/application.cc
 +++ b/main/application.cc
 @@ -1,4 +1,5 @@
@@ -39,7 +39,33 @@ index 31de205..50096d8 100644
          }
  
          // This will block the loop until the activation is done or timeout
-@@ -725,30 +730,6 @@ void Application::InitializeProtocol() {
+@@ -535,7 +540,12 @@ void Application::InitializeProtocol() {
+ 
+     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
+ 
+-    if (ota_->HasMqttConfig()) {
++#ifdef CONFIG_STACKCHAN_AI_AUDIO_TRIAL
++    const bool prefer_websocket = ota_->HasWebsocketConfig();
++#else
++    constexpr bool prefer_websocket = false;
++#endif
++    if (ota_->HasMqttConfig() && !prefer_websocket) {
+         protocol_ = std::make_unique<MqttProtocol>();
+     } else if (ota_->HasWebsocketConfig()) {
+         protocol_ = std::make_unique<WebsocketProtocol>();
+@@ -551,9 +561,9 @@ void Application::InitializeProtocol() {
+         xEventGroupSetBits(event_group_, MAIN_EVENT_ERROR);
+     });
+ 
+-    protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
++    protocol_->OnIncomingAudio([this, prefer_websocket](std::unique_ptr<AudioStreamPacket> packet) {
+         if (GetDeviceState() == kDeviceStateSpeaking) {
+-            audio_service_.PushPacketToDecodeQueue(std::move(packet));
++            audio_service_.PushPacketToDecodeQueue(std::move(packet), prefer_websocket);
+         }
+     });
+ 
+@@ -725,30 +735,6 @@ void Application::InitializeProtocol() {
      protocol_->Start();
  }
  
@@ -70,7 +96,7 @@ index 31de205..50096d8 100644
  void Application::Alert(const char* status, const char* message, const char* emotion,
                          const std::string_view& sound) {
      ESP_LOGW(TAG, "Alert [%s] %s: %s", emotion, status, message);
-@@ -833,6 +814,7 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
+@@ -833,6 +819,7 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
          if (!protocol_->OpenAudioChannel()) {
              // Return to idle so the device is not stuck in the connecting
              // state (not every failure path reports a network error)
@@ -78,7 +104,7 @@ index 31de205..50096d8 100644
              SetDeviceState(kDeviceStateIdle);
              return;
          }
-@@ -970,6 +952,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
+@@ -970,6 +957,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
              // Return to idle so the device is not stuck in the connecting
              // state (not every failure path reports a network error), and
              // wake word detection is re-enabled by the idle state handler.
@@ -440,7 +466,7 @@ index 7ee973c..8de99db 100644
      /**
       * WiFi connection timeout callback
 diff --git a/main/boards/m5stack/core-s3/cores3_audio_codec.cc b/main/boards/m5stack/core-s3/cores3_audio_codec.cc
-index 84c4af6..97339c3 100644
+index 84c4af6..ad5c550 100644
 --- a/main/boards/m5stack/core-s3/cores3_audio_codec.cc
 +++ b/main/boards/m5stack/core-s3/cores3_audio_codec.cc
 @@ -1,20 +1,24 @@
@@ -473,7 +499,19 @@ index 84c4af6..97339c3 100644
  
      CreateDuplexChannels(mclk, bclk, ws, dout, din);
  
-@@ -194,7 +198,7 @@ void CoreS3AudioCodec::EnableInput(bool enable) {
+@@ -98,7 +102,11 @@ void CoreS3AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
+     i2s_chan_config_t chan_cfg = {
+         .id = I2S_NUM_0,
+         .role = I2S_ROLE_MASTER,
++#ifdef CONFIG_STACKCHAN_AI_AUDIO_TRIAL
++        .dma_desc_num = 8,  // 240 frames at 24 kHz per descriptor.
++#else
+         .dma_desc_num = AUDIO_CODEC_DMA_DESC_NUM,
++#endif
+         .dma_frame_num = AUDIO_CODEC_DMA_FRAME_NUM,
+         .auto_clear_after_cb = true,
+         .auto_clear_before_cb = false,
+@@ -194,7 +202,7 @@ void CoreS3AudioCodec::EnableInput(bool enable) {
      if (enable) {
          esp_codec_dev_sample_info_t fs = {
              .bits_per_sample = 16,
@@ -482,7 +520,7 @@ index 84c4af6..97339c3 100644
              .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
              .sample_rate = (uint32_t)output_sample_rate_,
              .mclk_multiple = 0,
-@@ -215,9 +219,9 @@ void CoreS3AudioCodec::EnableOutput(bool enable) {
+@@ -215,9 +223,9 @@ void CoreS3AudioCodec::EnableOutput(bool enable) {
          return;
      }
      if (enable) {
@@ -494,7 +532,7 @@ index 84c4af6..97339c3 100644
              .channel = 1,
              .channel_mask = 0,
              .sample_rate = (uint32_t)output_sample_rate_,
-@@ -239,8 +243,24 @@ int CoreS3AudioCodec::Read(int16_t* dest, int samples) {
+@@ -239,8 +247,24 @@ int CoreS3AudioCodec::Read(int16_t* dest, int samples) {
  }
  
  int CoreS3AudioCodec::Write(const int16_t* data, int samples) {
