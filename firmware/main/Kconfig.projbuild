@@ -13,6 +13,16 @@ endmenu
 
 menu "Xiaozhi Assistant"
 
+config STACKCHAN_AI_AUDIO_TRIAL
+    bool "Try WebSocket playback and 80 ms I2S buffers on StackChan"
+    depends on BOARD_TYPE_M5STACK_STACK_CHAN
+    default n
+    help
+        Prefer WebSocket when offered and wait for room in its audio decode
+        queue. MQTT-only sessions keep their non-blocking receive callback.
+        Increase each CoreS3 I2S ring from six to eight DMA descriptors.
+        The larger rings use additional internal memory.
+
 config OTA_URL
     string "Default OTA URL"
     default "https://api.tenclass.net/xiaozhi/ota/"
